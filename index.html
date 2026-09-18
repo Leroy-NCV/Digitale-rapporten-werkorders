@@ -46,14 +46,18 @@ const KOP_COLUMN_MAP = {
 function kopToRow(kop, werkorderId) {
   const row = { werkorder_id: werkorderId, nummer: kop.nummer };
   KOP_FIELDS.forEach((f) => {
-    row[KOP_COLUMN_MAP[f] || f] = kop[f];
+    let value = kop[f];
+    if (f === "werkuren" && value === "") value = null;
+    row[KOP_COLUMN_MAP[f] || f] = value;
   });
   return row;
 }
 function rowToKop(row) {
   const kop = { nummer: row.nummer, id: row.id };
   KOP_FIELDS.forEach((f) => {
-    kop[f] = row[KOP_COLUMN_MAP[f] || f];
+    let value = row[KOP_COLUMN_MAP[f] || f];
+    if (f === "werkuren" && (value === null || value === void 0)) value = "";
+    kop[f] = value;
   });
   return kop;
 }
