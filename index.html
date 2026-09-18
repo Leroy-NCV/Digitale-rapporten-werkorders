@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<title>Werkorders - Cilinderkop Overhaul</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  html, body, #root { height: 100%; margin: 0; }
+  body { font-family: Inter, system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+
+
+
+// ---------- Supabase (REST/PostgREST, no supabase-js dependency needed) ----------
+const SUPABASE_URL = "https://aoqvxgfpqinzpauukfpw.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Ij1vK5VhIQH14LW-5YQxtw_eO9fQ6Q_";
+
+async function sb(path, options = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: options.prefer || "return=representation",
+      ...(options.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Supabase ${options.method || "GET"} ${path} failed: ${res.status} ${text}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+const KOP_FIELDS = ["disassembly", "seatRing", "valve", "valveStem", "valveGuide", "valveChecks", "assembly", "werkuren", "aanvullendeInfo"];
+const KOP_COLUMN_MAP = {
+  seatRing: "seat_ring",
+  valveStem: "valve_stem",
+  valveGuide: "valve_guide",
+  valveChecks: "valve_checks",
+  aanvullendeInfo: "aanvullende_info",
+};
+
+function kopToRow(kop, werkorderId) {
+  const row = { werkorder_id: werkorderId, nummer: kop.nummer };
+  KOP_FIELDS.forEach((f) => {
+    row[KOP_COLUMN_MAP[f] || f] = kop[f];
+  });
+  return row;
+}
+
+function rowToKop(row) {
+  const kop = { nummer: row.nummer, id: row.id };
+  KOP_FIELDS.forEach((f) => {
+    kop[f] = row[KOP_COLUMN_MAP[f] || f];
+  });
+  return kop;
+}
+
+// ---------- Template definitions (cilinderkop klustype) ----------
+// In a real system these live in a "rapportsjablonen" table per klustype/motortype.
+// Defaults below are pre-filled from the Yanmar 8EY26L example so the auto-reject
+// calculation has something real to compare against; every number stays editable.
+
+const DISASSEMBLY_CHECKLIST = [
+  "Cilinderkop genummerd",
+  "Injector aanwezig",
+  "Start air valve aanwezig",
+  "Kleppen compleet",
+  "Studs compleet",
+  "Grof vuil afgeschraapt",
+  "Cilinderkop en onderdelen gewassen",
+  "Ultrasoon gereinigd",
+  "Afgeperst",
+  "Gepolijst",
+  "Dye-check verbrandingsoppervlak",
+  "Visuele controle cilinderkop",
+  "Visuele controle zittingring",
+];
+
+const SEAT_RING_ROWS = [
+  { id: "S1", label: "S1 (inlaat)", limit: 88, direction: "max" },
+  { id: "S2", label: "S2 (inlaat)", limit: 88, direction: "max" },
+  { id: "E1", label: "E1 (uitlaat)", limit: 86, direction: "max" },
+  { id: "E2", label: "E2 (uitlaat)", limit: 86, direction: "max" },
+];
+
+const VALVE_ROWS = [
+  { id: "S1", label: "S1 (inlaat)", limitQ: 7.1, limitR: 7, direction: "min" },
+  { id: "S2", label: "S2 (inlaat)", limitQ: 7.1, limitR: 7, direction: "min" },
+  { id: "E1", label: "E1 (uitlaat)", limitQ: 4, limitR: 10.9, direction: "min" },
+  { id: "E2", label: "E2 (uitlaat)", limitQ: 4, limitR: 10.9, direction: "min" },
+];
+
+const VALVE_STEM_ROWS = [
+  { id: "S1", label: "S1 (inlaat)", nominal: 19, limit: -0.32, direction: "min" },
+  { id: "S2", label: "S2 (inlaat)", nominal: 19, limit: -0.32, direction: "min" },
+  { id: "E1", label: "E1 (uitlaat)", nominal: 19, limit: -0.35, direction: "min" },
+  { id: "E2", label: "E2 (uitlaat)", nominal: 19, limit: -0.35, direction: "min" },
+];
+
+const VALVE_GUIDE_ROWS = [
+  { id: "S1", label: "S1 (inlaat)", nominal: 19, limit: 0.26, direction: "max" },
+  { id: "S2", label: "S2 (inlaat)", nominal: 19, limit: 0.26, direction: "max" },
+  { id: "E1", label: "E1 (uitlaat)", nominal: 19, limit: 0.28, direction: "max" },
+  { id: "E2", label: "E2 (uitlaat)", nominal: 19, limit: 0.28, direction: "max" },
+];
+
+const VALVE_CHECKS = ["Klepveren gecontroleerd", "Klepdraaiers gecontroleerd", "Kotters gecontroleerd"];
+
+const ASSEMBLY_CHECKLIST = [
+  "Nieuwe zittingringen geplaatst",
+  "Afgeperst",
+  "Nieuwe klepgeleiders geplaatst",
+  "Nieuwe seal lips geplaatst",
+  "Kleppen geplaatst",
+  "Kleppen geslepen",
+  "Klepveren, draaiers en kotters geplaatst",
+  "Rotatie klepdraaier getest",
+  "Studs gecontroleerd en gereinigd",
+  "Schroefdraad getapt",
+  "Studs geplaatst",
+  "Cilinderkop geschilderd",
+  "Start air valve gereviseerd, getest en geplaatst",
+  "Tectyl laag aangebracht",
+  "Klaargemaakt voor verzending",
+  "Benodigde documenten toegevoegd",
+];
+
+function emptyRows(rows) {
+  return rows.map((r) => ({ ...r, measured: "" }));
+}
+
+function makeCilinderkop(nummer) {
+  return {
+    nummer,
+    disassembly: DISASSEMBLY_CHECKLIST.map((label) => ({ label, result: "", remarks: "" })),
+    seatRing: emptyRows(SEAT_RING_ROWS),
+    valve: emptyRows(VALVE_ROWS).map((r) => ({ ...r, measuredQ: "", measuredR: "" })),
+    valveStem: emptyRows(VALVE_STEM_ROWS),
+    valveGuide: emptyRows(VALVE_GUIDE_ROWS),
+    valveChecks: VALVE_CHECKS.map((label) => ({ label, result: "", remarks: "" })),
+    assembly: ASSEMBLY_CHECKLIST.map((label) => ({ label, result: "", remarks: "" })),
+    werkuren: "",
+    aanvullendeInfo: "",
+  };
+}
+
+function isRejected(measured, limit, direction) {
+  if (measured === "" || measured === null || limit === "" || limit === null) return null;
+  const m = parseFloat(measured);
+  const l = parseFloat(limit);
+  if (isNaN(m) || isNaN(l)) return null;
+  return direction === "max" ? m > l : m < l;
+}
+
+// ---------- Small building blocks ----------
+
+function Field({ label, children }) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13, color: "#3a3f36" }}>
+      <span style={{ fontWeight: 600 }}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+const inputStyle = {
+  border: "1px solid #c7cabf",
+  borderRadius: 4,
+  padding: "10px 10px",
+  fontSize: 15,
+  background: "#fff",
+  color: "#1f231c",
+};
+
+function TextInput(props) {
+  return <input {...props} style={{ ...inputStyle, ...(props.style || {}) }} />;
+}
+
+function RejectBadge({ rejected }) {
+  if (rejected === null) return <span style={{ color: "#9a9d92", fontSize: 12 }}>—</span>;
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "3px 9px",
+        borderRadius: 3,
+        fontSize: 12,
+        fontWeight: 700,
+        letterSpacing: 0.3,
+        background: rejected ? "#d9483a" : "#3f7a4f",
+        color: "#fff",
+      }}
+    >
+      {rejected ? "AFGEKEURD" : "OK"}
+    </span>
+  );
+}
+
+function ChecklistTable({ rows, onChange }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {rows.map((row, i) => (
+        <div
+          key={i}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 130px 1fr",
+            gap: 10,
+            alignItems: "center",
+            padding: "8px 10px",
+            background: i % 2 ? "#f4f4ef" : "transparent",
+            borderRadius: 4,
+          }}
+        >
+          <span style={{ fontSize: 14, color: "#1f231c" }}>{row.label}</span>
+          <select
+            value={row.result}
+            onChange={(e) => onChange(i, { ...row, result: e.target.value })}
+            style={{ ...inputStyle, padding: "8px" }}
+          >
+            <option value="">—</option>
+            <option value="ja">Ja</option>
+            <option value="nee">Nee</option>
+            <option value="nvt">N.v.t.</option>
+          </select>
+          <TextInput
+            placeholder="Opmerking"
+            value={row.remarks}
+            onChange={(e) => onChange(i, { ...row, remarks: e.target.value })}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SeatRingTable({ rows, onChange }) {
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 100px 110px", gap: 10, fontSize: 12, fontWeight: 700, color: "#5b5f52", padding: "0 10px 6px" }}>
+        <span>Zitting</span>
+        <span>Gemeten (mm)</span>
+        <span>Limiet (mm)</span>
+        <span>Status</span>
+      </div>
+      {rows.map((row, i) => {
+        const rejected = isRejected(row.measured, row.limit, row.direction);
+        return (
+          <div key={row.id} style={{ display: "grid", gridTemplateColumns: "1fr 140px 100px 110px", gap: 10, alignItems: "center", padding: "8px 10px", background: i % 2 ? "#f4f4ef" : "transparent", borderRadius: 4 }}>
+            <span style={{ fontSize: 14 }}>{row.label}</span>
+            <TextInput type="number" step="0.01" value={row.measured} onChange={(e) => onChange(i, { ...row, measured: e.target.value })} />
+            <TextInput type="number" step="0.01" value={row.limit} onChange={(e) => onChange(i, { ...row, limit: e.target.value })} />
+            <RejectBadge rejected={rejected} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ValveTable({ rows, onChange }) {
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px 90px 90px 110px", gap: 8, fontSize: 12, fontWeight: 700, color: "#5b5f52", padding: "0 10px 6px" }}>
+        <span>Klep</span>
+        <span>Q gemeten</span>
+        <span>R gemeten</span>
+        <span>Limiet Q</span>
+        <span>Limiet R</span>
+        <span>Status</span>
+      </div>
+      {rows.map((row, i) => {
+        const rejQ = isRejected(row.measuredQ, row.limitQ, row.direction);
+        const rejR = isRejected(row.measuredR, row.limitR, row.direction);
+        const rejected = rejQ === null && rejR === null ? null : rejQ || rejR;
+        return (
+          <div key={row.id} style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px 90px 90px 110px", gap: 8, alignItems: "center", padding: "8px 10px", background: i % 2 ? "#f4f4ef" : "transparent", borderRadius: 4 }}>
+            <span style={{ fontSize: 14 }}>{row.label}</span>
+            <TextInput type="number" step="0.01" value={row.measuredQ} onChange={(e) => onChange(i, { ...row, measuredQ: e.target.value })} />
+            <TextInput type="number" step="0.01" value={row.measuredR} onChange={(e) => onChange(i, { ...row, measuredR: e.target.value })} />
+            <TextInput type="number" step="0.01" value={row.limitQ} onChange={(e) => onChange(i, { ...row, limitQ: e.target.value })} />
+            <TextInput type="number" step="0.01" value={row.limitR} onChange={(e) => onChange(i, { ...row, limitR: e.target.value })} />
+            <RejectBadge rejected={rejected} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ToleranceTable({ rows, onChange, title }) {
+  return (
+    <div>
+      <div style={{ fontWeight: 700, fontSize: 14, margin: "16px 0 6px", color: "#1f231c" }}>{title}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 90px 100px 110px", gap: 8, fontSize: 12, fontWeight: 700, color: "#5b5f52", padding: "0 10px 6px" }}>
+        <span>Positie</span>
+        <span>Gemeten (mm)</span>
+        <span>Nominaal</span>
+        <span>Limiet (afw.)</span>
+        <span>Status</span>
+      </div>
+      {rows.map((row, i) => {
+        const measured = row.measured === "" ? "" : parseFloat(row.measured) - row.nominal;
+        const rejected = isRejected(measured, row.limit, row.direction);
+        return (
+          <div key={row.id} style={{ display: "grid", gridTemplateColumns: "1fr 110px 90px 100px 110px", gap: 8, alignItems: "center", padding: "8px 10px", background: i % 2 ? "#f4f4ef" : "transparent", borderRadius: 4 }}>
+            <span style={{ fontSize: 14 }}>{row.label}</span>
+            <TextInput type="number" step="0.01" value={row.measured} onChange={(e) => onChange(i, { ...row, measured: e.target.value })} />
+            <span style={{ fontSize: 13, color: "#5b5f52" }}>{row.nominal}</span>
+            <TextInput type="number" step="0.01" value={row.limit} onChange={(e) => onChange(i, { ...row, limit: e.target.value })} />
+            <RejectBadge rejected={rejected} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------- Main app ----------
+
+function App() {
+  const [werkorder, setWerkorder] = useState(null);
+  const [draft, setDraft] = useState({
+    orderNummer: "",
+    schipKlant: "",
+    motortype: "Yanmar 8EY26L",
+    datum: new Date().toISOString().slice(0, 10),
+    monteur: "",
+    aantal: 6,
+  });
+  const [koppen, setKoppen] = useState([]);
+  const [activeKop, setActiveKop] = useState(0);
+  const [activePage, setActivePage] = useState(1);
+  const [openWerkorders, setOpenWerkorders] = useState([]);
+  const [loadError, setLoadError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const saveTimer = useRef(null);
+
+  useEffect(() => {
+    sb("werkorders?status=eq.open&select=*&order=created_at.desc")
+      .then(setOpenWerkorders)
+      .catch((e) => setLoadError(e.message));
+  }, [werkorder === null]);
+
+  async function startWerkorder() {
+    setLoadError("");
+    try {
+      const [created] = await sb("werkorders", {
+        method: "POST",
+        body: JSON.stringify({
+          order_nummer: draft.orderNummer,
+          schip_klant: draft.schipKlant,
+          motortype: draft.motortype,
+          datum: draft.datum,
+          monteur: draft.monteur,
+          aantal_koppen: Number(draft.aantal) || 1,
+        }),
+      });
+      const blanks = Array.from({ length: Number(draft.aantal) || 1 }, (_, i) => makeCilinderkop(i + 1));
+      const rows = await sb("cilinderkop_rapporten", {
+        method: "POST",
+        body: JSON.stringify(blanks.map((k) => kopToRow(k, created.id))),
+      });
+      setWerkorder({ ...draft, id: created.id });
+      setKoppen(rows.sort((a, b) => a.nummer - b.nummer).map(rowToKop));
+      setActiveKop(0);
+      setActivePage(1);
+    } catch (e) {
+      setLoadError(e.message);
+    }
+  }
+
+  async function openExisting(w) {
+    setLoadError("");
+    try {
+      const rows = await sb(`cilinderkop_rapporten?werkorder_id=eq.${w.id}&select=*&order=nummer.asc`);
+      setWerkorder({
+        id: w.id,
+        orderNummer: w.order_nummer,
+        schipKlant: w.schip_klant,
+        motortype: w.motortype,
+        datum: w.datum,
+        monteur: w.monteur,
+      });
+      setKoppen(rows.map(rowToKop));
+      setActiveKop(0);
+      setActivePage(1);
+    } catch (e) {
+      setLoadError(e.message);
+    }
+  }
+
+  async function markAfgerond() {
+    try {
+      await sb(`werkorders?id=eq.${werkorder.id}`, { method: "PATCH", body: JSON.stringify({ status: "afgerond" }), prefer: "return=minimal" });
+      setWerkorder(null);
+    } catch (e) {
+      setLoadError(e.message);
+    }
+  }
+
+  function scheduleSave(kop) {
+    setSaving(true);
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        const row = kopToRow(kop, werkorder.id);
+        delete row.werkorder_id;
+        delete row.nummer;
+        await sb(`cilinderkop_rapporten?id=eq.${kop.id}`, { method: "PATCH", body: JSON.stringify(row), prefer: "return=minimal" });
+      } catch (e) {
+        setLoadError(e.message);
+      } finally {
+        setSaving(false);
+      }
+    }, 700);
+  }
+
+  function updateKop(index, patch) {
+    setKoppen((prev) => {
+      const next = prev.map((k, i) => (i === index ? { ...k, ...patch } : k));
+      scheduleSave(next[index]);
+      return next;
+    });
+  }
+
+  function updateRow(field, i, value) {
+    setKoppen((prev) =>
+      prev.map((k, ki) => {
+        if (ki !== activeKop) return k;
+        const rows = [...k[field]];
+        rows[i] = value;
+        const updated = { ...k, [field]: rows };
+        scheduleSave(updated);
+        return updated;
+      })
+    );
+  }
+
+  function countRejected(kop) {
+    let n = 0;
+    kop.seatRing.forEach((r) => { if (isRejected(r.measured, r.limit, r.direction)) n++; });
+    kop.valve.forEach((r) => {
+      const rq = isRejected(r.measuredQ, r.limitQ, r.direction);
+      const rr = isRejected(r.measuredR, r.limitR, r.direction);
+      if (rq || rr) n++;
+    });
+    kop.valveStem.forEach((r) => {
+      const v = r.measured === "" ? "" : parseFloat(r.measured) - r.nominal;
+      if (isRejected(v, r.limit, r.direction)) n++;
+    });
+    kop.valveGuide.forEach((r) => {
+      const v = r.measured === "" ? "" : parseFloat(r.measured) - r.nominal;
+      if (isRejected(v, r.limit, r.direction)) n++;
+    });
+    return n;
+  }
+
+  const palette = { bg: "#f4f4ef", ink: "#1f231c", accent: "#c25a2c", panel: "#ffffff", line: "#dfe1d8" };
+
+  if (!werkorder) {
+    return (
+      <div style={{ minHeight: "100%", background: palette.bg, padding: 24, fontFamily: "'Inter', system-ui, sans-serif", color: palette.ink }}>
+        <div style={{ maxWidth: 520, margin: "0 auto" }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Werkorders — cilinderkop overhaul</h1>
+          <p style={{ fontSize: 13, color: "#5b5f52", marginBottom: 20 }}>Gegevens worden bewaard in Supabase (project: Digitaliseren werkplaats).</p>
+          {loadError && (
+            <div style={{ background: "#fbeae7", border: "1px solid #d9483a", color: "#8a2e22", borderRadius: 6, padding: 10, fontSize: 12, marginBottom: 14 }}>{loadError}</div>
+          )}
+
+          {openWerkorders.length > 0 && (
+            <div style={{ background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 16, marginBottom: 20 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Openstaande werkorders</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {openWerkorders.map((w) => (
+                  <button
+                    key={w.id}
+                    onClick={() => openExisting(w)}
+                    style={{ textAlign: "left", padding: "10px 12px", borderRadius: 5, border: `1px solid ${palette.line}`, background: "#fafaf7", cursor: "pointer", fontSize: 13 }}
+                  >
+                    <b>{w.order_nummer}</b> — {w.schip_klant} · {w.motortype} · {w.datum}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Nieuwe werkorder</div>
+          <div style={{ background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+            <Field label="Ordernummer">
+              <TextInput value={draft.orderNummer} onChange={(e) => setDraft({ ...draft, orderNummer: e.target.value })} placeholder="26152606" />
+            </Field>
+            <Field label="Schip / klant">
+              <TextInput value={draft.schipKlant} onChange={(e) => setDraft({ ...draft, schipKlant: e.target.value })} placeholder="Songa Ruby" />
+            </Field>
+            <Field label="Motortype">
+              <TextInput value={draft.motortype} onChange={(e) => setDraft({ ...draft, motortype: e.target.value })} />
+            </Field>
+            <Field label="Datum">
+              <TextInput type="date" value={draft.datum} onChange={(e) => setDraft({ ...draft, datum: e.target.value })} />
+            </Field>
+            <Field label="Monteur">
+              <TextInput value={draft.monteur} onChange={(e) => setDraft({ ...draft, monteur: e.target.value })} placeholder="Naam monteur" />
+            </Field>
+            <Field label="Aantal cilinderkoppen">
+              <TextInput type="number" min={1} value={draft.aantal} onChange={(e) => setDraft({ ...draft, aantal: e.target.value })} />
+            </Field>
+            <button
+              onClick={startWerkorder}
+              disabled={!draft.orderNummer || !draft.schipKlant}
+              style={{ marginTop: 8, padding: "12px 16px", borderRadius: 6, border: "none", background: palette.accent, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: !draft.orderNummer || !draft.schipKlant ? 0.5 : 1 }}
+            >
+              Werkorder starten
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const kop = koppen[activeKop];
+
+  return (
+    <div style={{ minHeight: "100%", background: palette.bg, fontFamily: "'Inter', system-ui, sans-serif", color: palette.ink }}>
+      {/* Header */}
+      <div style={{ background: palette.panel, borderBottom: `1px solid ${palette.line}`, padding: "14px 20px" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 18, fontSize: 13 }}>
+          <span><b>Order</b> {werkorder.orderNummer}</span>
+          <span><b>Schip</b> {werkorder.schipKlant}</span>
+          <span><b>Motortype</b> {werkorder.motortype}</span>
+          <span><b>Datum</b> {werkorder.datum}</span>
+          <span><b>Monteur</b> {werkorder.monteur || "—"}</span>
+          <span style={{ color: "#9a9d92", fontSize: 12 }}>{saving ? "opslaan…" : "opgeslagen"}</span>
+          <button onClick={markAfgerond} style={{ marginLeft: "auto", border: `1px solid ${palette.accent}`, background: "none", color: palette.accent, fontWeight: 700, cursor: "pointer", fontSize: 13, borderRadius: 5, padding: "5px 10px" }}>
+            Markeer als afgerond
+          </button>
+          <button onClick={() => setWerkorder(null)} style={{ border: "none", background: "none", color: "#5b5f52", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+            ← Terug naar overzicht
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", minHeight: "calc(100% - 54px)" }}>
+        {/* Cilinderkop sidebar */}
+        <div style={{ width: 190, background: palette.panel, borderRight: `1px solid ${palette.line}`, padding: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#5b5f52", marginBottom: 4 }}>CILINDERKOPPEN</div>
+          {koppen.map((k, i) => {
+            const rej = countRejected(k);
+            return (
+              <button
+                key={i}
+                onClick={() => { setActiveKop(i); setActivePage(1); }}
+                style={{
+                  textAlign: "left",
+                  padding: "9px 10px",
+                  borderRadius: 5,
+                  border: i === activeKop ? `1px solid ${palette.accent}` : "1px solid transparent",
+                  background: i === activeKop ? "#fbeee6" : "transparent",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <span>Kop {k.nummer}</span>
+                {rej > 0 && <span style={{ background: "#d9483a", color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 9 }}>{rej}</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Report body */}
+        <div style={{ flex: 1, padding: 20, maxWidth: 900 }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+            {[1, 2, 3].map((p) => (
+              <button
+                key={p}
+                onClick={() => setActivePage(p)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 6,
+                  border: `1px solid ${activePage === p ? palette.accent : palette.line}`,
+                  background: activePage === p ? palette.accent : palette.panel,
+                  color: activePage === p ? "#fff" : palette.ink,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                {p}/3 {p === 1 ? "Demontage & inspectie" : p === 2 ? "Metingen kleppen" : "Montage"}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 20 }}>
+            {activePage === 1 && (
+              <>
+                <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10 }}>Demontage & inspectie</h2>
+                <ChecklistTable rows={kop.disassembly} onChange={(i, v) => updateRow("disassembly", i, v)} />
+                <div style={{ fontWeight: 700, fontSize: 14, margin: "18px 0 6px" }}>
+                  Zittingring — nominaal suc {SEAT_RING_ROWS.length ? "87" : ""} mm / exh 85 mm (±0.1)
+                </div>
+                <SeatRingTable rows={kop.seatRing} onChange={(i, v) => updateRow("seatRing", i, v)} />
+              </>
+            )}
+
+            {activePage === 2 && (
+              <>
+                <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10 }}>Klepmetingen</h2>
+                <ValveTable rows={kop.valve} onChange={(i, v) => updateRow("valve", i, v)} />
+                <ToleranceTable title="Klepsteel (afwijking t.o.v. nominaal, mm)" rows={kop.valveStem} onChange={(i, v) => updateRow("valveStem", i, v)} />
+                <ToleranceTable title="Klepgeleider (afwijking t.o.v. nominaal, mm)" rows={kop.valveGuide} onChange={(i, v) => updateRow("valveGuide", i, v)} />
+                <div style={{ fontWeight: 700, fontSize: 14, margin: "18px 0 6px" }}>Overige controles</div>
+                <ChecklistTable rows={kop.valveChecks} onChange={(i, v) => updateRow("valveChecks", i, v)} />
+              </>
+            )}
+
+            {activePage === 3 && (
+              <>
+                <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10 }}>Montage</h2>
+                <ChecklistTable rows={kop.assembly} onChange={(i, v) => updateRow("assembly", i, v)} />
+                <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 14, marginTop: 18 }}>
+                  <Field label="Werkuren">
+                    <TextInput type="number" step="0.25" value={kop.werkuren} onChange={(e) => updateKop(activeKop, { werkuren: e.target.value })} />
+                  </Field>
+                  <Field label="Aanvullende informatie">
+                    <textarea
+                      value={kop.aanvullendeInfo}
+                      onChange={(e) => updateKop(activeKop, { aanvullendeInfo: e.target.value })}
+                      rows={3}
+                      style={{ ...inputStyle, resize: "vertical" }}
+                    />
+                  </Field>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div style={{ marginTop: 16, fontSize: 13, color: "#5b5f52" }}>
+            Totaal werkuren alle koppen: <b>{koppen.reduce((s, k) => s + (parseFloat(k.werkuren) || 0), 0)}</b>
+            {" · "}
+            Koppen met afkeuring: <b>{koppen.filter((k) => countRejected(k) > 0).length}</b> / {koppen.length}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
