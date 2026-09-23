@@ -286,7 +286,7 @@ function App() {
   const [woDraft, setWoDraft] = useState({ orderNummer: "", schipKlant: "", datum: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) });
   const [huidigeWerkopdracht, setHuidigeWerkopdracht] = useState(null);
   const [toegevoegdeWerkorders, setToegevoegdeWerkorders] = useState([]);
-  const [worDraft, setWorDraft] = useState({ klustype: "cilinderkop", motortype: "Yanmar 8EY26L", monteur: "", aantal: 6, werkbeschrijving: STANDAARD_WERKBESCHRIJVING.cilinderkop });
+  const [worDraft, setWorDraft] = useState({ klustype: "cilinderkop", motortype: "", monteur: "", aantal: 6, werkbeschrijving: STANDAARD_WERKBESCHRIJVING.cilinderkop });
   const [activeWerkorder, setActiveWerkorder] = useState(null);
   const [koppen, setKoppen] = useState([]);
   const [activeKop, setActiveKop] = useState(0);
@@ -465,7 +465,7 @@ function App() {
         await sb("cilinderkop_rapporten", { method: "POST", body: JSON.stringify(blanks.map((k) => kopToRow(k, createdWO.id))) });
       }
       setToegevoegdeWerkorders((prev) => [...prev, createdWO]);
-      setWorDraft({ klustype: worDraft.klustype, motortype: worDraft.motortype, monteur: "", aantal: 6, werkbeschrijving: getWerkbeschrijving(worDraft.klustype) });
+      setWorDraft({ klustype: worDraft.klustype, motortype: "", monteur: "", aantal: 6, werkbeschrijving: getWerkbeschrijving(worDraft.klustype) });
     } catch (e) {
       setLoadError(e.message);
     }
@@ -887,7 +887,7 @@ function App() {
         style: inputStyle
       },
       KLUSTYPEN_DB.map((k) => /* @__PURE__ */ React.createElement("option", { key: k.value, value: k.value }, k.label))
-    )), /* @__PURE__ */ React.createElement(Field, { label: "Motortype" }, /* @__PURE__ */ React.createElement(TextInput, { value: worDraft.motortype, onChange: (e) => setWorDraft({ ...worDraft, motortype: e.target.value }) })), /* @__PURE__ */ React.createElement(Field, { label: "Monteur (optioneel)" }, /* @__PURE__ */ React.createElement(TextInput, { value: worDraft.monteur, onChange: (e) => setWorDraft({ ...worDraft, monteur: e.target.value }), placeholder: "Naam monteur" })), /* @__PURE__ */ React.createElement(Field, { label: "Werkbeschrijving (wat moet er gebeuren)" }, /* @__PURE__ */ React.createElement(
+    )), /* @__PURE__ */ React.createElement(Field, { label: "Motortype" }, /* @__PURE__ */ React.createElement(TextInput, { value: worDraft.motortype, onChange: (e) => setWorDraft({ ...worDraft, motortype: e.target.value }), placeholder: "Vul motortype in" })), /* @__PURE__ */ React.createElement(Field, { label: "Monteur (optioneel)" }, /* @__PURE__ */ React.createElement(TextInput, { value: worDraft.monteur, onChange: (e) => setWorDraft({ ...worDraft, monteur: e.target.value }), placeholder: "Naam monteur" })), /* @__PURE__ */ React.createElement(Field, { label: "Werkbeschrijving (wat moet er gebeuren)" }, /* @__PURE__ */ React.createElement(
       "textarea",
       {
         value: worDraft.werkbeschrijving,
