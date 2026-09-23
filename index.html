@@ -470,6 +470,43 @@ function App() {
       setLoadError(e.message);
     }
   }
+  async function verwijderWerkopdracht(wop) {
+    const akkoord = window.confirm(
+      `Weet je zeker dat je werkopdracht "${wop.order_nummer} — ${wop.schip_klant}" wilt verwijderen?\n\nAlle gekoppelde werkorders en rapportgegevens worden ook verwijderd.`
+    );
+
+    if (!akkoord) return;
+
+    setLoadError("");
+
+    try {
+      const werkorders = await sb(
+        `werkorders?werkopdracht_id=eq.${wop.id}&select=id`
+      );
+
+      for (const wo of werkorders || []) {
+        await sb(`cilinderkop_rapporten?werkorder_id=eq.${wo.id}`, {
+          method: "DELETE",
+          prefer: "return=minimal"
+        });
+      }
+
+      await sb(`werkorders?werkopdracht_id=eq.${wop.id}`, {
+        method: "DELETE",
+        prefer: "return=minimal"
+      });
+
+      await sb(`werkopdrachten?id=eq.${wop.id}`, {
+        method: "DELETE",
+        prefer: "return=minimal"
+      });
+
+      await loadOverzicht();
+    } catch (e) {
+      setLoadError(e.message);
+    }
+  }
+
   async function openWerkorder(wo, werkopdrachtInfo) {
     setLoadError("");
     try {
@@ -784,7 +821,37 @@ function App() {
         style: { padding: "9px 14px", borderRadius: 6, border: "none", background: palette.accent, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }
       },
       "+ Nieuwe werkopdracht"
-    )), ErrorBanner, werkopdrachten.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "#5b5f52" } }, "Nog geen werkopdrachten."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, werkopdrachten.map((wop) => /* @__PURE__ */ React.createElement("div", { key: wop.id, style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 14 } }, wop.order_nummer, " \u2014 ", wop.schip_klant), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#5b5f52", marginBottom: 10 } }, wop.datum), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, (wop.werkorders || []).map((wor) => /* @__PURE__ */ React.createElement(
+    )), ErrorBanner, werkopdrachten.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "#5b5f52" } }, "Nog geen werkopdrachten."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, werkopdrachten.map((wop) => /* @__PURE__ */ React.createElement(
+      "div",
+      { key: wop.id, style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 16 } },
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { style: { display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10 } },
+        /* @__PURE__ */ React.createElement(
+          "div",
+          { style: { flex: 1 } },
+          /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 14 } }, wop.order_nummer, " \u2014 ", wop.schip_klant),
+          /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#5b5f52", marginTop: 2 } }, wop.datum)
+        ),
+        /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => verwijderWerkopdracht(wop),
+            style: {
+              padding: "6px 9px",
+              borderRadius: 5,
+              border: "1px solid #d9483a",
+              background: "#fff",
+              color: "#d9483a",
+              fontWeight: 700,
+              fontSize: 11,
+              cursor: "pointer",
+              whiteSpace: "nowrap"
+            }
+          },
+          "Verwijderen"
+        )
+      ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, (wop.werkorders || []).map((wor) => /* @__PURE__ */ React.createElement(
       "button",
       {
         key: wor.id,
