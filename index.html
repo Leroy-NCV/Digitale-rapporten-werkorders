@@ -255,6 +255,11 @@ const KLUSTYPEN = [
   { value: "turbo", label: "Turbo (sjabloon nog te bouwen)" },
   { value: "injector", label: "Injector (sjabloon nog te bouwen)" }
 ];
+const STANDAARD_WERKBESCHRIJVING = {
+  cilinderkop: "Cilinderkop(pen) demonteren, reinigen en visueel inspecteren. Zittingringen en kleppen meten en beoordelen op af/goedkeuring. Bij goedkeuring: kleppen slijpen, afpersen en monteren. Bij afkeuring: nieuwe zittingringen/klepgeleiders plaatsen. Resultaten vastleggen in het rapport per cilinderkop.",
+  turbo: "",
+  injector: ""
+};
 function lsGet(key, fallback) {
   try {
     const v = window.localStorage.getItem(key);
@@ -281,7 +286,7 @@ function App() {
   const [woDraft, setWoDraft] = useState({ orderNummer: "", schipKlant: "", datum: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) });
   const [huidigeWerkopdracht, setHuidigeWerkopdracht] = useState(null);
   const [toegevoegdeWerkorders, setToegevoegdeWerkorders] = useState([]);
-  const [worDraft, setWorDraft] = useState({ klustype: "cilinderkop", motortype: "Yanmar 8EY26L", monteur: "", aantal: 6, werkbeschrijving: "" });
+  const [worDraft, setWorDraft] = useState({ klustype: "cilinderkop", motortype: "Yanmar 8EY26L", monteur: "", aantal: 6, werkbeschrijving: STANDAARD_WERKBESCHRIJVING.cilinderkop });
   const [activeWerkorder, setActiveWerkorder] = useState(null);
   const [koppen, setKoppen] = useState([]);
   const [activeKop, setActiveKop] = useState(0);
@@ -339,7 +344,7 @@ function App() {
         await sb("cilinderkop_rapporten", { method: "POST", body: JSON.stringify(blanks.map((k) => kopToRow(k, createdWO.id))) });
       }
       setToegevoegdeWerkorders((prev) => [...prev, createdWO]);
-      setWorDraft({ klustype: "cilinderkop", motortype: worDraft.motortype, monteur: "", aantal: 6, werkbeschrijving: "" });
+      setWorDraft({ klustype: worDraft.klustype, motortype: worDraft.motortype, monteur: "", aantal: 6, werkbeschrijving: STANDAARD_WERKBESCHRIJVING[worDraft.klustype] || "" });
     } catch (e) {
       setLoadError(e.message);
     }
@@ -533,7 +538,18 @@ function App() {
     )))));
   }
   if (mode === "kantoor" && view === "werkorders_toevoegen") {
-    return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100%", background: palette.bg, fontFamily: "'Inter', system-ui, sans-serif", color: palette.ink } }, ModeSwitch, /* @__PURE__ */ React.createElement("div", { style: { padding: 24, maxWidth: 520, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 20, fontWeight: 800, marginBottom: 2 } }, huidigeWerkopdracht.order_nummer, " \u2014 ", huidigeWerkopdracht.schip_klant), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "#5b5f52", marginBottom: 16 } }, "Voeg een of meer werkorders toe aan deze werkopdracht."), ErrorBanner, toegevoegdeWerkorders.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 14, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 12, marginBottom: 8 } }, "TOEGEVOEGD"), toegevoegdeWerkorders.map((w) => /* @__PURE__ */ React.createElement("div", { key: w.id, style: { fontSize: 13, padding: "4px 0" } }, KLUSTYPEN.find((k) => k.value === w.klustype)?.label || w.klustype, " \u2014 ", w.motortype, " ", w.monteur ? `\u2014 ${w.monteur}` : ""))), /* @__PURE__ */ React.createElement("div", { style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement(Field, { label: "Klustype" }, /* @__PURE__ */ React.createElement("select", { value: worDraft.klustype, onChange: (e) => setWorDraft({ ...worDraft, klustype: e.target.value }), style: inputStyle }, KLUSTYPEN.map((k) => /* @__PURE__ */ React.createElement("option", { key: k.value, value: k.value }, k.label)))), /* @__PURE__ */ React.createElement(Field, { label: "Motortype" }, /* @__PURE__ */ React.createElement(TextInput, { value: worDraft.motortype, onChange: (e) => setWorDraft({ ...worDraft, motortype: e.target.value }) })), /* @__PURE__ */ React.createElement(Field, { label: "Monteur (optioneel)" }, /* @__PURE__ */ React.createElement(TextInput, { value: worDraft.monteur, onChange: (e) => setWorDraft({ ...worDraft, monteur: e.target.value }), placeholder: "Naam monteur" })), /* @__PURE__ */ React.createElement(Field, { label: "Werkbeschrijving (wat moet er gebeuren)" }, /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100%", background: palette.bg, fontFamily: "'Inter', system-ui, sans-serif", color: palette.ink } }, ModeSwitch, /* @__PURE__ */ React.createElement("div", { style: { padding: 24, maxWidth: 520, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 20, fontWeight: 800, marginBottom: 2 } }, huidigeWerkopdracht.order_nummer, " \u2014 ", huidigeWerkopdracht.schip_klant), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "#5b5f52", marginBottom: 16 } }, "Voeg een of meer werkorders toe aan deze werkopdracht."), ErrorBanner, toegevoegdeWerkorders.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 14, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 12, marginBottom: 8 } }, "TOEGEVOEGD"), toegevoegdeWerkorders.map((w) => /* @__PURE__ */ React.createElement("div", { key: w.id, style: { fontSize: 13, padding: "4px 0" } }, KLUSTYPEN.find((k) => k.value === w.klustype)?.label || w.klustype, " \u2014 ", w.motortype, " ", w.monteur ? `\u2014 ${w.monteur}` : ""))), /* @__PURE__ */ React.createElement("div", { style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement(Field, { label: "Klustype" }, /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        value: worDraft.klustype,
+        onChange: (e) => {
+          const klustype = e.target.value;
+          setWorDraft({ ...worDraft, klustype, werkbeschrijving: STANDAARD_WERKBESCHRIJVING[klustype] || "" });
+        },
+        style: inputStyle
+      },
+      KLUSTYPEN.map((k) => /* @__PURE__ */ React.createElement("option", { key: k.value, value: k.value }, k.label))
+    )), /* @__PURE__ */ React.createElement(Field, { label: "Motortype" }, /* @__PURE__ */ React.createElement(TextInput, { value: worDraft.motortype, onChange: (e) => setWorDraft({ ...worDraft, motortype: e.target.value }) })), /* @__PURE__ */ React.createElement(Field, { label: "Monteur (optioneel)" }, /* @__PURE__ */ React.createElement(TextInput, { value: worDraft.monteur, onChange: (e) => setWorDraft({ ...worDraft, monteur: e.target.value }), placeholder: "Naam monteur" })), /* @__PURE__ */ React.createElement(Field, { label: "Werkbeschrijving (wat moet er gebeuren)" }, /* @__PURE__ */ React.createElement(
       "textarea",
       {
         value: worDraft.werkbeschrijving,
