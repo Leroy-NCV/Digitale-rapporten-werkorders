@@ -250,16 +250,29 @@ const STATUS_COLORS = {
 function StatusBadge({ status }) {
   return /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", padding: "3px 9px", borderRadius: 3, fontSize: 11, fontWeight: 700, background: STATUS_COLORS[status] || "#9a9d92", color: "#fff" } }, STATUS_LABELS[status] || status);
 }
-const KLUSTYPEN = [
-  { value: "cilinderkop", label: "Cilinderkop overhaul" },
-  { value: "turbo", label: "Turbo (sjabloon nog te bouwen)" },
-  { value: "injector", label: "Injector (sjabloon nog te bouwen)" }
+const KLUSTYPEN_FALLBACK = [
+  { value: "cilinderkop", code: "cilinderkop", label: "Cilinderkop overhaul", werkbeschrijving: "Cilinderkop(pen) demonteren, reinigen en visueel inspecteren. Zittingringen en kleppen meten en beoordelen op af/goedkeuring. Bij goedkeuring: kleppen slijpen, afpersen en monteren. Bij afkeuring: nieuwe zittingringen/klepgeleiders plaatsen. Resultaten vastleggen in het rapport per cilinderkop." },
+  { value: "zuiger", code: "zuiger", label: "Zuiger", werkbeschrijving: "Zuiger inspecteren en maatvoering vastleggen volgens het zuigerrapport." },
+  { value: "turbo", code: "turbo", label: "Turbo", werkbeschrijving: "" },
+  { value: "injector", code: "injector", label: "Injector", werkbeschrijving: "" }
 ];
-const STANDAARD_WERKBESCHRIJVING = {
-  cilinderkop: "Cilinderkop(pen) demonteren, reinigen en visueel inspecteren. Zittingringen en kleppen meten en beoordelen op af/goedkeuring. Bij goedkeuring: kleppen slijpen, afpersen en monteren. Bij afkeuring: nieuwe zittingringen/klepgeleiders plaatsen. Resultaten vastleggen in het rapport per cilinderkop.",
-  turbo: "",
-  injector: ""
-};
+
+const ZUIGER_METINGEN = [
+  { key: "groove1", label: "Groove 1", nominal: "", limit: "", measured: "" },
+  { key: "groove2", label: "Groove 2", nominal: "", limit: "", measured: "" },
+  { key: "oilGroove", label: "Oil groove", nominal: "", limit: "", measured: "" },
+  { key: "pinBoreV", label: "Piston pin bore - V", nominal: "", limit: "", measured: "" },
+  { key: "pinBoreN", label: "Piston pin bore - N", nominal: "", limit: "", measured: "" }
+];
+function makeZuigerRapport(nummer=1) {
+  return { nummer, type_variant: "", metingen: ZUIGER_METINGEN.map(r => ({...r})), remarks: "", werkuren: "" };
+}
+function normaliseZuiger(row) {
+  if (!row) return makeZuigerRapport(1);
+  let metingen = row.metingen;
+  if (!Array.isArray(metingen)) metingen = ZUIGER_METINGEN.map(r => ({...r}));
+  return { ...row, werkuren: row.werkuren == null ? "" : row.werkuren, metingen };
+}
 function lsGet(key, fallback) {
   try {
     const v = window.localStorage.getItem(key);
@@ -280,791 +293,153 @@ function App() {
   const [view, setView] = useState("overzicht");
   const [werkopdrachten, setWerkopdrachten] = useState([]);
   const [monteurWerkorders, setMonteurWerkorders] = useState([]);
+  const [klustypenDb, setKlustypenDb] = useState([]);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const saveTimer = useRef(null);
-  const [woDraft, setWoDraft] = useState({ orderNummer: "", schipKlant: "", datum: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) });
+  const [woDraft, setWoDraft] = useState({ orderNummer: "", schipKlant: "", datum: new Date().toISOString().slice(0,10) });
   const [huidigeWerkopdracht, setHuidigeWerkopdracht] = useState(null);
   const [toegevoegdeWerkorders, setToegevoegdeWerkorders] = useState([]);
-  const [worDraft, setWorDraft] = useState({ klustype: "cilinderkop", motortype: "", monteur: "", aantal: 6, werkbeschrijving: STANDAARD_WERKBESCHRIJVING.cilinderkop });
+  const [worDraft, setWorDraft] = useState({ klustype: "cilinderkop", motortype: "", monteur: "", aantal: 1, werkbeschrijving: KLUSTYPEN_FALLBACK[0].werkbeschrijving });
   const [activeWerkorder, setActiveWerkorder] = useState(null);
   const [koppen, setKoppen] = useState([]);
   const [activeKop, setActiveKop] = useState(0);
   const [activePage, setActivePage] = useState(1);
+  const [zuigerRapport, setZuigerRapport] = useState(null);
   const [terugOpmerking, setTerugOpmerking] = useState("");
-  const [klustypenDb, setKlustypenDb] = useState([]);
-  const [nieuwKlustype, setNieuwKlustype] = useState({ naam: "", werkbeschrijving: "" });
+  const [nieuwKlustype, setNieuwKlustype] = useState({ label:"", code:"", werkbeschrijving:"" });
   const [editingKlustype, setEditingKlustype] = useState(null);
 
-  const KLUSTYPEN_DB = klustypenDb.length ? klustypenDb : KLUSTYPEN;
-
-  function getKlustypeNaam(code) {
-    return KLUSTYPEN_DB.find((k) => k.value === code)?.label || code || "";
-  }
-
-  function getWerkbeschrijving(code) {
-    const dbItem = klustypenDb.find((k) => k.value === code);
-    if (dbItem) return dbItem.werkbeschrijving || "";
-    return STANDAARD_WERKBESCHRIJVING[code] || "";
-  }
-
-  async function loadKlustypen() {
-    try {
-      const rows = await sb("klustypen?select=*&actief=eq.true&order=label.asc");
-      setKlustypenDb((rows || []).map((row) => ({
-        id: row.id,
-        value: row.code,
-        code: row.code,
-        label: row.naam || row.label,
-        naam: row.naam || row.label,
-        werkbeschrijving: row.werkbeschrijving || ""
-      })));
-    } catch (e) {
-      console.error("Klustypen laden mislukt:", e);
-      setLoadError(e.message);
-    }
-  }
-
-  function maakKlustypeCode(naam) {
-    return naam
-      .toLowerCase()
-      .trim()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "");
-  }
-
-  async function voegKlustypeToe() {
-    setLoadError("");
-    const naam = nieuwKlustype.naam.trim();
-    const werkbeschrijving = nieuwKlustype.werkbeschrijving.trim();
-
-    if (!naam) {
-      setLoadError("Vul een naam voor het klustype in.");
-      return;
-    }
-    if (!werkbeschrijving) {
-      setLoadError("Vul een werkbeschrijving in.");
-      return;
-    }
-
-    try {
-      const code = maakKlustypeCode(naam);
-      await sb("klustypen", {
-        method: "POST",
-        body: JSON.stringify({
-          label: naam,
-          naam,
-          code,
-          werkbeschrijving,
-          actief: true
-        })
-      });
-
-      setNieuwKlustype({ naam: "", werkbeschrijving: "" });
-      await loadKlustypen();
-    } catch (e) {
-      setLoadError(e.message);
-    }
-  }
-
-  async function slaKlustypeOp() {
-    if (!editingKlustype) return;
-    const naam = editingKlustype.naam.trim();
-
-    if (!naam) {
-      setLoadError("Naam mag niet leeg zijn.");
-      return;
-    }
-
-    try {
-      await sb(`klustypen?id=eq.${editingKlustype.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          label: naam,
-          naam,
-          werkbeschrijving: editingKlustype.werkbeschrijving || ""
-        }),
-        prefer: "return=minimal"
-      });
-
-      setEditingKlustype(null);
-      await loadKlustypen();
-    } catch (e) {
-      setLoadError(e.message);
-    }
-  }
-
-  async function verwijderKlustype(k) {
-    if (!window.confirm(`Weet je zeker dat je "${k.label}" wilt verwijderen?`)) return;
-
-    try {
-      await sb(`klustypen?id=eq.${k.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ actief: false }),
-        prefer: "return=minimal"
-      });
-      await loadKlustypen();
-    } catch (e) {
-      setLoadError(e.message);
-    }
-  }
-  useEffect(() => {
-    lsSet("wo_mode", mode);
-  }, [mode]);
-  useEffect(() => {
-    lsSet("wo_monteur_naam", monteurNaam);
-  }, [monteurNaam]);
-  useEffect(() => {
-    loadKlustypen();
-  }, []);
-  function loadOverzicht() {
-    setLoadError("");
-    sb("werkopdrachten?select=*,werkorders(*)&order=created_at.desc").then(setWerkopdrachten).catch((e) => setLoadError(e.message));
-  }
-  function loadMonteurLijst() {
-    setLoadError("");
-    sb("werkorders?select=*,werkopdrachten(*)&status=in.(open,teruggestuurd)&order=created_at.desc").then(setMonteurWerkorders).catch((e) => setLoadError(e.message));
-  }
-  useEffect(() => {
-    if (view !== "overzicht") return;
-    if (mode === "kantoor") loadOverzicht();
-    else loadMonteurLijst();
-  }, [view, mode]);
-  async function createWerkopdracht() {
-    setLoadError("");
-    try {
-      const [created] = await sb("werkopdrachten", {
-        method: "POST",
-        body: JSON.stringify({ order_nummer: woDraft.orderNummer, schip_klant: woDraft.schipKlant, datum: woDraft.datum })
-      });
-      setHuidigeWerkopdracht(created);
-      setToegevoegdeWerkorders([]);
-      setView("werkorders_toevoegen");
-    } catch (e) {
-      setLoadError(e.message);
-    }
-  }
-  async function addWerkorder() {
-    setLoadError("");
-    try {
-      const [createdWO] = await sb("werkorders", {
-        method: "POST",
-        body: JSON.stringify({
-          werkopdracht_id: huidigeWerkopdracht.id,
-          klustype: worDraft.klustype,
-          motortype: worDraft.motortype,
-          monteur: worDraft.monteur,
-          aantal_koppen: Number(worDraft.aantal) || 1,
-          werkbeschrijving: worDraft.werkbeschrijving
-        })
-      });
-      if (worDraft.klustype === "cilinderkop") {
-        const blanks = Array.from({ length: Number(worDraft.aantal) || 1 }, (_, i) => makeCilinderkop(i + 1));
-        await sb("cilinderkop_rapporten", { method: "POST", body: JSON.stringify(blanks.map((k) => kopToRow(k, createdWO.id))) });
-      }
-      setToegevoegdeWerkorders((prev) => [...prev, createdWO]);
-      setWorDraft({ klustype: worDraft.klustype, motortype: "", monteur: "", aantal: 6, werkbeschrijving: getWerkbeschrijving(worDraft.klustype) });
-    } catch (e) {
-      setLoadError(e.message);
-    }
-  }
-  async function verwijderWerkopdracht(wop) {
-    const akkoord = window.confirm(
-      `Weet je zeker dat je werkopdracht "${wop.order_nummer} — ${wop.schip_klant}" wilt verwijderen?\n\nAlle gekoppelde werkorders en rapportgegevens worden ook verwijderd.`
-    );
-
-    if (!akkoord) return;
-
-    setLoadError("");
-
-    try {
-      const werkorders = await sb(
-        `werkorders?werkopdracht_id=eq.${wop.id}&select=id`
-      );
-
-      for (const wo of werkorders || []) {
-        await sb(`cilinderkop_rapporten?werkorder_id=eq.${wo.id}`, {
-          method: "DELETE",
-          prefer: "return=minimal"
-        });
-      }
-
-      await sb(`werkorders?werkopdracht_id=eq.${wop.id}`, {
-        method: "DELETE",
-        prefer: "return=minimal"
-      });
-
-      await sb(`werkopdrachten?id=eq.${wop.id}`, {
-        method: "DELETE",
-        prefer: "return=minimal"
-      });
-
-      await loadOverzicht();
-    } catch (e) {
-      setLoadError(e.message);
-    }
-  }
-
-  async function openWerkorder(wo, werkopdrachtInfo) {
-    setLoadError("");
-    try {
-      let rows = [];
-      if (wo.klustype === "cilinderkop") {
-        rows = await sb(`cilinderkop_rapporten?werkorder_id=eq.${wo.id}&select=*&order=nummer.asc`);
-      }
-      setActiveWerkorder({ ...wo, werkopdracht: werkopdrachtInfo });
-      setKoppen(rows.map(rowToKop));
-      setActiveKop(0);
-      setActivePage(1);
-      setTerugOpmerking("");
-      setView("werkorder");
-    } catch (e) {
-      setLoadError(e.message);
-    }
-  }
-  function updateWerkbeschrijving(text) {
-    setActiveWerkorder((prev) => ({ ...prev, werkbeschrijving: text }));
-    setSaving(true);
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      try {
-        await sb(`werkorders?id=eq.${activeWerkorder.id}`, { method: "PATCH", body: JSON.stringify({ werkbeschrijving: text }), prefer: "return=minimal" });
-      } catch (e) {
-        setLoadError(e.message);
-      } finally {
-        setSaving(false);
-      }
-    }, 700);
-  }
-  function scheduleSave(kop) {
-    setSaving(true);
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      try {
-        const row = kopToRow(kop, activeWerkorder.id);
-        delete row.werkorder_id;
-        delete row.nummer;
-        await sb(`cilinderkop_rapporten?id=eq.${kop.id}`, { method: "PATCH", body: JSON.stringify(row), prefer: "return=minimal" });
-      } catch (e) {
-        setLoadError(e.message);
-      } finally {
-        setSaving(false);
-      }
-    }, 700);
-  }
-  function updateKop(index, patch) {
-    setKoppen((prev) => {
-      const next = prev.map((k, i) => i === index ? { ...k, ...patch } : k);
-      scheduleSave(next[index]);
-      return next;
-    });
-  }
-  function updateRow(field, i, value) {
-    setKoppen(
-      (prev) => prev.map((k, ki) => {
-        if (ki !== activeKop) return k;
-        const rows = [...k[field]];
-        rows[i] = value;
-        const updated = { ...k, [field]: rows };
-        scheduleSave(updated);
-        return updated;
-      })
-    );
-  }
-  async function indienenTerControle() {
-    setLoadError("");
-    try {
-      const patch = { status: "ter_controle" };
-      if (!activeWerkorder.monteur && monteurNaam) patch.monteur = monteurNaam;
-      await sb(`werkorders?id=eq.${activeWerkorder.id}`, { method: "PATCH", body: JSON.stringify(patch), prefer: "return=minimal" });
-      setView("overzicht");
-      setActiveWerkorder(null);
-    } catch (e) {
-      setLoadError(e.message);
-    }
-  }
-  async function goedkeuren() {
-    setLoadError("");
-    try {
-      await sb(`werkorders?id=eq.${activeWerkorder.id}`, { method: "PATCH", body: JSON.stringify({ status: "goedgekeurd" }), prefer: "return=minimal" });
-      setView("overzicht");
-      setActiveWerkorder(null);
-    } catch (e) {
-      setLoadError(e.message);
-    }
-  }
-  async function terugsturen() {
-    setLoadError("");
-    try {
-      await sb(`werkorders?id=eq.${activeWerkorder.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "teruggestuurd", opmerking_controle: terugOpmerking }),
-        prefer: "return=minimal"
-      });
-      setView("overzicht");
-      setActiveWerkorder(null);
-    } catch (e) {
-      setLoadError(e.message);
-    }
-  }
-  function countRejected(kop) {
-    let n = 0;
-    kop.seatRing.forEach((r) => {
-      if (isRejected(r.measured, r.limit, r.direction)) n++;
-    });
-    kop.valve.forEach((r) => {
-      const rq = isRejected(r.measuredQ, r.limitQ, r.direction);
-      const rr = isRejected(r.measuredR, r.limitR, r.direction);
-      if (rq || rr) n++;
-    });
-    kop.valveStem.forEach((r) => {
-      const v = r.measured === "" ? "" : parseFloat(r.measured) - r.nominal;
-      if (isRejected(v, r.limit, r.direction)) n++;
-    });
-    kop.valveGuide.forEach((r) => {
-      const v = r.measured === "" ? "" : parseFloat(r.measured) - r.nominal;
-      if (isRejected(v, r.limit, r.direction)) n++;
-    });
-    return n;
-  }
   const palette = { bg: "#f4f4ef", ink: "#1f231c", accent: "#c25a2c", panel: "#ffffff", line: "#dfe1d8" };
-  const ModeSwitch = /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, padding: "10px 20px", background: "#1f231c" } }, ["kantoor", "monteur"].map((m) => /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      key: m,
-      onClick: () => {
-        setMode(m);
-        setView("overzicht");
-        setActiveWerkorder(null);
-      },
-      style: {
-        padding: "6px 14px",
-        borderRadius: 5,
-        border: "none",
-        background: mode === m ? palette.accent : "transparent",
-        color: "#fff",
-        fontWeight: 700,
-        fontSize: 12,
-        cursor: "pointer",
-        textTransform: "uppercase",
-        letterSpacing: 0.5
+  const KLUSTYPEN = klustypenDb.length ? klustypenDb : KLUSTYPEN_FALLBACK;
+  const getKlustype = code => KLUSTYPEN.find(k => (k.value||k.code) === code) || KLUSTYPEN_FALLBACK.find(k=>k.value===code);
+  const getKlustypeNaam = code => getKlustype(code)?.label || code;
+  const getWerkbeschrijving = code => getKlustype(code)?.werkbeschrijving || "";
+
+  useEffect(()=>lsSet("wo_mode", mode),[mode]);
+  useEffect(()=>lsSet("wo_monteur_naam", monteurNaam),[monteurNaam]);
+  useEffect(()=>{ loadKlustypen(); },[]);
+  useEffect(()=>{ if(view!=="overzicht") return; mode==="kantoor"?loadOverzicht():loadMonteurLijst(); },[view,mode]);
+
+  async function loadKlustypen(){
+    try{
+      const rows=await sb("klustypen?select=*&actief=eq.true&order=label.asc");
+      setKlustypenDb((rows||[]).map(r=>({ id:r.id, value:r.code, code:r.code, label:r.naam||r.label, naam:r.naam||r.label, werkbeschrijving:r.werkbeschrijving||r.werkbeschrijving_standaard||"", rapport_type:r.rapport_type })));
+    }catch(e){ console.warn(e); }
+  }
+  function loadOverzicht(){ setLoadError(""); sb("werkopdrachten?select=*,werkorders(*)&order=created_at.desc").then(setWerkopdrachten).catch(e=>setLoadError(e.message)); }
+  function loadMonteurLijst(){ setLoadError(""); sb("werkorders?select=*,werkopdrachten(*)&status=in.(open,teruggestuurd)&order=created_at.desc").then(setMonteurWerkorders).catch(e=>setLoadError(e.message)); }
+
+  async function createWerkopdracht(){
+    setLoadError("");
+    try{
+      const [created]=await sb("werkopdrachten",{method:"POST",body:JSON.stringify({order_nummer:woDraft.orderNummer,schip_klant:woDraft.schipKlant,datum:woDraft.datum})});
+      setHuidigeWerkopdracht(created); setToegevoegdeWerkorders([]); setView("werkorders_toevoegen");
+    }catch(e){setLoadError(e.message)}
+  }
+  async function addWerkorder(){
+    setLoadError("");
+    try{
+      const kt=getKlustype(worDraft.klustype);
+      const [createdWO]=await sb("werkorders",{method:"POST",body:JSON.stringify({
+        werkopdracht_id:huidigeWerkopdracht.id, klustype:worDraft.klustype, motortype:worDraft.motortype || "-", monteur:worDraft.monteur,
+        aantal_koppen:worDraft.klustype==="cilinderkop"?(Number(worDraft.aantal)||1):1, werkbeschrijving:worDraft.werkbeschrijving, rapport_type:kt?.rapport_type||worDraft.klustype||"generiek"
+      })});
+      if(worDraft.klustype==="cilinderkop"){
+        const blanks=Array.from({length:Number(worDraft.aantal)||1},(_,i)=>makeCilinderkop(i+1));
+        await sb("cilinderkop_rapporten",{method:"POST",body:JSON.stringify(blanks.map(k=>kopToRow(k,createdWO.id)))});
       }
-    },
-    m === "kantoor" ? "Kantoor" : "Monteur"
-  )), mode === "monteur" && /* @__PURE__ */ React.createElement(
-    "input",
-    {
-      value: monteurNaam,
-      onChange: (e) => setMonteurNaam(e.target.value),
-      placeholder: "Jouw naam",
-      style: { marginLeft: "auto", border: "none", borderRadius: 4, padding: "5px 10px", fontSize: 12, width: 160 }
-    }
-  ));
-  const ErrorBanner = loadError ? /* @__PURE__ */ React.createElement("div", { style: { background: "#fbeae7", border: "1px solid #d9483a", color: "#8a2e22", borderRadius: 6, padding: 10, fontSize: 12, margin: "0 0 14px" } }, loadError) : null;
-  if (mode === "kantoor" && view === "klustypen") {
-    return React.createElement(
-      "div",
-      { style: { minHeight: "100%", background: palette.bg, fontFamily: "'Inter', system-ui, sans-serif", color: palette.ink } },
-      ModeSwitch,
-      React.createElement(
-        "div",
-        { style: { padding: 24, maxWidth: 720, margin: "0 auto" } },
-        React.createElement(
-          "div",
-          { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 20 } },
-          React.createElement(
-            "button",
-            {
-              onClick: () => setView("overzicht"),
-              style: { padding: "8px 12px", borderRadius: 6, border: `1px solid ${palette.line}`, background: "#fff", cursor: "pointer" }
-            },
-            "← Terug"
-          ),
-          React.createElement("h1", { style: { margin: 0, fontSize: 20, fontWeight: 800 } }, "Werkopdrachten beheren")
-        ),
-        ErrorBanner,
-        React.createElement(
-          "div",
-          { style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 20, marginBottom: 24 } },
-          React.createElement("h2", { style: { fontSize: 16, marginTop: 0 } }, "Nieuw klustype"),
-          React.createElement(
-            Field,
-            { label: "Naam klustype" },
-            React.createElement(TextInput, {
-              value: nieuwKlustype.naam,
-              placeholder: "Bijv. Drijfstang revisie",
-              onChange: (e) => setNieuwKlustype({ ...nieuwKlustype, naam: e.target.value })
-            })
-          ),
-          React.createElement(
-            "div",
-            { style: { height: 14 } }
-          ),
-          React.createElement(
-            Field,
-            { label: "Standaard werkbeschrijving" },
-            React.createElement("textarea", {
-              value: nieuwKlustype.werkbeschrijving,
-              rows: 7,
-              placeholder: "Beschrijf hier de standaard werkzaamheden...",
-              onChange: (e) => setNieuwKlustype({ ...nieuwKlustype, werkbeschrijving: e.target.value }),
-              style: { ...inputStyle, resize: "vertical" }
-            })
-          ),
-          React.createElement(
-            "button",
-            {
-              onClick: voegKlustypeToe,
-              style: { marginTop: 14, padding: "10px 14px", border: "none", borderRadius: 6, background: palette.accent, color: "#fff", fontWeight: 700, cursor: "pointer" }
-            },
-            "+ Klustype toevoegen"
-          )
-        ),
-        React.createElement("h2", { style: { fontSize: 16 } }, "Bestaande klustypes"),
-        KLUSTYPEN_DB.map((k) =>
-          React.createElement(
-            "div",
-            {
-              key: k.id || k.value,
-              style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 16, marginBottom: 12 }
-            },
-            editingKlustype?.id === k.id
-              ? React.createElement(
-                  React.Fragment,
-                  null,
-                  React.createElement(TextInput, {
-                    value: editingKlustype.naam,
-                    onChange: (e) => setEditingKlustype({ ...editingKlustype, naam: e.target.value }),
-                    style: { width: "100%", boxSizing: "border-box", marginBottom: 10 }
-                  }),
-                  React.createElement("textarea", {
-                    value: editingKlustype.werkbeschrijving || "",
-                    rows: 6,
-                    onChange: (e) => setEditingKlustype({ ...editingKlustype, werkbeschrijving: e.target.value }),
-                    style: { ...inputStyle, width: "100%", boxSizing: "border-box", resize: "vertical" }
-                  }),
-                  React.createElement(
-                    "div",
-                    { style: { display: "flex", gap: 8, marginTop: 10 } },
-                    React.createElement(
-                      "button",
-                      {
-                        onClick: slaKlustypeOp,
-                        style: { padding: "8px 12px", border: "none", borderRadius: 6, background: palette.accent, color: "#fff", fontWeight: 700, cursor: "pointer" }
-                      },
-                      "Opslaan"
-                    ),
-                    React.createElement(
-                      "button",
-                      {
-                        onClick: () => setEditingKlustype(null),
-                        style: { padding: "8px 12px", border: `1px solid ${palette.line}`, borderRadius: 6, background: "#fff", cursor: "pointer" }
-                      },
-                      "Annuleren"
-                    )
-                  )
-                )
-              : React.createElement(
-                  React.Fragment,
-                  null,
-                  React.createElement("div", { style: { fontWeight: 800, marginBottom: 7 } }, k.label),
-                  React.createElement(
-                    "div",
-                    { style: { fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", color: "#5b5f52", marginBottom: 12 } },
-                    k.werkbeschrijving || "Geen werkbeschrijving."
-                  ),
-                  React.createElement(
-                    "div",
-                    { style: { display: "flex", gap: 8 } },
-                    React.createElement(
-                      "button",
-                      {
-                        onClick: () => setEditingKlustype({ ...k, naam: k.label }),
-                        style: { padding: "7px 11px", border: `1px solid ${palette.line}`, borderRadius: 6, background: "#fff", cursor: "pointer" }
-                      },
-                      "Bewerken"
-                    ),
-                    k.value !== "cilinderkop" &&
-                      React.createElement(
-                        "button",
-                        {
-                          onClick: () => verwijderKlustype(k),
-                          style: { padding: "7px 11px", border: "1px solid #d9483a", borderRadius: 6, background: "#fff", color: "#d9483a", cursor: "pointer" }
-                        },
-                        "Verwijderen"
-                      )
-                  )
-                )
-          )
-        )
-      )
-    );
+      if(worDraft.klustype==="zuiger"){
+        const z=makeZuigerRapport(1);
+        await sb("zuiger_rapporten",{method:"POST",body:JSON.stringify({werkorder_id:createdWO.id,nummer:1,type_variant:z.type_variant,metingen:z.metingen,remarks:"",werkuren:null})});
+      }
+      setToegevoegdeWerkorders(p=>[...p,createdWO]);
+      setWorDraft({klustype:worDraft.klustype,motortype:"",monteur:"",aantal:1,werkbeschrijving:getWerkbeschrijving(worDraft.klustype)});
+    }catch(e){setLoadError(e.message)}
   }
 
-  if (mode === "kantoor" && view === "overzicht") {
-    return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100%", background: palette.bg, fontFamily: "'Inter', system-ui, sans-serif", color: palette.ink } }, ModeSwitch, /* @__PURE__ */ React.createElement("div", { style: { padding: 24, maxWidth: 720, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 20, fontWeight: 800, margin: 0 } }, "Werkopdrachten"), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        onClick: () => setView("klustypen"),
-        style: { marginLeft: "auto", marginRight: 8, padding: "9px 14px", borderRadius: 6, border: `1px solid ${palette.line}`, background: "#fff", color: palette.ink, fontWeight: 700, fontSize: 13, cursor: "pointer" }
-      },
-      "Werkopdrachten beheren"
-    ), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        onClick: () => {
-          setWoDraft({ orderNummer: "", schipKlant: "", datum: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) });
-          setView("nieuwe_werkopdracht");
-        },
-        style: { padding: "9px 14px", borderRadius: 6, border: "none", background: palette.accent, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }
-      },
-      "+ Nieuwe werkopdracht"
-    )), ErrorBanner, werkopdrachten.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "#5b5f52" } }, "Nog geen werkopdrachten."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, werkopdrachten.map((wop) => /* @__PURE__ */ React.createElement(
-      "div",
-      { key: wop.id, style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 16 } },
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { style: { display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10 } },
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { style: { flex: 1 } },
-          /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 14 } }, wop.order_nummer, " \u2014 ", wop.schip_klant),
-          /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#5b5f52", marginTop: 2 } }, wop.datum)
-        ),
-        /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            onClick: () => verwijderWerkopdracht(wop),
-            style: {
-              padding: "6px 9px",
-              borderRadius: 5,
-              border: "1px solid #d9483a",
-              background: "#fff",
-              color: "#d9483a",
-              fontWeight: 700,
-              fontSize: 11,
-              cursor: "pointer",
-              whiteSpace: "nowrap"
-            }
-          },
-          "Verwijderen"
-        )
-      ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, (wop.werkorders || []).map((wor) => /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        key: wor.id,
-        onClick: () => openWerkorder(wor, wop),
-        style: { display: "flex", alignItems: "center", gap: 10, textAlign: "left", padding: "9px 10px", borderRadius: 5, border: `1px solid ${palette.line}`, background: "#fafaf7", cursor: "pointer", fontSize: 13 }
-      },
-      /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 700 } }, getKlustypeNaam(wor.klustype)),
-      /* @__PURE__ */ React.createElement("span", { style: { color: "#5b5f52" } }, wor.motortype),
-      /* @__PURE__ */ React.createElement("span", { style: { color: "#5b5f52" } }, wor.monteur || "nog niet toegewezen"),
-      /* @__PURE__ */ React.createElement("span", { style: { marginLeft: "auto" } }, /* @__PURE__ */ React.createElement(StatusBadge, { status: wor.status }))
-    )), (wop.werkorders || []).length === 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#9a9d92" } }, "Nog geen werkorders toegevoegd.")))))));
-  }
-  if (mode === "kantoor" && view === "nieuwe_werkopdracht") {
-    return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100%", background: palette.bg, fontFamily: "'Inter', system-ui, sans-serif", color: palette.ink } }, ModeSwitch, /* @__PURE__ */ React.createElement("div", { style: { padding: 24, maxWidth: 480, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 20, fontWeight: 800, marginBottom: 16 } }, "Nieuwe werkopdracht"), ErrorBanner, /* @__PURE__ */ React.createElement("div", { style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement(Field, { label: "Ordernummer" }, /* @__PURE__ */ React.createElement(TextInput, { value: woDraft.orderNummer, onChange: (e) => setWoDraft({ ...woDraft, orderNummer: e.target.value }), placeholder: "26152606" })), /* @__PURE__ */ React.createElement(Field, { label: "Schip / klant" }, /* @__PURE__ */ React.createElement(TextInput, { value: woDraft.schipKlant, onChange: (e) => setWoDraft({ ...woDraft, schipKlant: e.target.value }), placeholder: "Songa Ruby" })), /* @__PURE__ */ React.createElement(Field, { label: "Datum" }, /* @__PURE__ */ React.createElement(TextInput, { type: "date", value: woDraft.datum, onChange: (e) => setWoDraft({ ...woDraft, datum: e.target.value }) })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 6 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setView("overzicht"), style: { padding: "10px 14px", borderRadius: 6, border: `1px solid ${palette.line}`, background: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Annuleren"), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        onClick: createWerkopdracht,
-        disabled: !woDraft.orderNummer || !woDraft.schipKlant,
-        style: { padding: "10px 14px", borderRadius: 6, border: "none", background: palette.accent, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: !woDraft.orderNummer || !woDraft.schipKlant ? 0.5 : 1 }
-      },
-      "Aanmaken \u2192"
-    )))));
-  }
-  if (mode === "kantoor" && view === "werkorders_toevoegen") {
-    return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100%", background: palette.bg, fontFamily: "'Inter', system-ui, sans-serif", color: palette.ink } }, ModeSwitch, /* @__PURE__ */ React.createElement("div", { style: { padding: 24, maxWidth: 520, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 20, fontWeight: 800, marginBottom: 2 } }, huidigeWerkopdracht.order_nummer, " \u2014 ", huidigeWerkopdracht.schip_klant), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "#5b5f52", marginBottom: 16 } }, "Voeg een of meer werkorders toe aan deze werkopdracht."), ErrorBanner, toegevoegdeWerkorders.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 14, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 12, marginBottom: 8 } }, "TOEGEVOEGD"), toegevoegdeWerkorders.map((w) => /* @__PURE__ */ React.createElement("div", { key: w.id, style: { fontSize: 13, padding: "4px 0" } }, getKlustypeNaam(w.klustype), " \u2014 ", w.motortype, " ", w.monteur ? `\u2014 ${w.monteur}` : ""))), /* @__PURE__ */ React.createElement("div", { style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement(Field, { label: "Klustype" }, /* @__PURE__ */ React.createElement(
-      "select",
-      {
-        value: worDraft.klustype,
-        onChange: (e) => {
-          const klustype = e.target.value;
-          setWorDraft({ ...worDraft, klustype, werkbeschrijving: getWerkbeschrijving(klustype) });
-        },
-        style: inputStyle
-      },
-      KLUSTYPEN_DB.map((k) => /* @__PURE__ */ React.createElement("option", { key: k.value, value: k.value }, k.label))
-    )), /* @__PURE__ */ React.createElement(Field, { label: "Motortype" }, /* @__PURE__ */ React.createElement(TextInput, { value: worDraft.motortype, onChange: (e) => setWorDraft({ ...worDraft, motortype: e.target.value }), placeholder: "Vul motortype in" })), /* @__PURE__ */ React.createElement(Field, { label: "Monteur (optioneel)" }, /* @__PURE__ */ React.createElement(TextInput, { value: worDraft.monteur, onChange: (e) => setWorDraft({ ...worDraft, monteur: e.target.value }), placeholder: "Naam monteur" })), /* @__PURE__ */ React.createElement(Field, { label: "Werkbeschrijving (wat moet er gebeuren)" }, /* @__PURE__ */ React.createElement(
-      "textarea",
-      {
-        value: worDraft.werkbeschrijving,
-        onChange: (e) => setWorDraft({ ...worDraft, werkbeschrijving: e.target.value }),
-        rows: 4,
-        placeholder: "Bv. verbussen / nieuwe helicoils plaatsen, zie markeringen op cilinderkop...",
-        style: { ...inputStyle, resize: "vertical" }
-      }
-    )), worDraft.klustype === "cilinderkop" && /* @__PURE__ */ React.createElement(Field, { label: "Aantal cilinderkoppen" }, /* @__PURE__ */ React.createElement(TextInput, { type: "number", min: 1, value: worDraft.aantal, onChange: (e) => setWorDraft({ ...worDraft, aantal: e.target.value }) })), /* @__PURE__ */ React.createElement("button", { onClick: addWerkorder, style: { padding: "10px 14px", borderRadius: 6, border: "none", background: palette.accent, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "+ Werkorder toevoegen")), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        onClick: () => {
-          setView("overzicht");
-          setHuidigeWerkopdracht(null);
-        },
-        style: { marginTop: 16, padding: "10px 14px", borderRadius: 6, border: `1px solid ${palette.line}`, background: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }
-      },
-      "Klaar \u2014 naar overzicht"
-    )));
-  }
-  if (mode === "monteur" && view === "overzicht") {
-    return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100%", background: palette.bg, fontFamily: "'Inter', system-ui, sans-serif", color: palette.ink } }, ModeSwitch, /* @__PURE__ */ React.createElement("div", { style: { padding: 24, maxWidth: 600, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 20, fontWeight: 800, marginBottom: 16 } }, "Openstaande werkorders"), ErrorBanner, monteurWerkorders.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "#5b5f52" } }, "Geen openstaande werkorders."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, monteurWerkorders.map((wor) => /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        key: wor.id,
-        onClick: () => openWerkorder(wor, wor.werkopdrachten),
-        style: { textAlign: "left", padding: "14px 16px", borderRadius: 8, border: `1px solid ${palette.line}`, background: palette.panel, cursor: "pointer" }
-      },
-      /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 14 } }, wor.werkopdrachten?.order_nummer, " \u2014 ", wor.werkopdrachten?.schip_klant),
-      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#5b5f52", margin: "4px 0" } }, getKlustypeNaam(wor.klustype), " \xB7 ", wor.motortype),
-      /* @__PURE__ */ React.createElement(StatusBadge, { status: wor.status }),
-      wor.status === "teruggestuurd" && wor.opmerking_controle && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 12, color: "#8a2e22" } }, "Opmerking kantoor: ", wor.opmerking_controle)
-    )))));
-  }
-  if (view === "werkorder" && activeWerkorder && activeWerkorder.klustype !== "cilinderkop") {
-    return React.createElement(
-      "div",
-      { style: { minHeight: "100%", background: palette.bg, fontFamily: "'Inter', system-ui, sans-serif", color: palette.ink } },
-      ModeSwitch,
-      React.createElement(
-        "div",
-        { style: { padding: 24, maxWidth: 720, margin: "0 auto" } },
-        React.createElement(
-          "div",
-          { style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 20 } },
-          React.createElement(
-            "div",
-            { style: { display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 18 } },
-            React.createElement("div", { style: { fontWeight: 800, fontSize: 18 } }, activeWerkorder.werkopdracht?.order_nummer, " — ", activeWerkorder.werkopdracht?.schip_klant),
-            React.createElement("span", { style: { marginLeft: "auto" } }, React.createElement(StatusBadge, { status: activeWerkorder.status }))
-          ),
-          React.createElement("div", { style: { fontSize: 13, color: "#5b5f52", marginBottom: 6 } }, React.createElement("b", null, "Klustype: "), getKlustypeNaam(activeWerkorder.klustype)),
-          React.createElement("div", { style: { fontSize: 13, color: "#5b5f52", marginBottom: 6 } }, React.createElement("b", null, "Motortype: "), activeWerkorder.motortype || "—"),
-          React.createElement("div", { style: { fontSize: 13, color: "#5b5f52", marginBottom: 18 } }, React.createElement("b", null, "Monteur: "), activeWerkorder.monteur || "—"),
-          React.createElement("div", { style: { fontWeight: 700, fontSize: 12, color: "#5b5f52", marginBottom: 5 } }, "WERKBESCHRIJVING"),
-          mode === "kantoor"
-            ? React.createElement("textarea", {
-                value: activeWerkorder.werkbeschrijving || "",
-                onChange: (e) => updateWerkbeschrijving(e.target.value),
-                rows: 8,
-                style: { ...inputStyle, width: "100%", boxSizing: "border-box", resize: "vertical" }
-              })
-            : React.createElement("div", {
-                style: { background: "#fbeee6", border: `1px solid ${palette.line}`, borderRadius: 6, padding: 12, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }
-              }, activeWerkorder.werkbeschrijving || "Geen werkbeschrijving opgegeven."),
-          activeWerkorder.status === "teruggestuurd" && activeWerkorder.opmerking_controle &&
-            React.createElement("div", { style: { marginTop: 14, background: "#fbeae7", border: "1px solid #d9483a", color: "#8a2e22", borderRadius: 6, padding: 10, fontSize: 12 } }, "Teruggestuurd door kantoor: ", activeWerkorder.opmerking_controle),
-          React.createElement(
-            "div",
-            { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 18 } },
-            React.createElement("button", {
-              onClick: () => { setView("overzicht"); setActiveWerkorder(null); },
-              style: { padding: "9px 13px", borderRadius: 6, border: `1px solid ${palette.line}`, background: "#fff", fontWeight: 700, cursor: "pointer" }
-            }, "← Terug naar overzicht"),
-            mode === "monteur" && (activeWerkorder.status === "open" || activeWerkorder.status === "teruggestuurd") &&
-              React.createElement("button", {
-                onClick: indienenTerControle,
-                style: { padding: "9px 13px", borderRadius: 6, border: "none", background: palette.accent, color: "#fff", fontWeight: 700, cursor: "pointer" }
-              }, "Indienen ter controle"),
-            mode === "kantoor" && activeWerkorder.status === "ter_controle" &&
-              React.createElement(React.Fragment, null,
-                React.createElement("input", {
-                  value: terugOpmerking,
-                  onChange: (e) => setTerugOpmerking(e.target.value),
-                  placeholder: "Opmerking bij terugsturen",
-                  style: { ...inputStyle, minWidth: 220 }
-                }),
-                React.createElement("button", {
-                  onClick: terugsturen,
-                  style: { padding: "9px 13px", borderRadius: 6, border: "1px solid #d9483a", background: "#fff", color: "#d9483a", fontWeight: 700, cursor: "pointer" }
-                }, "Terugsturen"),
-                React.createElement("button", {
-                  onClick: goedkeuren,
-                  style: { padding: "9px 13px", borderRadius: 6, border: "none", background: "#3f7a4f", color: "#fff", fontWeight: 700, cursor: "pointer" }
-                }, "Goedkeuren")
-              )
-          ),
-          saving && React.createElement("div", { style: { marginTop: 10, fontSize: 12, color: "#9a9d92" } }, "opslaan…")
-        ),
-        ErrorBanner && React.createElement("div", { style: { marginTop: 14 } }, ErrorBanner)
-      )
-    );
-  }
-
-  if (view === "werkorder" && activeWerkorder) {
-    const kop = koppen[activeKop];
-    if (!kop) return React.createElement("div", { style: { padding: 24, fontFamily: "'Inter', system-ui, sans-serif" } }, "Geen cilinderkoprapport gevonden voor deze werkorder.");
-    return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100%", background: palette.bg, fontFamily: "'Inter', system-ui, sans-serif", color: palette.ink } }, ModeSwitch, /* @__PURE__ */ React.createElement("div", { style: { background: palette.panel, borderBottom: `1px solid ${palette.line}`, padding: "14px 20px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 18, fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("b", null, "Order"), " ", activeWerkorder.werkopdracht?.order_nummer), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("b", null, "Schip"), " ", activeWerkorder.werkopdracht?.schip_klant), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("b", null, "Klustype"), " ", getKlustypeNaam(activeWerkorder.klustype)), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("b", null, "Motortype"), " ", activeWerkorder.motortype), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("b", null, "Monteur"), " ", activeWerkorder.monteur || "\u2014"), /* @__PURE__ */ React.createElement(StatusBadge, { status: activeWerkorder.status }), /* @__PURE__ */ React.createElement("span", { style: { color: "#9a9d92", fontSize: 12 } }, saving ? "opslaan\u2026" : "opgeslagen"), mode === "monteur" && (activeWerkorder.status === "open" || activeWerkorder.status === "teruggestuurd") && /* @__PURE__ */ React.createElement("button", { onClick: indienenTerControle, style: { marginLeft: "auto", border: "none", background: palette.accent, color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13, borderRadius: 5, padding: "7px 12px" } }, "Indienen ter controle"), mode === "kantoor" && activeWerkorder.status === "ter_controle" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        value: terugOpmerking,
-        onChange: (e) => setTerugOpmerking(e.target.value),
-        placeholder: "Opmerking bij terugsturen",
-        style: { marginLeft: "auto", border: `1px solid ${palette.line}`, borderRadius: 5, padding: "6px 10px", fontSize: 12, width: 220 }
-      }
-    ), /* @__PURE__ */ React.createElement("button", { onClick: terugsturen, style: { border: `1px solid #d9483a`, background: "none", color: "#d9483a", fontWeight: 700, cursor: "pointer", fontSize: 13, borderRadius: 5, padding: "7px 12px" } }, "Terugsturen"), /* @__PURE__ */ React.createElement("button", { onClick: goedkeuren, style: { border: "none", background: "#3f7a4f", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13, borderRadius: 5, padding: "7px 12px" } }, "Goedkeuren")), /* @__PURE__ */ React.createElement("button", { onClick: () => {
-      setView("overzicht");
-      setActiveWerkorder(null);
-    }, style: { border: "none", background: "none", color: "#5b5f52", fontWeight: 700, cursor: "pointer", fontSize: 13 } }, "\u2190 Terug naar overzicht")), activeWerkorder.status === "teruggestuurd" && activeWerkorder.opmerking_controle && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, background: "#fbeae7", border: "1px solid #d9483a", color: "#8a2e22", borderRadius: 6, padding: 10, fontSize: 12 } }, "Teruggestuurd door kantoor: ", activeWerkorder.opmerking_controle), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 12, color: "#5b5f52", marginBottom: 4 } }, "WERKBESCHRIJVING"), mode === "kantoor" ? /* @__PURE__ */ React.createElement(
-      "textarea",
-      {
-        value: activeWerkorder.werkbeschrijving || "",
-        onChange: (e) => updateWerkbeschrijving(e.target.value),
-        rows: 3,
-        placeholder: "Wat moet er gebeuren...",
-        style: { ...inputStyle, resize: "vertical", width: "100%", maxWidth: 640 }
-      }
-    ) : /* @__PURE__ */ React.createElement("div", { style: { background: "#fbeee6", border: `1px solid ${palette.line}`, borderRadius: 6, padding: 10, fontSize: 13, maxWidth: 640, whiteSpace: "pre-wrap" } }, activeWerkorder.werkbeschrijving || "Geen werkbeschrijving opgegeven."))), ErrorBanner && /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 20px 0" } }, ErrorBanner), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", minHeight: "calc(100% - 54px)" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 190, background: palette.panel, borderRight: `1px solid ${palette.line}`, padding: 14, display: "flex", flexDirection: "column", gap: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#5b5f52", marginBottom: 4 } }, "CILINDERKOPPEN"), koppen.map((k, i) => {
-      const rej = countRejected(k);
-      return /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          key: i,
-          onClick: () => {
-            setActiveKop(i);
-            setActivePage(1);
-          },
-          style: {
-            textAlign: "left",
-            padding: "9px 10px",
-            borderRadius: 5,
-            border: i === activeKop ? `1px solid ${palette.accent}` : "1px solid transparent",
-            background: i === activeKop ? "#fbeee6" : "transparent",
-            cursor: "pointer",
-            fontSize: 14,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center"
-          }
-        },
-        /* @__PURE__ */ React.createElement("span", null, "Kop ", k.nummer),
-        rej > 0 && /* @__PURE__ */ React.createElement("span", { style: { background: "#d9483a", color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 9 } }, rej)
-      );
-    })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, padding: 20, maxWidth: 900 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 16 } }, [1, 2, 3].map((p) => /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        key: p,
-        onClick: () => setActivePage(p),
-        style: {
-          padding: "8px 16px",
-          borderRadius: 6,
-          border: `1px solid ${activePage === p ? palette.accent : palette.line}`,
-          background: activePage === p ? palette.accent : palette.panel,
-          color: activePage === p ? "#fff" : palette.ink,
-          fontWeight: 700,
-          fontSize: 13,
-          cursor: "pointer"
+  async function openWerkorder(wo,werkopdrachtInfo){
+    setLoadError(""); setKoppen([]); setZuigerRapport(null);
+    try{
+      const combined={...wo,werkopdracht:werkopdrachtInfo};
+      setActiveWerkorder(combined); setActiveKop(0); setActivePage(1); setTerugOpmerking("");
+      if(wo.klustype==="cilinderkop"){
+        const rows=await sb(`cilinderkop_rapporten?werkorder_id=eq.${wo.id}&select=*&order=nummer.asc`);
+        setKoppen((rows||[]).map(rowToKop));
+      }else if(wo.klustype==="zuiger"){
+        let rows=await sb(`zuiger_rapporten?werkorder_id=eq.${wo.id}&select=*&order=nummer.asc`);
+        if(!rows || !rows.length){
+          const z=makeZuigerRapport(1);
+          rows=await sb("zuiger_rapporten",{method:"POST",body:JSON.stringify({werkorder_id:wo.id,nummer:1,type_variant:"",metingen:z.metingen,remarks:"",werkuren:null})});
         }
-      },
-      p,
-      "/3 ",
-      p === 1 ? "Demontage & inspectie" : p === 2 ? "Metingen kleppen" : "Montage"
-    ))), /* @__PURE__ */ React.createElement("div", { style: { background: palette.panel, border: `1px solid ${palette.line}`, borderRadius: 8, padding: 20 } }, activePage === 1 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", { style: { fontSize: 15, fontWeight: 800, marginBottom: 10 } }, "Demontage & inspectie"), /* @__PURE__ */ React.createElement(ChecklistTable, { rows: kop.disassembly, onChange: (i, v) => updateRow("disassembly", i, v) }), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 14, margin: "18px 0 6px" } }, "Zittingring \u2014 nominaal suc 87 mm / exh 85 mm (\xB10.1)"), /* @__PURE__ */ React.createElement(SeatRingTable, { rows: kop.seatRing, onChange: (i, v) => updateRow("seatRing", i, v) })), activePage === 2 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", { style: { fontSize: 15, fontWeight: 800, marginBottom: 10 } }, "Klepmetingen"), /* @__PURE__ */ React.createElement(ValveTable, { rows: kop.valve, onChange: (i, v) => updateRow("valve", i, v) }), /* @__PURE__ */ React.createElement(ToleranceTable, { title: "Klepsteel (afwijking t.o.v. nominaal, mm)", rows: kop.valveStem, onChange: (i, v) => updateRow("valveStem", i, v) }), /* @__PURE__ */ React.createElement(ToleranceTable, { title: "Klepgeleider (afwijking t.o.v. nominaal, mm)", rows: kop.valveGuide, onChange: (i, v) => updateRow("valveGuide", i, v) }), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 14, margin: "18px 0 6px" } }, "Overige controles"), /* @__PURE__ */ React.createElement(ChecklistTable, { rows: kop.valveChecks, onChange: (i, v) => updateRow("valveChecks", i, v) })), activePage === 3 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", { style: { fontSize: 15, fontWeight: 800, marginBottom: 10 } }, "Montage"), /* @__PURE__ */ React.createElement(ChecklistTable, { rows: kop.assembly, onChange: (i, v) => updateRow("assembly", i, v) }), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "160px 1fr", gap: 14, marginTop: 18 } }, /* @__PURE__ */ React.createElement(Field, { label: "Werkuren" }, /* @__PURE__ */ React.createElement(TextInput, { type: "number", step: "0.25", value: kop.werkuren, onChange: (e) => updateKop(activeKop, { werkuren: e.target.value }) })), /* @__PURE__ */ React.createElement(Field, { label: "Aanvullende informatie" }, /* @__PURE__ */ React.createElement("textarea", { value: kop.aanvullendeInfo, onChange: (e) => updateKop(activeKop, { aanvullendeInfo: e.target.value }), rows: 3, style: { ...inputStyle, resize: "vertical" } }))))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 16, fontSize: 13, color: "#5b5f52" } }, "Totaal werkuren alle koppen: ", /* @__PURE__ */ React.createElement("b", null, koppen.reduce((s, k) => s + (parseFloat(k.werkuren) || 0), 0)), " \xB7 ", "Koppen met afkeuring: ", /* @__PURE__ */ React.createElement("b", null, koppen.filter((k) => countRejected(k) > 0).length), " / ", koppen.length))));
+        setZuigerRapport(normaliseZuiger(rows[0]));
+      }
+      setView("werkorder");
+    }catch(e){setLoadError(e.message)}
+  }
+
+  function debounce(fn){ setSaving(true); clearTimeout(saveTimer.current); saveTimer.current=setTimeout(async()=>{try{await fn()}catch(e){setLoadError(e.message)}finally{setSaving(false)}},600); }
+  function updateWerkbeschrijving(text){ setActiveWerkorder(p=>({...p,werkbeschrijving:text})); debounce(()=>sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({werkbeschrijving:text}),prefer:"return=minimal"})); }
+  function updateWerkorderMeta(patch){ setActiveWerkorder(p=>({...p,...patch})); debounce(()=>sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify(patch),prefer:"return=minimal"})); }
+  function scheduleSaveKop(kop){ debounce(async()=>{const row=kopToRow(kop,activeWerkorder.id); delete row.werkorder_id; delete row.nummer; await sb(`cilinderkop_rapporten?id=eq.${kop.id}`,{method:"PATCH",body:JSON.stringify(row),prefer:"return=minimal"});}); }
+  function updateKop(index,patch){ setKoppen(prev=>{const next=prev.map((k,i)=>i===index?{...k,...patch}:k); scheduleSaveKop(next[index]); return next;}); }
+  function updateRow(field,i,value){ setKoppen(prev=>prev.map((k,ki)=>{if(ki!==activeKop)return k; const rows=[...k[field]];rows[i]=value;const updated={...k,[field]:rows};scheduleSaveKop(updated);return updated;})); }
+  function updateZuiger(patch){
+    setZuigerRapport(prev=>{const next={...prev,...patch}; debounce(()=>sb(`zuiger_rapporten?id=eq.${next.id}`,{method:"PATCH",body:JSON.stringify({type_variant:next.type_variant,metingen:next.metingen,remarks:next.remarks,werkuren:next.werkuren===""?null:Number(next.werkuren)}),prefer:"return=minimal"})); return next;});
+  }
+  function updateZuigerMeting(i,patch){ const m=[...(zuigerRapport?.metingen||[])]; m[i]={...m[i],...patch}; updateZuiger({metingen:m}); }
+
+  async function indienenTerControle(){ try{const patch={status:"ter_controle",uitgevoerd:true};if(!activeWerkorder.monteur&&monteurNaam)patch.monteur=monteurNaam;await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify(patch),prefer:"return=minimal"});setView("overzicht");setActiveWerkorder(null);}catch(e){setLoadError(e.message)} }
+  async function goedkeuren(){ try{await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({status:"goedgekeurd"}),prefer:"return=minimal"});setView("overzicht");setActiveWerkorder(null);}catch(e){setLoadError(e.message)} }
+  async function terugsturen(){ try{await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({status:"teruggestuurd",opmerking_controle:terugOpmerking}),prefer:"return=minimal"});setView("overzicht");setActiveWerkorder(null);}catch(e){setLoadError(e.message)} }
+  async function verwijderWerkopdracht(wop){
+    if(!confirm(`Werkopdracht ${wop.order_nummer} verwijderen?`)) return;
+    try{
+      const ids=(await sb(`werkorders?werkopdracht_id=eq.${wop.id}&select=id`))||[];
+      for(const x of ids){ await sb(`cilinderkop_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{}); await sb(`zuiger_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{}); }
+      await sb(`werkorders?werkopdracht_id=eq.${wop.id}`,{method:"DELETE",prefer:"return=minimal"});
+      await sb(`werkopdrachten?id=eq.${wop.id}`,{method:"DELETE",prefer:"return=minimal"}); loadOverzicht();
+    }catch(e){setLoadError(e.message)}
+  }
+  async function voegKlustypeToe(){
+    if(!nieuwKlustype.label.trim())return;
+    const code=(nieuwKlustype.code||nieuwKlustype.label).toLowerCase().trim().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"");
+    try{await sb("klustypen",{method:"POST",body:JSON.stringify({label:nieuwKlustype.label,naam:nieuwKlustype.label,code,werkbeschrijving:nieuwKlustype.werkbeschrijving,rapport_type:"generiek",actief:true})});setNieuwKlustype({label:"",code:"",werkbeschrijving:""});loadKlustypen();}catch(e){setLoadError(e.message)}
+  }
+  async function saveEditKlustype(){ if(!editingKlustype)return; try{await sb(`klustypen?id=eq.${editingKlustype.id}`,{method:"PATCH",body:JSON.stringify({label:editingKlustype.label,naam:editingKlustype.label,werkbeschrijving:editingKlustype.werkbeschrijving}),prefer:"return=minimal"});setEditingKlustype(null);loadKlustypen();}catch(e){setLoadError(e.message)} }
+  async function deleteKlustype(k){ if(!confirm(`${k.label} uitschakelen?`))return; try{await sb(`klustypen?id=eq.${k.id}`,{method:"PATCH",body:JSON.stringify({actief:false}),prefer:"return=minimal"});loadKlustypen();}catch(e){setLoadError(e.message)} }
+
+  function countRejected(kop){let n=0;kop.seatRing.forEach(r=>{if(isRejected(r.measured,r.limit,r.direction))n++});kop.valve.forEach(r=>{if(isRejected(r.measuredQ,r.limitQ,r.direction)||isRejected(r.measuredR,r.limitR,r.direction))n++});kop.valveStem.forEach(r=>{const v=r.measured===""?"":parseFloat(r.measured)-r.nominal;if(isRejected(v,r.limit,r.direction))n++});kop.valveGuide.forEach(r=>{const v=r.measured===""?"":parseFloat(r.measured)-r.nominal;if(isRejected(v,r.limit,r.direction))n++});return n;}
+
+  const ModeSwitch=React.createElement("div",{style:{display:"flex",gap:6,padding:"10px 20px",background:"#1f231c"}},["kantoor","monteur"].map(m=>React.createElement("button",{key:m,onClick:()=>{setMode(m);setView("overzicht");setActiveWerkorder(null)},style:{padding:"6px 14px",borderRadius:5,border:"none",background:mode===m?palette.accent:"transparent",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",textTransform:"uppercase"}},m)),mode==="monteur"&&React.createElement("input",{value:monteurNaam,onChange:e=>setMonteurNaam(e.target.value),placeholder:"Jouw naam",style:{marginLeft:"auto",border:"none",borderRadius:4,padding:"5px 10px",fontSize:12,width:160}}));
+  const ErrorBanner=loadError?React.createElement("div",{style:{background:"#fbeae7",border:"1px solid #d9483a",color:"#8a2e22",borderRadius:6,padding:10,fontSize:12,marginBottom:14}},loadError):null;
+  const btn=(label,onClick,extra={})=>React.createElement("button",{onClick,style:{padding:"9px 13px",borderRadius:6,border:`1px solid ${palette.line}`,background:"#fff",fontWeight:700,cursor:"pointer",...extra}},label);
+
+  if(mode==="kantoor"&&view==="overzicht") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg,color:palette.ink}},ModeSwitch,React.createElement("div",{style:{padding:24,maxWidth:900,margin:"0 auto"}},React.createElement("div",{style:{display:"flex",gap:10,alignItems:"center",marginBottom:18}},React.createElement("h1",{style:{fontSize:21,margin:0}},"Werkopdrachten"),React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:8}},btn("Werkopdrachten beheren",()=>setView("klustypen")),React.createElement("button",{onClick:()=>setView("nieuwe_werkopdracht"),style:{padding:"10px 14px",border:0,borderRadius:6,background:palette.accent,color:"white",fontWeight:700,cursor:"pointer"}},"+ Nieuwe werkopdracht"))),ErrorBanner,React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:12}},werkopdrachten.map(wop=>React.createElement("div",{key:wop.id,style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:16}},React.createElement("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10}},React.createElement("b",null,wop.order_nummer),React.createElement("span",null,wop.schip_klant),React.createElement("span",{style:{color:"#777"}},wop.datum),React.createElement("button",{onClick:()=>verwijderWerkopdracht(wop),style:{marginLeft:"auto",border:"1px solid #d9483a",color:"#d9483a",background:"#fff",borderRadius:5,padding:"6px 9px",cursor:"pointer"}},"Verwijderen")),React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:6}},(wop.werkorders||[]).map(wor=>React.createElement("button",{key:wor.id,onClick:()=>openWerkorder(wor,wop),style:{display:"flex",gap:10,alignItems:"center",padding:"9px 10px",borderRadius:5,border:`1px solid ${palette.line}`,background:"#fafaf7",cursor:"pointer"}},React.createElement("b",null,getKlustypeNaam(wor.klustype)),React.createElement("span",null,wor.motortype==="-"?"":wor.motortype),React.createElement("span",null,wor.monteur||"nog niet toegewezen"),wor.uitgevoerd&&React.createElement("span",{style:{color:"#3f7a4f",fontWeight:700}},"✓ uitgevoerd"),React.createElement("span",{style:{marginLeft:"auto"}},React.createElement(StatusBadge,{status:wor.status}))))))))));
+
+  if(mode==="kantoor"&&view==="klustypen") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,React.createElement("div",{style:{padding:24,maxWidth:750,margin:"0 auto"}},React.createElement("div",{style:{display:"flex",alignItems:"center",marginBottom:16}},React.createElement("h1",{style:{fontSize:20,margin:0}},"Werkopdrachten beheren"),React.createElement("div",{style:{marginLeft:"auto"}},btn("← Terug",()=>setView("overzicht")))),ErrorBanner,React.createElement("div",{style:{background:"#fff",padding:16,border:`1px solid ${palette.line}`,borderRadius:8,marginBottom:15}},React.createElement("h3",null,"Nieuw klustype"),React.createElement(Field,{label:"Naam"},React.createElement(TextInput,{value:nieuwKlustype.label,onChange:e=>setNieuwKlustype({...nieuwKlustype,label:e.target.value})})),React.createElement(Field,{label:"Standaard werkbeschrijving"},React.createElement("textarea",{rows:3,value:nieuwKlustype.werkbeschrijving,onChange:e=>setNieuwKlustype({...nieuwKlustype,werkbeschrijving:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box",marginTop:8}})),React.createElement("div",{style:{marginTop:10}},btn("Toevoegen",voegKlustypeToe,{background:palette.accent,color:"#fff",border:"none"}))),KLUSTYPEN.map(k=>React.createElement("div",{key:k.value,style:{background:"#fff",padding:14,border:`1px solid ${palette.line}`,borderRadius:8,marginBottom:8}},editingKlustype?.id===k.id?React.createElement(React.Fragment,null,React.createElement(TextInput,{value:editingKlustype.label,onChange:e=>setEditingKlustype({...editingKlustype,label:e.target.value}),style:{width:"100%",boxSizing:"border-box"}}),React.createElement("textarea",{rows:3,value:editingKlustype.werkbeschrijving||"",onChange:e=>setEditingKlustype({...editingKlustype,werkbeschrijving:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box",marginTop:8}}),React.createElement("div",{style:{display:"flex",gap:8,marginTop:8}},btn("Opslaan",saveEditKlustype),btn("Annuleren",()=>setEditingKlustype(null)))):React.createElement("div",{style:{display:"flex",gap:10,alignItems:"center"}},React.createElement("div",{style:{flex:1}},React.createElement("b",null,k.label),React.createElement("div",{style:{fontSize:12,color:"#666",marginTop:4}},k.werkbeschrijving||"Geen standaard werkbeschrijving")),k.id&&btn("Bewerken",()=>setEditingKlustype({...k})),k.id&&React.createElement("button",{onClick:()=>deleteKlustype(k),style:{border:"1px solid #d9483a",color:"#d9483a",background:"#fff",borderRadius:5,padding:"7px 10px",cursor:"pointer"}},"Uitschakelen"))))));
+
+  if(mode==="kantoor"&&view==="nieuwe_werkopdracht") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,React.createElement("div",{style:{padding:24,maxWidth:500,margin:"0 auto"}},React.createElement("h1",null,"Nieuwe werkopdracht"),ErrorBanner,React.createElement("div",{style:{background:"#fff",padding:20,border:`1px solid ${palette.line}`,borderRadius:8,display:"flex",flexDirection:"column",gap:14}},React.createElement(Field,{label:"Ordernummer"},React.createElement(TextInput,{value:woDraft.orderNummer,onChange:e=>setWoDraft({...woDraft,orderNummer:e.target.value})})),React.createElement(Field,{label:"Schip / klant"},React.createElement(TextInput,{value:woDraft.schipKlant,onChange:e=>setWoDraft({...woDraft,schipKlant:e.target.value})})),React.createElement(Field,{label:"Datum"},React.createElement(TextInput,{type:"date",value:woDraft.datum,onChange:e=>setWoDraft({...woDraft,datum:e.target.value})})),React.createElement("div",{style:{display:"flex",gap:8}},btn("Annuleren",()=>setView("overzicht")),React.createElement("button",{disabled:!woDraft.orderNummer||!woDraft.schipKlant,onClick:createWerkopdracht,style:{padding:"10px 14px",border:0,borderRadius:6,background:palette.accent,color:"#fff",fontWeight:700,cursor:"pointer"}},"Aanmaken →")))));
+
+  if(mode==="kantoor"&&view==="werkorders_toevoegen") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,React.createElement("div",{style:{padding:24,maxWidth:550,margin:"0 auto"}},React.createElement("h1",{style:{fontSize:20}},huidigeWerkopdracht.order_nummer," — ",huidigeWerkopdracht.schip_klant),ErrorBanner,React.createElement("div",{style:{background:"#fff",padding:20,border:`1px solid ${palette.line}`,borderRadius:8,display:"flex",flexDirection:"column",gap:14}},React.createElement(Field,{label:"Klustype"},React.createElement("select",{value:worDraft.klustype,onChange:e=>{const klustype=e.target.value;setWorDraft({...worDraft,klustype,werkbeschrijving:getWerkbeschrijving(klustype),aantal:1})},style:inputStyle},KLUSTYPEN.map(k=>React.createElement("option",{key:k.value,value:k.value},k.label)))),React.createElement(Field,{label:"Motortype"},React.createElement(TextInput,{value:worDraft.motortype,onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),placeholder:"Vul motortype in"})),React.createElement(Field,{label:"Monteur (optioneel)"},React.createElement(TextInput,{value:worDraft.monteur,onChange:e=>setWorDraft({...worDraft,monteur:e.target.value})})),React.createElement(Field,{label:"Werkbeschrijving"},React.createElement("textarea",{rows:4,value:worDraft.werkbeschrijving,onChange:e=>setWorDraft({...worDraft,werkbeschrijving:e.target.value}),style:{...inputStyle,resize:"vertical"}})),worDraft.klustype==="cilinderkop"&&React.createElement(Field,{label:"Aantal cilinderkoppen"},React.createElement(TextInput,{type:"number",min:1,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),btn("+ Werkorder toevoegen",addWerkorder,{background:palette.accent,color:"#fff",border:"none"})),React.createElement("div",{style:{marginTop:14}},btn("Klaar — naar overzicht",()=>{setView("overzicht");setHuidigeWerkopdracht(null)}))));
+
+  if(mode==="monteur"&&view==="overzicht") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,React.createElement("div",{style:{padding:24,maxWidth:650,margin:"0 auto"}},React.createElement("h1",{style:{fontSize:20}},"Openstaande werkorders"),ErrorBanner,React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:10}},monteurWerkorders.map(wor=>React.createElement("button",{key:wor.id,onClick:()=>openWerkorder(wor,wor.werkopdrachten),style:{textAlign:"left",padding:14,borderRadius:8,border:`1px solid ${palette.line}`,background:"#fff",cursor:"pointer"}},React.createElement("b",null,wor.werkopdrachten?.order_nummer," — ",wor.werkopdrachten?.schip_klant),React.createElement("div",{style:{fontSize:13,color:"#666",margin:"4px 0"}},getKlustypeNaam(wor.klustype)," · ",wor.motortype==="-"?"":wor.motortype),React.createElement(StatusBadge,{status:wor.status}))))));
+
+  if(view==="werkorder"&&activeWerkorder){
+    const header=React.createElement("div",{style:{background:"#fff",borderBottom:`1px solid ${palette.line}`,padding:"14px 20px"}},React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:16,alignItems:"center",fontSize:13}},React.createElement("span",null,React.createElement("b",null,"Order "),activeWerkorder.werkopdracht?.order_nummer),React.createElement("span",null,React.createElement("b",null,"Schip "),activeWerkorder.werkopdracht?.schip_klant),React.createElement("span",null,React.createElement("b",null,"Klustype "),getKlustypeNaam(activeWerkorder.klustype)),React.createElement("span",null,React.createElement("b",null,"Motortype "),activeWerkorder.motortype==="-"?"":activeWerkorder.motortype),React.createElement(StatusBadge,{status:activeWerkorder.status}),React.createElement("span",{style:{color:"#999"}},saving?"opslaan…":"opgeslagen"),mode==="monteur"&&btn("Indienen ter controle",indienenTerControle,{marginLeft:"auto",background:palette.accent,color:"#fff",border:"none"}),mode==="kantoor"&&activeWerkorder.status==="ter_controle"&&React.createElement(React.Fragment,null,React.createElement("input",{value:terugOpmerking,onChange:e=>setTerugOpmerking(e.target.value),placeholder:"Opmerking bij terugsturen",style:{...inputStyle,marginLeft:"auto",width:220}}),btn("Terugsturen",terugsturen,{color:"#d9483a"}),btn("Goedkeuren",goedkeuren,{background:"#3f7a4f",color:"#fff",border:"none"})),btn("← Terug",()=>{setView("overzicht");setActiveWerkorder(null)})),React.createElement("div",{style:{marginTop:10,maxWidth:760}},React.createElement("div",{style:{fontSize:12,fontWeight:700,marginBottom:4}},"WERKBESCHRIJVING"),mode==="kantoor"?React.createElement("textarea",{value:activeWerkorder.werkbeschrijving||"",onChange:e=>updateWerkbeschrijving(e.target.value),rows:3,style:{...inputStyle,width:"100%",boxSizing:"border-box"}}):React.createElement("div",{style:{padding:10,border:`1px solid ${palette.line}`,borderRadius:6,background:"#fbeee6",whiteSpace:"pre-wrap"}},activeWerkorder.werkbeschrijving||"Geen werkbeschrijving")),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"150px 1fr",gap:12,marginTop:12,maxWidth:760}},React.createElement(Field,{label:"Uitgevoerd"},React.createElement("label",{style:{display:"flex",gap:8,alignItems:"center",padding:"10px 0"}},React.createElement("input",{type:"checkbox",checked:!!activeWerkorder.uitgevoerd,onChange:e=>updateWerkorderMeta({uitgevoerd:e.target.checked})}),"Werk is uitgevoerd")),React.createElement(Field,{label:"Opmerking monteur"},React.createElement("textarea",{rows:2,value:activeWerkorder.monteur_opmerking||"",onChange:e=>updateWerkorderMeta({monteur_opmerking:e.target.value}),style:{...inputStyle,resize:"vertical"}}))));
+
+    if(activeWerkorder.klustype==="zuiger"&&zuigerRapport){
+      const z=zuigerRapport;
+      return React.createElement("div",{style:{minHeight:"100%",background:palette.bg,color:palette.ink}},ModeSwitch,header,ErrorBanner&&React.createElement("div",{style:{padding:20}},ErrorBanner),React.createElement("div",{style:{padding:20,maxWidth:900,margin:"0 auto"}},React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,padding:20,borderRadius:8}},React.createElement("h2",{style:{marginTop:0,textAlign:"center",fontSize:18}},"SIZE PROTOCOL PISTON"),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18,fontSize:13}},React.createElement("div",null,React.createElement("b",null,"Customer / Vessel: "),activeWerkorder.werkopdracht?.schip_klant),React.createElement("div",null,React.createElement("b",null,"Order no.: "),activeWerkorder.werkopdracht?.order_nummer),React.createElement("div",null,React.createElement("b",null,"Date: "),activeWerkorder.werkopdracht?.datum),React.createElement("div",null,React.createElement("b",null,"Employee: "),activeWerkorder.monteur||monteurNaam||""),React.createElement("div",null,React.createElement("b",null,"Engine type: "),activeWerkorder.motortype==="-"?"":activeWerkorder.motortype),React.createElement(Field,{label:"Piston type"},React.createElement("select",{value:z.type_variant||"",onChange:e=>updateZuiger({type_variant:e.target.value}),style:inputStyle},React.createElement("option",{value:""},"—"),React.createElement("option",{value:"V"},"V-type"),React.createElement("option",{value:"N"},"N-type")))),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1.6fr 1fr 1fr 1fr",gap:8,fontSize:12,fontWeight:700,padding:"8px 10px",background:"#eee"}},React.createElement("span",null,"Measurement"),React.createElement("span",null,"Nominal"),React.createElement("span",null,"Limit"),React.createElement("span",null,"Measured")),z.metingen.map((r,i)=>React.createElement("div",{key:r.key||i,style:{display:"grid",gridTemplateColumns:"1.6fr 1fr 1fr 1fr",gap:8,alignItems:"center",padding:"8px 10px",background:i%2?"#f7f7f3":"#fff"}},React.createElement("span",null,r.label),React.createElement(TextInput,{value:r.nominal||"",onChange:e=>updateZuigerMeting(i,{nominal:e.target.value}),placeholder:"mm"}),React.createElement(TextInput,{value:r.limit||"",onChange:e=>updateZuigerMeting(i,{limit:e.target.value}),placeholder:"mm"}),React.createElement(TextInput,{value:r.measured||"",onChange:e=>updateZuigerMeting(i,{measured:e.target.value}),placeholder:"mm"}))),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 160px",gap:14,marginTop:18}},React.createElement(Field,{label:"REMARKS"},React.createElement("textarea",{rows:5,value:z.remarks||"",onChange:e=>updateZuiger({remarks:e.target.value}),style:{...inputStyle,resize:"vertical"}})),React.createElement(Field,{label:"Werkuren"},React.createElement(TextInput,{type:"number",step:"0.25",value:z.werkuren,onChange:e=>updateZuiger({werkuren:e.target.value})}))))));
+    }
+
+    if(activeWerkorder.klustype!=="cilinderkop") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,header,React.createElement("div",{style:{padding:24,maxWidth:760,margin:"0 auto"}},React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:20}},React.createElement("h2",null,getKlustypeNaam(activeWerkorder.klustype)),React.createElement("p",null,"Voor dit klustype is nog geen gespecialiseerd rapport toegevoegd. De werkbeschrijving, uitgevoerd-status en monteur-opmerking worden wel opgeslagen."))));
+
+    const kop=koppen[activeKop]; if(!kop) return React.createElement("div",null,ModeSwitch,header,React.createElement("div",{style:{padding:24}},"Geen cilinderkoprapport gevonden."));
+    return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,header,React.createElement("div",{style:{display:"flex"}},React.createElement("div",{style:{width:190,background:"#fff",borderRight:`1px solid ${palette.line}`,padding:14}},React.createElement("b",{style:{fontSize:12}},"CILINDERKOPPEN"),koppen.map((k,i)=>React.createElement("button",{key:i,onClick:()=>{setActiveKop(i);setActivePage(1)},style:{display:"flex",justifyContent:"space-between",width:"100%",padding:"9px 10px",marginTop:6,borderRadius:5,border:i===activeKop?`1px solid ${palette.accent}`:"1px solid transparent",background:i===activeKop?"#fbeee6":"transparent",cursor:"pointer"}},React.createElement("span",null,"Kop ",k.nummer),countRejected(k)>0&&React.createElement("span",{style:{background:"#d9483a",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10}},countRejected(k))))),React.createElement("div",{style:{flex:1,padding:20,maxWidth:900}},React.createElement("div",{style:{display:"flex",gap:6,marginBottom:14}},[1,2,3].map(p=>btn(`${p}/3 ${p===1?"Demontage & inspectie":p===2?"Metingen kleppen":"Montage"}`,()=>setActivePage(p),{background:activePage===p?palette.accent:"#fff",color:activePage===p?"#fff":palette.ink,border:`1px solid ${activePage===p?palette.accent:palette.line}`}))),React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:20}},activePage===1&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Demontage & inspectie"),React.createElement(ChecklistTable,{rows:kop.disassembly,onChange:(i,v)=>updateRow("disassembly",i,v)}),React.createElement("div",{style:{fontWeight:700,margin:"18px 0 6px"}},"Zittingring"),React.createElement(SeatRingTable,{rows:kop.seatRing,onChange:(i,v)=>updateRow("seatRing",i,v)})),activePage===2&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Klepmetingen"),React.createElement(ValveTable,{rows:kop.valve,onChange:(i,v)=>updateRow("valve",i,v)}),React.createElement(ToleranceTable,{title:"Klepsteel",rows:kop.valveStem,onChange:(i,v)=>updateRow("valveStem",i,v)}),React.createElement(ToleranceTable,{title:"Klepgeleider",rows:kop.valveGuide,onChange:(i,v)=>updateRow("valveGuide",i,v)}),React.createElement(ChecklistTable,{rows:kop.valveChecks,onChange:(i,v)=>updateRow("valveChecks",i,v)})),activePage===3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Montage"),React.createElement(ChecklistTable,{rows:kop.assembly,onChange:(i,v)=>updateRow("assembly",i,v)}),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"160px 1fr",gap:14,marginTop:18}},React.createElement(Field,{label:"Werkuren"},React.createElement(TextInput,{type:"number",step:"0.25",value:kop.werkuren,onChange:e=>updateKop(activeKop,{werkuren:e.target.value})})),React.createElement(Field,{label:"Aanvullende informatie"},React.createElement("textarea",{rows:3,value:kop.aanvullendeInfo,onChange:e=>updateKop(activeKop,{aanvullendeInfo:e.target.value}),style:{...inputStyle,resize:"vertical"}}))))))));
   }
   return null;
 }
-
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
