@@ -815,18 +815,20 @@ function CylinderCustomerEditor(props){
             ...["Kop","Categorie","Positie","Actie","Aantal","Artikelnummer","Omschrijving","Opmerking",""].map(h=>React.createElement("th",{key:h,style:{textAlign:"left",padding:"7px 5px",borderBottom:"1px solid "+palette.line,background:"#f4f4ef",whiteSpace:"nowrap"}},h))
           )),
           React.createElement("tbody",null,
-            parts.length===0?React.createElement("tr",null,React.createElement("td",{colSpan:9,style:{padding:14,color:"#777",textAlign:"center"}},"Nog geen onderdelen. Gebruik 'Voorstel uit matrix' of voeg handmatig een regel toe.")):
-            ...parts.map((part,i)=>React.createElement("tr",{key:part.id||i},
-              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.headNo||"",onChange:e=>updatePart(i,"headNo",e.target.value),style:{...inputStyle,width:60}})),
-              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.category||"",onChange:e=>updatePart(i,"category",e.target.value),style:{...inputStyle,width:130}})),
-              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.position||"",onChange:e=>updatePart(i,"position",e.target.value),style:{...inputStyle,width:75}})),
-              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("select",{value:part.action||"",onChange:e=>updatePart(i,"action",e.target.value),style:{...inputStyle,width:115}},...["","PROPOSED","REQUIRED","RENEWED","REPAIRED","GRINDED"].map(v=>React.createElement("option",{key:v,value:v},v||"—")))),
-              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{type:"number",min:"0",step:"1",value:part.qty===undefined?1:part.qty,onChange:e=>updatePart(i,"qty",e.target.value),style:{...inputStyle,width:65}})),
-              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.partNo||"",onChange:e=>updatePart(i,"partNo",e.target.value),placeholder:"Part no.",style:{...inputStyle,width:130}})),
-              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.description||"",onChange:e=>updatePart(i,"description",e.target.value),style:{...inputStyle,width:180}})),
-              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.remark||"",onChange:e=>updatePart(i,"remark",e.target.value),style:{...inputStyle,width:220}})),
-              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},btn("×",()=>removePart(i),{padding:"5px 9px",color:"#a22"}))
-            ))
+            ...(parts.length===0
+              ? [React.createElement("tr",{key:"empty"},React.createElement("td",{colSpan:9,style:{padding:14,color:"#777",textAlign:"center"}},"Nog geen onderdelen. Gebruik 'Voorstel uit matrix' of voeg handmatig een regel toe."))]
+              : parts.map((part,i)=>React.createElement("tr",{key:part.id||i},
+                  React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.headNo||"",onChange:e=>updatePart(i,"headNo",e.target.value),style:{...inputStyle,width:60}})),
+                  React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.category||"",onChange:e=>updatePart(i,"category",e.target.value),style:{...inputStyle,width:130}})),
+                  React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.position||"",onChange:e=>updatePart(i,"position",e.target.value),style:{...inputStyle,width:75}})),
+                  React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("select",{value:part.action||"",onChange:e=>updatePart(i,"action",e.target.value),style:{...inputStyle,width:115}},...["","PROPOSED","REQUIRED","RENEWED","REPAIRED","GRINDED"].map(v=>React.createElement("option",{key:v,value:v},v||"—")))),
+                  React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{type:"number",min:"0",step:"1",value:part.qty===undefined?1:part.qty,onChange:e=>updatePart(i,"qty",e.target.value),style:{...inputStyle,width:65}})),
+                  React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.partNo||"",onChange:e=>updatePart(i,"partNo",e.target.value),placeholder:"Part no.",style:{...inputStyle,width:130}})),
+                  React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.description||"",onChange:e=>updatePart(i,"description",e.target.value),style:{...inputStyle,width:180}})),
+                  React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.remark||"",onChange:e=>updatePart(i,"remark",e.target.value),style:{...inputStyle,width:220}})),
+                  React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},btn("×",()=>removePart(i),{padding:"5px 9px",color:"#a22"}))
+                ))
+            )
           )
         )
       )
