@@ -251,6 +251,8 @@ const STATUS_COLORS = {
 function StatusBadge({ status }) {
   return /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", padding: "3px 9px", borderRadius: 3, fontSize: 11, fontWeight: 700, background: STATUS_COLORS[status] || "#9a9d92", color: "#fff" } }, STATUS_LABELS[status] || status);
 }
+const MONTEURS = ["Marvin","George","Niek","Gino","Pawel","Max","Jonathan","Dani","Lee","Sebastiaan","Jervin","Rinze","Peter","Tycho","Bradley","Milan","Wesley","Richard","Cor","Negasi","Frank"];
+
 const KLUSTYPEN_FALLBACK = [
   { value: "cilinderkop", code: "cilinderkop", label: "Cilinderkop overhaul", werkbeschrijving: "Cilinderkop(pen) demonteren, reinigen en visueel inspecteren. Zittingringen en kleppen meten en beoordelen op af/goedkeuring. Bij goedkeuring: kleppen slijpen, afpersen en monteren. Bij afkeuring: nieuwe zittingringen/klepgeleiders plaatsen. Resultaten vastleggen in het rapport per cilinderkop." },
   { value: "zuiger", code: "zuiger", label: "Zuiger", werkbeschrijving: "Zuiger inspecteren en maatvoering vastleggen volgens het zuigerrapport." },
@@ -543,7 +545,7 @@ function KopMatrixTable(props){
 }
 
 function CustomerCylinderHeadReport(props){
-  const werkorder=props.werkorder,koppen=props.koppen,data=props.data,photos=props.photos||[];
+  const werkorder=props.werkorder,koppen=props.koppen,data=props.data;
   const phase=data&&data.activePhase==="after"?"after":"before";
   const p=data&&data[phase]?data[phase]:makeKopCustomerPhase(koppen,phase,{});
   const cell={border:"1px solid #7f8790",padding:"4px 5px",fontSize:8.2};
@@ -565,7 +567,6 @@ function CustomerCylinderHeadReport(props){
       React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginBottom:"4mm"}},React.createElement("thead",null,React.createElement("tr",null,React.createElement("th",{style:Object.assign({},cell,{textAlign:"left"})},"Activity"),...koppen.map(k=>React.createElement("th",{key:k.nummer,style:Object.assign({},cell,{textAlign:"center"})},k.nummer)))),React.createElement("tbody",null,...actions.map(item=>React.createElement("tr",{key:item[1]},React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},item[0]),...koppen.map((k,i)=>React.createElement("td",{key:i,style:Object.assign({},cell,{textAlign:"center"})},p.actions&&p.actions[item[1]]||"")))))),
       ...sections.map(item=>p.sections&&p.sections[item[0]]?React.createElement("div",{key:item[0],style:{pageBreakInside:"avoid",marginBottom:"3mm"}},React.createElement("div",{style:{fontWeight:700,fontSize:9.2,marginBottom:"1mm"}},item[1]+":"),React.createElement("div",{style:{fontSize:9,lineHeight:1.45,whiteSpace:"pre-wrap"}},p.sections[item[0]])):null),
       p.partsText&&React.createElement("div",{style:{pageBreakInside:"avoid",marginTop:"4mm"}},React.createElement("div",{style:{fontWeight:700,fontSize:9.2,marginBottom:"1mm"}},"Parts renewed / proposed:"),React.createElement("div",{style:{fontSize:8.8,lineHeight:1.45,whiteSpace:"pre-wrap",border:"1px solid #c8cbc3",padding:"2mm"}},p.partsText)),
-      photos.length?React.createElement("div",{style:{pageBreakBefore:"always"}},React.createElement("img",{src:NICOVERKEN_HEADER_IMAGE,style:{display:"block",width:"100%",height:"auto",marginBottom:"3mm"}}),React.createElement("h2",{style:{fontSize:12,margin:"0 0 3mm"}},"Photos / findings"),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"4mm"}},...photos.map((ph,i)=>React.createElement("div",{key:i,style:{pageBreakInside:"avoid",border:"1px solid #c8cbc3",padding:"2mm"}},React.createElement("img",{src:ph.dataUrl,style:{display:"block",width:"100%",height:"58mm",objectFit:"contain",background:"#f6f6f4"}}),React.createElement("div",{style:{fontSize:8,fontWeight:700,marginTop:"1.5mm"}},(ph.category||"Photo")+(ph.head?" - Head "+ph.head:"")),ph.caption&&React.createElement("div",{style:{fontSize:8,lineHeight:1.35,marginTop:"1mm"}},ph.caption))))):null,
       React.createElement("div",{style:{borderTop:"2px solid #1664a8",paddingTop:"2mm",marginTop:"6mm",display:"flex",justifyContent:"space-between",fontSize:7.5,color:"#304564"}},React.createElement("span",null,"Nicoverken Engine Repair | Cylinderhead Report"),React.createElement("span",null,"Date: ",werkorder.werkopdracht&&werkorder.werkopdracht.datum||""," | Order no.: ",werkorder.werkopdracht&&werkorder.werkopdracht.order_nummer||""))
     )
   );
@@ -574,10 +575,10 @@ function CustomerCylinderHeadReport(props){
 
 function CylinderCustomerEditor(props){
   const {
-    palette,inputStyle,btn,koppen,kopKlantData,kopPhotos,
+    palette,inputStyle,btn,koppen,kopKlantData,
     setKopPhase,regenerateKopCustomerText,setKopView,downloadKopPdf,
     updateKopCustomerCell,updateKopCustomerAction,updateKopCustomerSection,
-    updateKopCustomer,addKopPhotos,setKopPhotos
+    updateKopCustomer
   }=props;
   const phase=kopKlantData.activePhase||"before";
   const p=makeKopCustomerPhase(koppen,phase,kopKlantData&&kopKlantData[phase]);
@@ -634,29 +635,6 @@ function CylinderCustomerEditor(props){
       ),
       React.createElement(Field,{label:"Parts renewed / proposed"},
         React.createElement("textarea",{rows:5,value:p.partsText||"",onChange:e=>updateKopCustomer({...kopKlantData,[phase]:{...p,partsText:e.target.value}}),placeholder:"Part no. - description - qty",style:{...inputStyle,width:"100%",boxSizing:"border-box",resize:"vertical"}})
-      )
-    ),
-    React.createElement("div",{style:{background:"#fff",border:"1px solid "+palette.line,borderRadius:8,padding:18}},
-      React.createElement("h3",{style:{marginTop:0}},"Foto's"),
-      React.createElement("div",{style:{padding:10,border:"1px solid #e0a43b",background:"#fff9eb",borderRadius:6,fontSize:12,marginBottom:12}},"Foto's worden momenteel alleen in deze browsersessie bewaard en in de PDF opgenomen. Persistente foto-opslag komt achter de echte login, zodat we geen klantfoto's anoniem in Storage zetten."),
-      React.createElement("input",{type:"file",accept:"image/*",multiple:true,onChange:e=>{addKopPhotos(e.target.files);e.target.value="";}}),
-      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}},
-        ...kopPhotos.map((ph,i)=>
-          React.createElement("div",{key:i,style:{border:"1px solid "+palette.line,borderRadius:6,padding:10}},
-            React.createElement("img",{src:ph.dataUrl,style:{width:"100%",height:150,objectFit:"contain",background:"#f5f5f1"}}),
-            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 90px",gap:8,marginTop:8}},
-              React.createElement("select",{value:ph.category,onChange:e=>setKopPhotos(prev=>prev.map((x,j)=>j===i?{...x,category:e.target.value}:x)),style:inputStyle},
-                ...photoCats.map(x=>React.createElement("option",{key:x,value:x},x))
-              ),
-              React.createElement("select",{value:ph.head,onChange:e=>setKopPhotos(prev=>prev.map((x,j)=>j===i?{...x,head:e.target.value}:x)),style:inputStyle},
-                React.createElement("option",{value:""},"All"),
-                ...koppen.map(k=>React.createElement("option",{key:k.nummer,value:k.nummer},"Head "+k.nummer))
-              )
-            ),
-            React.createElement("textarea",{rows:2,value:ph.caption,onChange:e=>setKopPhotos(prev=>prev.map((x,j)=>j===i?{...x,caption:e.target.value}:x)),placeholder:"Tekst bij foto",style:{...inputStyle,width:"100%",boxSizing:"border-box",marginTop:8,resize:"vertical"}}),
-            React.createElement("button",{onClick:()=>setKopPhotos(prev=>prev.filter((_,j)=>j!==i)),style:{marginTop:8,border:"1px solid #d9483a",color:"#d9483a",background:"#fff",borderRadius:5,padding:"6px 9px",cursor:"pointer"}},"Verwijderen")
-          )
-        )
       )
     )
   );
@@ -786,7 +764,6 @@ function App() {
   const [showGenericKlantRapport, setShowGenericKlantRapport] = useState(false);
   const [kopView, setKopView] = useState("intern");
   const [kopKlantData, setKopKlantData] = useState({activePhase:"before",before:null,after:null});
-  const [kopPhotos, setKopPhotos] = useState([]);
   const [terugOpmerking, setTerugOpmerking] = useState("");
   const [nieuwKlustype, setNieuwKlustype] = useState({ label:"", code:"", werkbeschrijving:"" });
   const [editingKlustype, setEditingKlustype] = useState(null);
@@ -848,7 +825,7 @@ function App() {
   }
 
   async function openWerkorder(wo,werkopdrachtInfo){
-    setLoadError(""); setKoppen([]); setZuigerRapporten([]); setActiveZuiger(0); setShowZuigerKlantRapport(false); setShowGenericKlantRapport(false); setKopView("intern"); setKopPhotos([]);
+    setLoadError(""); setKoppen([]); setZuigerRapporten([]); setActiveZuiger(0); setShowZuigerKlantRapport(false); setShowGenericKlantRapport(false); setKopView("intern");
     try{
       const combined={...wo,werkopdracht:werkopdrachtInfo};
       setActiveWerkorder(combined); setActiveKop(0); setActivePage(1); setTerugOpmerking("");
@@ -906,8 +883,6 @@ function App() {
   function updateKopCustomerSection(key,value){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); updateKopCustomer({...kopKlantData,[phase]:{...p,sections:{...p.sections,[key]:value}}}); }
   function updateKopCustomerAction(key,value){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); updateKopCustomer({...kopKlantData,[phase]:{...p,actions:{...p.actions,[key]:value}}}); }
   function regenerateKopCustomerText(){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); updateKopCustomer({...kopKlantData,[phase]:{...p,sections:suggestedKopTexts(koppen,p.matrix,phase)}}); }
-  function fileToCompressedDataUrl(file){ return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const max=1600,scale=Math.min(1,max/Math.max(img.width,img.height));const canvas=document.createElement("canvas");canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL("image/jpeg",0.82));};img.src=reader.result;};reader.readAsDataURL(file);}); }
-  async function addKopPhotos(files){ const added=[]; for(const file of Array.from(files||[])){if(!file.type.startsWith("image/"))continue;added.push({dataUrl:await fileToCompressedDataUrl(file),category:"Finding",head:"",caption:""});} if(added.length){setKopPhotos(prev=>[...prev,...added]); if(activeWerkorder.status==="goedgekeurd"){await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({status:"ter_controle"}),prefer:"return=minimal"});setActiveWerkorder(p=>({...p,status:"ter_controle"}));}} }
   async function downloadKopPdf(){ const el=document.getElementById("cilinderkop-klantrapport"); if(!el||!window.html2pdf){setLoadError("PDF-module kon niet worden geladen. Probeer de pagina opnieuw te openen.");return;} const order=(activeWerkorder?.werkopdracht?.order_nummer||"werkorder").replace(/[^a-zA-Z0-9_-]/g,"_"); const phase=kopKlantData.activePhase||"before"; await window.html2pdf().set({margin:[4,4,4,4],filename:`${order}_cilinderkop_${phase}.pdf`,image:{type:"jpeg",quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},pagebreak:{mode:["css","legacy"]}}).from(el).save(); }
 
   async function indienenTerControle(){ try{const patch={status:"ter_controle",uitgevoerd:true};if(!activeWerkorder.monteur&&monteurNaam)patch.monteur=monteurNaam;await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify(patch),prefer:"return=minimal"});setView("overzicht");setActiveWerkorder(null);}catch(e){setLoadError(e.message)} }
@@ -932,7 +907,7 @@ function App() {
 
   function countRejected(kop){let n=0;kop.seatRing.forEach(r=>{if(isRejected(r.measured,r.limit,r.direction))n++});kop.valve.forEach(r=>{if(isRejected(r.measuredQ,r.limitQ,r.direction)||isRejected(r.measuredR,r.limitR,r.direction))n++});kop.valveStem.forEach(r=>{const v=r.measured===""?"":parseFloat(r.measured)-r.nominal;if(isRejected(v,r.limit,r.direction))n++});kop.valveGuide.forEach(r=>{const v=r.measured===""?"":parseFloat(r.measured)-r.nominal;if(isRejected(v,r.limit,r.direction))n++});return n;}
 
-  const ModeSwitch=React.createElement("div",{style:{display:"flex",gap:6,padding:"10px 20px",background:"#1f231c"}},["kantoor","monteur"].map(m=>React.createElement("button",{key:m,onClick:()=>{setMode(m);setView("overzicht");setActiveWerkorder(null)},style:{padding:"6px 14px",borderRadius:5,border:"none",background:mode===m?palette.accent:"transparent",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",textTransform:"uppercase"}},m)),mode==="monteur"&&React.createElement("input",{value:monteurNaam,onChange:e=>setMonteurNaam(e.target.value),placeholder:"Jouw naam",style:{marginLeft:"auto",border:"none",borderRadius:4,padding:"5px 10px",fontSize:12,width:160}}));
+  const ModeSwitch=React.createElement("div",{style:{display:"flex",gap:6,padding:"10px 20px",background:"#1f231c"}},["kantoor","monteur"].map(m=>React.createElement("button",{key:m,onClick:()=>{setMode(m);setView("overzicht");setActiveWerkorder(null)},style:{padding:"6px 14px",borderRadius:5,border:"none",background:mode===m?palette.accent:"transparent",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",textTransform:"uppercase"}},m)),mode==="monteur"&&React.createElement("select",{value:monteurNaam,onChange:e=>setMonteurNaam(e.target.value),style:{marginLeft:"auto",border:"none",borderRadius:4,padding:"5px 10px",fontSize:12,width:180,background:"#fff"}},React.createElement("option",{value:""},"Kies jouw naam..."),...MONTEURS.map(n=>React.createElement("option",{key:n,value:n},n))));
   const ErrorBanner=loadError?React.createElement("div",{style:{background:"#fbeae7",border:"1px solid #d9483a",color:"#8a2e22",borderRadius:6,padding:10,fontSize:12,marginBottom:14}},loadError):null;
   const btn=(label,onClick,extra={})=>React.createElement("button",{onClick,style:{padding:"9px 13px",borderRadius:6,border:`1px solid ${palette.line}`,background:"#fff",fontWeight:700,cursor:"pointer",...extra}},label);
 
@@ -942,7 +917,7 @@ function App() {
 
   if(mode==="kantoor"&&view==="nieuwe_werkopdracht") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,React.createElement("div",{style:{padding:24,maxWidth:500,margin:"0 auto"}},React.createElement("h1",null,"Nieuwe werkopdracht"),ErrorBanner,React.createElement("div",{style:{background:"#fff",padding:20,border:`1px solid ${palette.line}`,borderRadius:8,display:"flex",flexDirection:"column",gap:14}},React.createElement(Field,{label:"Ordernummer"},React.createElement(TextInput,{value:woDraft.orderNummer,onChange:e=>setWoDraft({...woDraft,orderNummer:e.target.value})})),React.createElement(Field,{label:"Schip / klant"},React.createElement(TextInput,{value:woDraft.schipKlant,onChange:e=>setWoDraft({...woDraft,schipKlant:e.target.value})})),React.createElement(Field,{label:"Datum"},React.createElement(TextInput,{type:"date",value:woDraft.datum,onChange:e=>setWoDraft({...woDraft,datum:e.target.value})})),React.createElement("div",{style:{display:"flex",gap:8}},btn("Annuleren",()=>setView("overzicht")),React.createElement("button",{disabled:!woDraft.orderNummer||!woDraft.schipKlant,onClick:createWerkopdracht,style:{padding:"10px 14px",border:0,borderRadius:6,background:palette.accent,color:"#fff",fontWeight:700,cursor:"pointer"}},"Aanmaken →")))));
 
-  if(mode==="kantoor"&&view==="werkorders_toevoegen") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,React.createElement("div",{style:{padding:24,maxWidth:550,margin:"0 auto"}},React.createElement("h1",{style:{fontSize:20}},huidigeWerkopdracht.order_nummer," — ",huidigeWerkopdracht.schip_klant),ErrorBanner,React.createElement("div",{style:{background:"#fff",padding:20,border:`1px solid ${palette.line}`,borderRadius:8,display:"flex",flexDirection:"column",gap:14}},React.createElement(Field,{label:"Klustype"},React.createElement("select",{value:worDraft.klustype,onChange:e=>{const klustype=e.target.value;setWorDraft({...worDraft,klustype,werkbeschrijving:getWerkbeschrijving(klustype),aantal:1,motortype:"",rapportTemplateCode:""})},style:inputStyle},KLUSTYPEN.map(k=>React.createElement("option",{key:k.value,value:k.value},k.label)))),isZuigerKlustype(worDraft.klustype)?React.createElement(Field,{label:"Zuigertype / motortype"},React.createElement("select",{value:worDraft.rapportTemplateCode,onChange:e=>{const code=e.target.value;const t=getZuigerTemplate(code);setWorDraft({...worDraft,rapportTemplateCode:code,motortype:t?.naam||""})},style:inputStyle},React.createElement("option",{value:""},"Kies motortype..."),zuigerTemplates.map(t=>React.createElement("option",{key:t.code,value:t.code},t.naam)))):React.createElement(Field,{label:"Motortype"},React.createElement(TextInput,{value:worDraft.motortype,onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),placeholder:"Vul motortype in"})),React.createElement(Field,{label:"Monteur (optioneel)"},React.createElement(TextInput,{value:worDraft.monteur,onChange:e=>setWorDraft({...worDraft,monteur:e.target.value})})),React.createElement(Field,{label:"Werkbeschrijving"},React.createElement("textarea",{rows:4,value:worDraft.werkbeschrijving,onChange:e=>setWorDraft({...worDraft,werkbeschrijving:e.target.value}),style:{...inputStyle,resize:"vertical"}})),worDraft.klustype==="cilinderkop"&&React.createElement(Field,{label:"Aantal cilinderkoppen"},React.createElement(TextInput,{type:"number",min:1,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),isZuigerKlustype(worDraft.klustype)&&React.createElement(Field,{label:"Aantal zuigers"},React.createElement(TextInput,{type:"number",min:1,max:24,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),btn("+ Werkorder toevoegen",addWerkorder,{background:palette.accent,color:"#fff",border:"none"})),React.createElement("div",{style:{marginTop:14}},btn("Klaar — naar overzicht",()=>{setView("overzicht");setHuidigeWerkopdracht(null)}))));
+  if(mode==="kantoor"&&view==="werkorders_toevoegen") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,React.createElement("div",{style:{padding:24,maxWidth:550,margin:"0 auto"}},React.createElement("h1",{style:{fontSize:20}},huidigeWerkopdracht.order_nummer," — ",huidigeWerkopdracht.schip_klant),ErrorBanner,React.createElement("div",{style:{background:"#fff",padding:20,border:`1px solid ${palette.line}`,borderRadius:8,display:"flex",flexDirection:"column",gap:14}},React.createElement(Field,{label:"Klustype"},React.createElement("select",{value:worDraft.klustype,onChange:e=>{const klustype=e.target.value;setWorDraft({...worDraft,klustype,werkbeschrijving:getWerkbeschrijving(klustype),aantal:1,motortype:"",rapportTemplateCode:""})},style:inputStyle},KLUSTYPEN.map(k=>React.createElement("option",{key:k.value,value:k.value},k.label)))),isZuigerKlustype(worDraft.klustype)?React.createElement(Field,{label:"Zuigertype / motortype"},React.createElement("select",{value:worDraft.rapportTemplateCode,onChange:e=>{const code=e.target.value;const t=getZuigerTemplate(code);setWorDraft({...worDraft,rapportTemplateCode:code,motortype:t?.naam||""})},style:inputStyle},React.createElement("option",{value:""},"Kies motortype..."),zuigerTemplates.map(t=>React.createElement("option",{key:t.code,value:t.code},t.naam)))):React.createElement(Field,{label:"Motortype"},React.createElement(TextInput,{value:worDraft.motortype,onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),placeholder:"Vul motortype in"})),React.createElement(Field,{label:"Monteur (optioneel)"},React.createElement("select",{value:worDraft.monteur,onChange:e=>setWorDraft({...worDraft,monteur:e.target.value}),style:inputStyle},React.createElement("option",{value:""},"Nog niet toewijzen"),...MONTEURS.map(n=>React.createElement("option",{key:n,value:n},n)))),React.createElement(Field,{label:"Werkbeschrijving"},React.createElement("textarea",{rows:4,value:worDraft.werkbeschrijving,onChange:e=>setWorDraft({...worDraft,werkbeschrijving:e.target.value}),style:{...inputStyle,resize:"vertical"}})),worDraft.klustype==="cilinderkop"&&React.createElement(Field,{label:"Aantal cilinderkoppen"},React.createElement(TextInput,{type:"number",min:1,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),isZuigerKlustype(worDraft.klustype)&&React.createElement(Field,{label:"Aantal zuigers"},React.createElement(TextInput,{type:"number",min:1,max:24,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),btn("+ Werkorder toevoegen",addWerkorder,{background:palette.accent,color:"#fff",border:"none"})),React.createElement("div",{style:{marginTop:14}},btn("Klaar — naar overzicht",()=>{setView("overzicht");setHuidigeWerkopdracht(null)}))));
 
   if(mode==="monteur"&&view==="overzicht") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,React.createElement("div",{style:{padding:24,maxWidth:650,margin:"0 auto"}},React.createElement("h1",{style:{fontSize:20}},"Openstaande werkorders"),ErrorBanner,React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:10}},monteurWerkorders.map(wor=>React.createElement("button",{key:wor.id,onClick:()=>openWerkorder(wor,wor.werkopdrachten),style:{textAlign:"left",padding:14,borderRadius:8,border:`1px solid ${palette.line}`,background:"#fff",cursor:"pointer"}},React.createElement("b",null,wor.werkopdrachten?.order_nummer," — ",wor.werkopdrachten?.schip_klant),React.createElement("div",{style:{fontSize:13,color:"#666",margin:"4px 0"}},getKlustypeNaam(wor.klustype)," · ",wor.motortype==="-"?"":wor.motortype),React.createElement(StatusBadge,{status:wor.status}))))));
 
@@ -1019,7 +994,7 @@ function App() {
     if(mode==="kantoor"&&kopView!=="intern"&&koppen.length){
       const phase=kopKlantData.activePhase||"before";
       const p=makeKopCustomerPhase(koppen,phase,kopKlantData&&kopKlantData[phase]);
-      const report=React.createElement(CustomerCylinderHeadReport,{werkorder:activeWerkorder,koppen,data:{...kopKlantData,[phase]:p},photos:kopPhotos});
+      const report=React.createElement(CustomerCylinderHeadReport,{werkorder:activeWerkorder,koppen,data:{...kopKlantData,[phase]:p}});
       if(kopView==="preview") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,header,
         React.createElement("div",{style:{padding:20,maxWidth:1050,margin:"0 auto"}},
           btn("← Terug naar opmaak",()=>setKopView("customer")),
@@ -1028,8 +1003,8 @@ function App() {
       );
       return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,header,
         React.createElement(CylinderCustomerEditor,{
-          palette,inputStyle,btn,koppen,kopKlantData,kopPhotos,setKopPhase,regenerateKopCustomerText,setKopView,downloadKopPdf,
-          updateKopCustomerCell,updateKopCustomerAction,updateKopCustomerSection,updateKopCustomer,addKopPhotos,setKopPhotos
+          palette,inputStyle,btn,koppen,kopKlantData,setKopPhase,regenerateKopCustomerText,setKopView,downloadKopPdf,
+          updateKopCustomerCell,updateKopCustomerAction,updateKopCustomerSection,updateKopCustomer
         }),
         React.createElement("div",{style:{position:"fixed",left:"-10000px",top:0,width:"794px",zIndex:-1}},report)
       );
