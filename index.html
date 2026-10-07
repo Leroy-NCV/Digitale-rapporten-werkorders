@@ -360,6 +360,217 @@ function CustomerPistonReport({ werkorder, rapporten, template }) {
   );
 }
 
+const KOP_CUSTOMER_SECTION_KEYS = ["landing","findings","penetrant","landingSurfaces","valves","seats","cwConnection","guides","rotators"];
+
+function kopResultByLabel(rows,label){
+  return (rows||[]).find(r=>(r.label||"").toLowerCase().includes(label.toLowerCase()))||null;
+}
+
+function kopRowById(rows,id){ return (rows||[]).find(r=>r.id===id)||null; }
+
+function kopMeasuredStatus(row,kind){
+  if(!row) return "";
+  if(kind==="valve"){
+    const q=isRejected(row.measuredQ,row.limitQ,row.direction);
+    const r=isRejected(row.measuredR,row.limitR,row.direction);
+    if(q===null&&r===null) return "";
+    return (q||r)?"NOT OK":"OK";
+  }
+  if(kind==="guide"){
+    if(row.measured===""||row.measured===null||row.measured===undefined) return "";
+    const delta=parseFloat(row.measured)-Number(row.nominal||0);
+    const bad=isRejected(delta,row.limit,row.direction);
+    return bad===null?"":(bad?"NOT OK":"OK");
+  }
+  const bad=isRejected(row.measured,row.limit,row.direction);
+  return bad===null?"":(bad?"NOT OK":"OK");
+}
+
+function suggestedKopMatrix(koppen,phase){
+  const out={valves:{},guides:{},seats:{},seatPocket:{},rotator:{},cwChamber:{},heliCoils:{}};
+  ["E1","E2","S1","S2"].forEach(pos=>{
+    out.valves[pos]=(koppen||[]).map(k=>kopMeasuredStatus(kopRowById(k.valve,pos),"valve"));
+    out.guides[pos]=(koppen||[]).map(k=>kopMeasuredStatus(kopRowById(k.valveGuide,pos),"guide"));
+    out.seats[pos]=(koppen||[]).map(k=>kopMeasuredStatus(kopRowById(k.seatRing,pos),"seat"));
+    out.seatPocket[pos]=(koppen||[]).map(()=>"");
+    out.rotator[pos]=(koppen||[]).map(k=>{
+      const x=kopResultByLabel(k.valveChecks,"Klepdraaiers");
+      if(!x||!x.result) return "";
+      return x.result==="nee"?"NOT OK":x.result==="ja"?"OK":"";
+    });
+  });
+  out.cwChamber.Chamber=(koppen||[]).map(()=>"");
+  out.heliCoils.Qty=(koppen||[]).map(()=>"");
+  if(phase==="after"){
+    ["valves","guides","seats","seatPocket","rotator","cwChamber"].forEach(section=>{
+      Object.keys(out[section]).forEach(row=>{
+        out[section][row]=out[section][row].map(v=>v==="NOT OK"?"":v);
+      });
+    });
+  }
+  return out;
+}
+
+function mergeKopMatrix(suggested,existing){
+  const out=JSON.parse(JSON.stringify(suggested));
+  Object.keys(out).forEach(section=>{
+    Object.keys(out[section]).forEach(row=>{
+      const old=existing&&existing[section]&&existing[section][row]?existing[section][row]:[];
+      out[section][row]=out[section][row].map((v,i)=>old[i]!==undefined&&old[i]!==""?old[i]:v);
+    });
+  });
+  return out;
+}
+
+function countMatrix(matrix,section,positions,value){
+  let n=0;
+  (positions||[]).forEach(pos=>((matrix&&matrix[section]&&matrix[section][pos])||[]).forEach(v=>{if(v===value)n++;}));
+  return n;
+}
+
+function suggestedKopTexts(koppen,matrix,phase){
+  const heads=(koppen||[]).length;
+  const s=["S1","S2"],e=["E1","E2"];
+  const sb=countMatrix(matrix,"valves",s,"NOT OK"),eb=countMatrix(matrix,"valves",e,"NOT OK");
+  const sr=countMatrix(matrix,"valves",s,"RENEWED"),er=countMatrix(matrix,"valves",e,"RENEWED");
+  const sg=countMatrix(matrix,"valves",s,"GRINDED"),eg=countMatrix(matrix,"valves",e,"GRINDED");
+  const gsb=countMatrix(matrix,"guides",s,"NOT OK"),geb=countMatrix(matrix,"guides",e,"NOT OK");
+  const gsr=countMatrix(matrix,"guides",s,"RENEWED"),ger=countMatrix(matrix,"guides",e,"RENEWED");
+  const ssb=countMatrix(matrix,"seats",s,"NOT OK"),seb=countMatrix(matrix,"seats",e,"NOT OK");
+  const ssr=countMatrix(matrix,"seats",s,"RENEWED"),ser=countMatrix(matrix,"seats",e,"RENEWED");
+  const dye=(koppen||[]).filter(k=>{const x=kopResultByLabel(k.disassembly,"Dye-check");return x&&x.result==="ja";}).length;
+  const extra=(koppen||[]).map(k=>k.aanvullendeInfo).filter(Boolean).join(" ");
+  let valves="",guides="",seats="";
+  if(phase==="before"){
+    if(sg) valves+=sg+" suction valve"+(sg===1?" was":"s were")+" found within limit after grinding. ";
+    if(sb) valves+=sb+" suction valve"+(sb===1?" was":"s were")+" found exceeding limit. Renewal required. ";
+    if(eg) valves+=eg+" exhaust valve"+(eg===1?" was":"s were")+" found within limit after grinding. ";
+    if(eb) valves+=eb+" exhaust valve"+(eb===1?" was":"s were")+" found exceeding limit. Renewal required.";
+    if(gsb) guides+=gsb+" suction valve guide"+(gsb===1?" was":"s were")+" found exceeding limit. ";
+    if(geb) guides+=geb+" exhaust valve guide"+(geb===1?" was":"s were")+" found exceeding limit. Renewal required.";
+    if(ssb) seats+=ssb+" suction valve seat"+(ssb===1?" was":"s were")+" found exceeding limit. ";
+    if(seb) seats+=seb+" exhaust valve seat"+(seb===1?" was":"s were")+" found exceeding limit. Renewal required.";
+  }else{
+    if(sr) valves+=sr+" suction valve"+(sr===1?" was":"s were")+" renewed. ";
+    if(er) valves+=er+" exhaust valve"+(er===1?" was":"s were")+" renewed. ";
+    if(sg) valves+=sg+" suction valve"+(sg===1?" was":"s were")+" grinded. ";
+    if(eg) valves+=eg+" exhaust valve"+(eg===1?" was":"s were")+" grinded.";
+    if(gsr) guides+=gsr+" suction valve guide"+(gsr===1?" was":"s were")+" renewed. ";
+    if(ger) guides+=ger+" exhaust valve guide"+(ger===1?" was":"s were")+" renewed.";
+    if(ssr) seats+=ssr+" suction valve seat"+(ssr===1?" was":"s were")+" renewed. ";
+    if(ser) seats+=ser+" exhaust valve seat"+(ser===1?" was":"s were")+" renewed.";
+  }
+  return {
+    landing:"In total "+heads+" ("+String(heads).padStart(2,"0")+") cylinder head"+(heads===1?" was":"s were")+" received for inspection and overhaul.",
+    findings:extra||"",
+    penetrant:dye?"Penetrant test (dye-check) performed on "+(dye===heads?"all ":"")+"cylinder head combustion surfaces. Results recorded in the inspection report.":"",
+    landingSurfaces:"",
+    valves:valves.trim(),
+    seats:seats.trim(),
+    cwConnection:"",
+    guides:guides.trim(),
+    rotators:""
+  };
+}
+
+function makeKopCustomerPhase(koppen,phase,existing){
+  const matrix=mergeKopMatrix(suggestedKopMatrix(koppen,phase),existing&&existing.matrix);
+  const sug=suggestedKopTexts(koppen,matrix,phase);
+  const keys=["landing","findings","penetrant","landingSurfaces","valves","seats","cwConnection","guides","rotators"];
+  const sections={}; keys.forEach(k=>sections[k]=(existing&&existing.sections&&existing.sections[k])||sug[k]||"");
+  return {matrix,actions:Object.assign({dyeCheck:"",pressureTest:"",painted:"",safetyValves:"",sealLips:""},existing&&existing.actions||{}),sections,partsText:existing&&existing.partsText||"",updatedAt:new Date().toISOString()};
+}
+
+function normaliseKopCustomerData(koppen,data){
+  const src=data&&typeof data==="object"?data:{};
+  return {activePhase:src.activePhase==="after"?"after":"before",before:makeKopCustomerPhase(koppen,"before",src.before),after:makeKopCustomerPhase(koppen,"after",src.after)};
+}
+
+function kopOptions(section,phase){
+  if(section==="heliCoils") return null;
+  if(phase==="before"){
+    if(section==="valves") return ["","OK","NOT OK","GRINDED"];
+    if(section==="guides") return ["","OK","NOT OK"];
+    if(section==="seats") return ["","OK","NOT OK","GRINDED","OS TO 0.5 mm","OS TO 1.0 mm","OS TO 2.0 mm","OS TO 3.0 mm"];
+    if(section==="seatPocket") return ["","OK","NOT OK","GRINDED","OS TO 0.5 mm","OS TO 1.0 mm","OS TO 2.0 mm","OS TO 3.0 mm"];
+    if(section==="rotator") return ["","OK","NOT OK"];
+    if(section==="cwChamber") return ["","OK","NOT OK"];
+  }else{
+    if(section==="valves") return ["","OK","GRINDED","RENEWED"];
+    if(section==="guides") return ["","OK","RENEWED"];
+    if(section==="seats") return ["","OK","GRINDED","RENEWED","OS TO 0.5 mm","OS TO 1.0 mm","OS TO 2.0 mm","OS TO 3.0 mm"];
+    if(section==="seatPocket") return ["","OK","GRINDED","REPAIRED","OS TO 0.5 mm","OS TO 1.0 mm","OS TO 2.0 mm","OS TO 3.0 mm"];
+    if(section==="rotator") return ["","OK","RENEWED"];
+    if(section==="cwChamber") return ["","OK","REPAIRED"];
+  }
+  return [""];
+}
+
+function KopMatrixTable(props){
+  const data=props.data,heads=props.heads,phase=props.phase,onCellChange=props.onCellChange,editable=props.editable!==false;
+  const cell={border:"1px solid #7f8790",padding:"4px 3px",fontSize:8,textAlign:"center"};
+  const head=Object.assign({},cell,{fontWeight:700,background:"#eef1f3"});
+  const sections=[
+    ["Valves","valves",["Valve E1","Valve E2","Valve S1","Valve S2"],["E1","E2","S1","S2"]],
+    ["Guides","guides",["Guide E1","Guide E2","Guide S1","Guide S2"],["E1","E2","S1","S2"]],
+    ["Valve Seats","seats",["Seat E1","Seat E2","Seat S1","Seat S2"],["E1","E2","S1","S2"]],
+    ["Seat pocket","seatPocket",["Hole E1","Hole E2","Hole S1","Hole S2"],["E1","E2","S1","S2"]],
+    ["Rotator","rotator",["RTT E1","RTT E2","RTT S1","RTT S2"],["E1","E2","S1","S2"]],
+    ["CW. Chamber condition","cwChamber",["Chamber"],["Chamber"]],
+    ["Heli-coils required","heliCoils",["Qty."],["Qty"]]
+  ];
+  return React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"}},
+    React.createElement("thead",null,React.createElement("tr",null,
+      React.createElement("th",{style:Object.assign({},head,{textAlign:"left",width:"26mm"})},""),
+      ...heads.map((h,i)=>React.createElement("th",{key:i,style:head},"No."+h.nummer))
+    )),
+    React.createElement("tbody",null,...sections.flatMap(item=>{
+      const title=item[0],section=item[1],labels=item[2],rows=item[3];
+      return [
+        React.createElement("tr",{key:title},React.createElement("td",{colSpan:heads.length+1,style:Object.assign({},head,{textAlign:"left",fontSize:8.5})},title)),
+        ...rows.map((row,ri)=>React.createElement("tr",{key:section+"-"+row},
+          React.createElement("td",{style:Object.assign({},cell,{textAlign:"left",fontWeight:700})},labels[ri]),
+          ...heads.map((h,hi)=>{
+            const value=data&&data.matrix&&data.matrix[section]&&data.matrix[section][row]&&data.matrix[section][row][hi]!==undefined?data.matrix[section][row][hi]:"";
+            if(!editable) return React.createElement("td",{key:hi,style:cell},value);
+            if(section==="heliCoils") return React.createElement("td",{key:hi,style:Object.assign({},cell,{padding:2})},React.createElement("input",{type:"number",min:0,value:value,onChange:e=>onCellChange(section,row,hi,e.target.value),style:{width:"100%",boxSizing:"border-box",border:0,textAlign:"center",fontSize:11,padding:5}}));
+            return React.createElement("td",{key:hi,style:Object.assign({},cell,{padding:1})},React.createElement("select",{value:value,onChange:e=>onCellChange(section,row,hi,e.target.value),style:{width:"100%",border:0,background:"#fff",fontSize:9,padding:4}},kopOptions(section,phase).map(o=>React.createElement("option",{key:o,value:o},o||"—"))));
+          })
+        ))
+      ];
+    }))
+  );
+}
+
+function CustomerCylinderHeadReport(props){
+  const werkorder=props.werkorder,koppen=props.koppen,data=props.data,photos=props.photos||[];
+  const phase=data&&data.activePhase==="after"?"after":"before";
+  const p=data&&data[phase]?data[phase]:makeKopCustomerPhase(koppen,phase,{});
+  const cell={border:"1px solid #7f8790",padding:"4px 5px",fontSize:8.2};
+  const actions=[["Dye Check Combustion surface","dyeCheck"],["Pressure test cylinder head","pressureTest"],["Painted cylinder head","painted"],["Safety valves tested","safetyValves"],["Placed new seal lips","sealLips"]];
+  const sections=[["landing","Landing"],["findings","Findings"],["penetrant","Penetrant test"],["landingSurfaces","Landing surfaces"],["valves","Suction- and exhaust valves"],["seats","Suction- and exhaust valve seats"],["cwConnection","Cylinder head CW connection (flange)"],["guides","Suction- and exhaust valve guides"],["rotators","Valve rotators"]];
+  return React.createElement("div",{id:"cilinderkop-klantrapport",style:{width:"190mm",boxSizing:"border-box",background:"#fff",color:"#10182f",fontFamily:"Arial, sans-serif",padding:"7mm"}},
+    React.createElement("img",{src:NICOVERKEN_HEADER_IMAGE,style:{display:"block",width:"100%",height:"auto",marginBottom:"3mm"}}),
+    werkorder.status!=="goedgekeurd"&&React.createElement("div",{style:{border:"1px solid #bd3b32",color:"#9d2f28",padding:"1.5mm 2mm",fontSize:8,fontWeight:700,textAlign:"center",marginBottom:"2mm"}},"DRAFT - NOT APPROVED"),
+    React.createElement("h1",{style:{textAlign:"center",fontSize:17,margin:"0 0 3mm"}},"Cylinderhead Report"),
+    React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginBottom:"3mm"}},React.createElement("tbody",null,
+      React.createElement("tr",null,React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Vessel / Customer"),React.createElement("td",{style:cell},werkorder.werkopdracht&&werkorder.werkopdracht.schip_klant||""),React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Date"),React.createElement("td",{style:cell},werkorder.werkopdracht&&werkorder.werkopdracht.datum||"")),
+      React.createElement("tr",null,React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"O/ref"),React.createElement("td",{style:cell},(werkorder.werkopdracht&&werkorder.werkopdracht.order_nummer||"")+" ("+phase+")"),React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Engine type"),React.createElement("td",{style:cell},werkorder.motortype==="-"?"":werkorder.motortype)),
+      React.createElement("tr",null,React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Employee"),React.createElement("td",{style:cell},werkorder.monteur||""),React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Subject"),React.createElement("td",{style:cell},"Cylinder head Assy, "+String(koppen.length).padStart(2,"0")+" pc."))
+    )),
+    React.createElement(KopMatrixTable,{data:p,heads:koppen,phase:phase,editable:false}),
+    React.createElement("div",{style:{pageBreakBefore:"always",paddingTop:"2mm"}},
+      React.createElement("img",{src:NICOVERKEN_HEADER_IMAGE,style:{display:"block",width:"100%",height:"auto",marginBottom:"3mm"}}),
+      React.createElement("h2",{style:{fontSize:12,margin:"0 0 2mm"}},"Inspection / overhaul summary"),
+      React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginBottom:"4mm"}},React.createElement("thead",null,React.createElement("tr",null,React.createElement("th",{style:Object.assign({},cell,{textAlign:"left"})},"Activity"),...koppen.map(k=>React.createElement("th",{key:k.nummer,style:Object.assign({},cell,{textAlign:"center"})},k.nummer)))),React.createElement("tbody",null,...actions.map(item=>React.createElement("tr",{key:item[1]},React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},item[0]),...koppen.map((k,i)=>React.createElement("td",{key:i,style:Object.assign({},cell,{textAlign:"center"})},p.actions&&p.actions[item[1]]||"")))))),
+      ...sections.map(item=>p.sections&&p.sections[item[0]]?React.createElement("div",{key:item[0],style:{pageBreakInside:"avoid",marginBottom:"3mm"}},React.createElement("div",{style:{fontWeight:700,fontSize:9.2,marginBottom:"1mm"}},item[1]+":"),React.createElement("div",{style:{fontSize:9,lineHeight:1.45,whiteSpace:"pre-wrap"}},p.sections[item[0]])):null),
+      p.partsText&&React.createElement("div",{style:{pageBreakInside:"avoid",marginTop:"4mm"}},React.createElement("div",{style:{fontWeight:700,fontSize:9.2,marginBottom:"1mm"}},"Parts renewed / proposed:"),React.createElement("div",{style:{fontSize:8.8,lineHeight:1.45,whiteSpace:"pre-wrap",border:"1px solid #c8cbc3",padding:"2mm"}},p.partsText)),
+      photos.length?React.createElement("div",{style:{pageBreakBefore:"always"}},React.createElement("img",{src:NICOVERKEN_HEADER_IMAGE,style:{display:"block",width:"100%",height:"auto",marginBottom:"3mm"}}),React.createElement("h2",{style:{fontSize:12,margin:"0 0 3mm"}},"Photos / findings"),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"4mm"}},...photos.map((ph,i)=>React.createElement("div",{key:i,style:{pageBreakInside:"avoid",border:"1px solid #c8cbc3",padding:"2mm"}},React.createElement("img",{src:ph.dataUrl,style:{display:"block",width:"100%",height:"58mm",objectFit:"contain",background:"#f6f6f4"}}),React.createElement("div",{style:{fontSize:8,fontWeight:700,marginTop:"1.5mm"}},(ph.category||"Photo")+(ph.head?" - Head "+ph.head:"")),ph.caption&&React.createElement("div",{style:{fontSize:8,lineHeight:1.35,marginTop:"1mm"}},ph.caption))))):null,
+      React.createElement("div",{style:{borderTop:"2px solid #1664a8",paddingTop:"2mm",marginTop:"6mm",display:"flex",justifyContent:"space-between",fontSize:7.5,color:"#304564"}},React.createElement("span",null,"Nicoverken Engine Repair | Cylinderhead Report"),React.createElement("span",null,"Date: ",werkorder.werkopdracht&&werkorder.werkopdracht.datum||""," | Order no.: ",werkorder.werkopdracht&&werkorder.werkopdracht.order_nummer||""))
+    )
+  );
+}
+
 function getGenericReportTitle(klustype,label) {
   const titles = {
     brandstof_pompen_voor: "FUEL INJECTION PUMP INSPECTION REPORT - BEFORE",
@@ -482,6 +693,9 @@ function App() {
   const [activeZuiger, setActiveZuiger] = useState(0);
   const [showZuigerKlantRapport, setShowZuigerKlantRapport] = useState(false);
   const [showGenericKlantRapport, setShowGenericKlantRapport] = useState(false);
+  const [kopView, setKopView] = useState("intern");
+  const [kopKlantData, setKopKlantData] = useState({activePhase:"before",before:null,after:null});
+  const [kopPhotos, setKopPhotos] = useState([]);
   const [terugOpmerking, setTerugOpmerking] = useState("");
   const [nieuwKlustype, setNieuwKlustype] = useState({ label:"", code:"", werkbeschrijving:"" });
   const [editingKlustype, setEditingKlustype] = useState(null);
@@ -543,13 +757,15 @@ function App() {
   }
 
   async function openWerkorder(wo,werkopdrachtInfo){
-    setLoadError(""); setKoppen([]); setZuigerRapporten([]); setActiveZuiger(0); setShowZuigerKlantRapport(false); setShowGenericKlantRapport(false);
+    setLoadError(""); setKoppen([]); setZuigerRapporten([]); setActiveZuiger(0); setShowZuigerKlantRapport(false); setShowGenericKlantRapport(false); setKopView("intern"); setKopPhotos([]);
     try{
       const combined={...wo,werkopdracht:werkopdrachtInfo};
       setActiveWerkorder(combined); setActiveKop(0); setActivePage(1); setTerugOpmerking("");
       if(wo.klustype==="cilinderkop"){
         const rows=await sb(`cilinderkop_rapporten?werkorder_id=eq.${wo.id}&select=*&order=nummer.asc`);
-        setKoppen((rows||[]).map(rowToKop));
+        const loadedKoppen=(rows||[]).map(rowToKop);
+        setKoppen(loadedKoppen);
+        setKopKlantData(normaliseKopCustomerData(loadedKoppen,wo.cilinderkop_klantdata||{}));
       }else if(isZuigerKlustype(wo.klustype)){
         let rows=await sb(`zuiger_rapporten?werkorder_id=eq.${wo.id}&select=*&order=nummer.asc`);
         if(!rows || !rows.length){
@@ -566,7 +782,7 @@ function App() {
   function debounce(fn){ setSaving(true); clearTimeout(saveTimer.current); saveTimer.current=setTimeout(async()=>{try{await fn()}catch(e){setLoadError(e.message)}finally{setSaving(false)}},600); }
   function updateWerkbeschrijving(text){ setActiveWerkorder(p=>({...p,werkbeschrijving:text})); debounce(()=>sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({werkbeschrijving:text}),prefer:"return=minimal"})); }
   function updateWerkorderMeta(patch){ setActiveWerkorder(p=>({...p,...patch})); debounce(()=>sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify(patch),prefer:"return=minimal"})); }
-  function scheduleSaveKop(kop){ debounce(async()=>{const row=kopToRow(kop,activeWerkorder.id); delete row.werkorder_id; delete row.nummer; await sb(`cilinderkop_rapporten?id=eq.${kop.id}`,{method:"PATCH",body:JSON.stringify(row),prefer:"return=minimal"});}); }
+  function scheduleSaveKop(kop){ debounce(async()=>{const row=kopToRow(kop,activeWerkorder.id); delete row.werkorder_id; delete row.nummer; await sb(`cilinderkop_rapporten?id=eq.${kop.id}`,{method:"PATCH",body:JSON.stringify(row),prefer:"return=minimal"}); if(activeWerkorder.status==="goedgekeurd"){await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({status:"ter_controle"}),prefer:"return=minimal"});setActiveWerkorder(p=>({...p,status:"ter_controle"}));}}); }
   function updateKop(index,patch){ setKoppen(prev=>{const next=prev.map((k,i)=>i===index?{...k,...patch}:k); scheduleSaveKop(next[index]); return next;}); }
   function updateRow(field,i,value){ setKoppen(prev=>prev.map((k,ki)=>{if(ki!==activeKop)return k; const rows=[...k[field]];rows[i]=value;const updated={...k,[field]:rows};scheduleSaveKop(updated);return updated;})); }
   function updateZuiger(patch){
@@ -592,6 +808,16 @@ function App() {
     const type=(activeWerkorder?.klustype||"rapport").replace(/[^a-zA-Z0-9_-]/g,"_");
     await window.html2pdf().set({margin:[5,5,5,5],filename:`${order}_${type}.pdf`,image:{type:"jpeg",quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},pagebreak:{mode:["css","legacy"]}}).from(el).save();
   }
+
+  function updateKopCustomer(next){ setKopKlantData(next); const patch={cilinderkop_klantdata:next}; if(activeWerkorder.status==="goedgekeurd") patch.status="ter_controle"; debounce(async()=>{await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify(patch),prefer:"return=minimal"});}); setActiveWerkorder(p=>({...p,...patch})); }
+  function setKopPhase(phase){ updateKopCustomer({...kopKlantData,activePhase:phase,[phase]:makeKopCustomerPhase(koppen,phase,kopKlantData?.[phase])}); }
+  function updateKopCustomerCell(section,row,headIndex,value){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); const arr=[...(p.matrix?.[section]?.[row]||[])]; arr[headIndex]=value; updateKopCustomer({...kopKlantData,[phase]:{...p,matrix:{...p.matrix,[section]:{...p.matrix[section],[row]:arr}}}}); }
+  function updateKopCustomerSection(key,value){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); updateKopCustomer({...kopKlantData,[phase]:{...p,sections:{...p.sections,[key]:value}}}); }
+  function updateKopCustomerAction(key,value){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); updateKopCustomer({...kopKlantData,[phase]:{...p,actions:{...p.actions,[key]:value}}}); }
+  function regenerateKopCustomerText(){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); updateKopCustomer({...kopKlantData,[phase]:{...p,sections:suggestedKopTexts(koppen,p.matrix,phase)}}); }
+  function fileToCompressedDataUrl(file){ return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const max=1600,scale=Math.min(1,max/Math.max(img.width,img.height));const canvas=document.createElement("canvas");canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL("image/jpeg",0.82));};img.src=reader.result;};reader.readAsDataURL(file);}); }
+  async function addKopPhotos(files){ const added=[]; for(const file of Array.from(files||[])){if(!file.type.startsWith("image/"))continue;added.push({dataUrl:await fileToCompressedDataUrl(file),category:"Finding",head:"",caption:""});} if(added.length){setKopPhotos(prev=>[...prev,...added]); if(activeWerkorder.status==="goedgekeurd"){await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({status:"ter_controle"}),prefer:"return=minimal"});setActiveWerkorder(p=>({...p,status:"ter_controle"}));}} }
+  async function downloadKopPdf(){ const el=document.getElementById("cilinderkop-klantrapport"); if(!el||!window.html2pdf){setLoadError("PDF-module kon niet worden geladen. Probeer de pagina opnieuw te openen.");return;} const order=(activeWerkorder?.werkopdracht?.order_nummer||"werkorder").replace(/[^a-zA-Z0-9_-]/g,"_"); const phase=kopKlantData.activePhase||"before"; await window.html2pdf().set({margin:[4,4,4,4],filename:`${order}_cilinderkop_${phase}.pdf`,image:{type:"jpeg",quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},pagebreak:{mode:["css","legacy"]}}).from(el).save(); }
 
   async function indienenTerControle(){ try{const patch={status:"ter_controle",uitgevoerd:true};if(!activeWerkorder.monteur&&monteurNaam)patch.monteur=monteurNaam;await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify(patch),prefer:"return=minimal"});setView("overzicht");setActiveWerkorder(null);}catch(e){setLoadError(e.message)} }
   async function goedkeuren(){ try{await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({status:"goedgekeurd"}),prefer:"return=minimal"});setView("overzicht");setActiveWerkorder(null);}catch(e){setLoadError(e.message)} }
@@ -699,8 +925,23 @@ function App() {
       );
     }
 
+    if(mode==="kantoor"&&kopView!=="intern"&&koppen.length){
+      const phase=kopKlantData.activePhase||"before";
+      const p=makeKopCustomerPhase(koppen,phase,kopKlantData?.[phase]);
+      const report=React.createElement(CustomerCylinderHeadReport,{werkorder:activeWerkorder,koppen,data:{...kopKlantData,[phase]:p},photos:kopPhotos});
+      if(kopView==="preview") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,header,React.createElement("div",{style:{padding:20,maxWidth:1050,margin:"0 auto"}},btn("← Terug naar opmaak",()=>setKopView("customer")),React.createElement("div",{style:{background:"#ddd",padding:16,overflowX:"auto",marginTop:10}},report)));
+      const secLabels={landing:"Landing",findings:"Findings",penetrant:"Penetrant test",landingSurfaces:"Landing surfaces",valves:"Suction- and exhaust valves",seats:"Suction- and exhaust valve seats",cwConnection:"Cylinder head CW connection (flange)",guides:"Suction- and exhaust valve guides",rotators:"Valve rotators"};
+      return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,header,React.createElement("div",{style:{padding:20,maxWidth:1050,margin:"0 auto"}},
+        React.createElement("div",{style:{display:"flex",gap:8,marginBottom:12}},btn("Intern monteurrapport",()=>setKopView("intern")),btn("Klantverslag opmaken",()=>setKopView("customer"),{background:palette.accent,color:"#fff",border:"none"})),
+        React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:18,marginBottom:14}},React.createElement("div",{style:{display:"flex",gap:10,alignItems:"end",flexWrap:"wrap"}},React.createElement(Field,{label:"Rapportfase"},React.createElement("select",{value:phase,onChange:e=>setKopPhase(e.target.value),style:{...inputStyle,minWidth:150}},React.createElement("option",{value:"before"},"BEFORE"),React.createElement("option",{value:"after"},"AFTER"))),React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:8,flexWrap:"wrap"}},btn("Tekst opnieuw voorstellen",regenerateKopCustomerText),btn("Voorbeeld klant-PDF",()=>setKopView("preview")),btn("Download PDF",downloadKopPdf,{background:palette.accent,color:"#fff",border:"none"}))),React.createElement("div",{style:{marginTop:10,fontSize:12,color:"#666"}},"Before = conditie/bevinding. After = uitgevoerd/eindresultaat. Kantoor controleert altijd vóór goedkeuring.")),
+        React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:18,marginBottom:14,overflowX:"auto"}},React.createElement("h3",{style:{marginTop:0}},"Klantmatrix"),React.createElement("div",{style:{minWidth:650}},React.createElement(KopMatrixTable,{data:p,heads:koppen,phase,onCellChange:updateKopCustomerCell,editable:true}))),
+        React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:18,marginBottom:14}},React.createElement("h3",{style:{marginTop:0}},"Acties"),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}},...[["dyeCheck","Dye Check Combustion surface"],["pressureTest","Pressure test cylinder head"],["painted","Painted cylinder head"],["safetyValves","Safety valves tested"],["sealLips","Placed new seal lips"]].map(x=>React.createElement(Field,{key:x[0],label:x[1]},React.createElement("select",{value:p.actions?.[x[0]]||"",onChange:e=>updateKopCustomerAction(x[0],e.target.value),style:inputStyle},["","OK","N/A","DONE","NOT OK"].map(v=>React.createElement("option",{key:v,value:v},v||"—"))))))),
+        React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:18,marginBottom:14}},React.createElement("h3",{style:{marginTop:0}},"Klanttekst"),...KOP_CUSTOMER_SECTION_KEYS.map(key=>React.createElement("div",{key,style:{marginBottom:12}},React.createElement(Field,{label:secLabels[key]},React.createElement("textarea",{rows:3,value:p.sections?.[key]||"",onChange:e=>updateKopCustomerSection(key,e.target.value),style:{...inputStyle,width:"100%",boxSizing:"border-box",resize:"vertical"}}))),React.createElement(Field,{label:"Parts renewed / proposed"},React.createElement("textarea",{rows:5,value:p.partsText||"",onChange:e=>updateKopCustomer({...kopKlantData,[phase]:{...p,partsText:e.target.value}}),placeholder:"Part no. - description - qty",style:{...inputStyle,width:"100%",boxSizing:"border-box",resize:"vertical"}})),
+        React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:18}},React.createElement("h3",{style:{marginTop:0}},"Foto's"),React.createElement("div",{style:{padding:10,border:"1px solid #e0a43b",background:"#fff9eb",borderRadius:6,fontSize:12,marginBottom:12}},"Foto's worden momenteel alleen in deze browsersessie bewaard en in de PDF opgenomen. Persistente foto-opslag komt achter de echte login, zodat we geen klantfoto's anoniem in Storage zetten."),React.createElement("input",{type:"file",accept:"image/*",multiple:true,onChange:e=>{addKopPhotos(e.target.files);e.target.value="";}}),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:12}},...kopPhotos.map((ph,i)=>React.createElement("div",{key:i,style:{border:`1px solid ${palette.line}`,borderRadius:6,padding:10}},React.createElement("img",{src:ph.dataUrl,style:{width:"100%",height:150,objectFit:"contain",background:"#f5f5f1"}}),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 90px",gap:8,marginTop:8}},React.createElement("select",{value:ph.category,onChange:e=>setKopPhotos(prev=>prev.map((x,j)=>j===i?{...x,category:e.target.value}:x)),style:inputStyle},["Finding","Dye check","Pressure test","Valve","Valve seat","Guide","Damage","Final result"].map(x=>React.createElement("option",{key:x,value:x},x))),React.createElement("select",{value:ph.head,onChange:e=>setKopPhotos(prev=>prev.map((x,j)=>j===i?{...x,head:e.target.value}:x)),style:inputStyle},React.createElement("option",{value:""},"All"),...koppen.map(k=>React.createElement("option",{key:k.nummer,value:k.nummer},"Head "+k.nummer)))),React.createElement("textarea",{rows:2,value:ph.caption,onChange:e=>setKopPhotos(prev=>prev.map((x,j)=>j===i?{...x,caption:e.target.value}:x)),placeholder:"Tekst bij foto",style:{...inputStyle,width:"100%",boxSizing:"border-box",marginTop:8,resize:"vertical"}}),React.createElement("button",{onClick:()=>setKopPhotos(prev=>prev.filter((_,j)=>j!==i)),style:{marginTop:8,border:"1px solid #d9483a",color:"#d9483a",background:"#fff",borderRadius:5,padding:"6px 9px",cursor:"pointer"}},"Verwijderen")))))
+      ),React.createElement("div",{style:{position:"fixed",left:"-10000px",top:0,width:"794px",zIndex:-1}},report));
+    }
     const kop=koppen[activeKop]; if(!kop) return React.createElement("div",null,ModeSwitch,header,React.createElement("div",{style:{padding:24}},"Geen cilinderkoprapport gevonden."));
-    return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,header,React.createElement("div",{style:{display:"flex"}},React.createElement("div",{style:{width:190,background:"#fff",borderRight:`1px solid ${palette.line}`,padding:14}},React.createElement("b",{style:{fontSize:12}},"CILINDERKOPPEN"),koppen.map((k,i)=>React.createElement("button",{key:i,onClick:()=>{setActiveKop(i);setActivePage(1)},style:{display:"flex",justifyContent:"space-between",width:"100%",padding:"9px 10px",marginTop:6,borderRadius:5,border:i===activeKop?`1px solid ${palette.accent}`:"1px solid transparent",background:i===activeKop?"#fbeee6":"transparent",cursor:"pointer"}},React.createElement("span",null,"Kop ",k.nummer),countRejected(k)>0&&React.createElement("span",{style:{background:"#d9483a",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10}},countRejected(k))))),React.createElement("div",{style:{flex:1,padding:20,maxWidth:900}},React.createElement("div",{style:{display:"flex",gap:6,marginBottom:14}},[1,2,3].map(p=>btn(`${p}/3 ${p===1?"Demontage & inspectie":p===2?"Metingen kleppen":"Montage"}`,()=>setActivePage(p),{background:activePage===p?palette.accent:"#fff",color:activePage===p?"#fff":palette.ink,border:`1px solid ${activePage===p?palette.accent:palette.line}`}))),React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:20}},activePage===1&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Demontage & inspectie"),React.createElement(ChecklistTable,{rows:kop.disassembly,onChange:(i,v)=>updateRow("disassembly",i,v)}),React.createElement("div",{style:{fontWeight:700,margin:"18px 0 6px"}},"Zittingring"),React.createElement(SeatRingTable,{rows:kop.seatRing,onChange:(i,v)=>updateRow("seatRing",i,v)})),activePage===2&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Klepmetingen"),React.createElement(ValveTable,{rows:kop.valve,onChange:(i,v)=>updateRow("valve",i,v)}),React.createElement(ToleranceTable,{title:"Klepsteel",rows:kop.valveStem,onChange:(i,v)=>updateRow("valveStem",i,v)}),React.createElement(ToleranceTable,{title:"Klepgeleider",rows:kop.valveGuide,onChange:(i,v)=>updateRow("valveGuide",i,v)}),React.createElement(ChecklistTable,{rows:kop.valveChecks,onChange:(i,v)=>updateRow("valveChecks",i,v)})),activePage===3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Montage"),React.createElement(ChecklistTable,{rows:kop.assembly,onChange:(i,v)=>updateRow("assembly",i,v)}),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"160px 1fr",gap:14,marginTop:18}},React.createElement(Field,{label:"Werkuren"},React.createElement(TextInput,{type:"number",step:"0.25",value:kop.werkuren,onChange:e=>updateKop(activeKop,{werkuren:e.target.value})})),React.createElement(Field,{label:"Aanvullende informatie"},React.createElement("textarea",{rows:3,value:kop.aanvullendeInfo,onChange:e=>updateKop(activeKop,{aanvullendeInfo:e.target.value}),style:{...inputStyle,resize:"vertical"}}))))))));
+    return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,header,mode==="kantoor"&&React.createElement("div",{style:{padding:"12px 20px 0",maxWidth:1050,margin:"0 auto",display:"flex",gap:8}},btn("Intern monteurrapport",()=>setKopView("intern"),{background:palette.accent,color:"#fff",border:"none"}),btn("Klantverslag opmaken",()=>setKopView("customer"))),React.createElement("div",{style:{display:"flex"}},React.createElement("div",{style:{width:190,background:"#fff",borderRight:`1px solid ${palette.line}`,padding:14}},React.createElement("b",{style:{fontSize:12}},"CILINDERKOPPEN"),koppen.map((k,i)=>React.createElement("button",{key:i,onClick:()=>{setActiveKop(i);setActivePage(1)},style:{display:"flex",justifyContent:"space-between",width:"100%",padding:"9px 10px",marginTop:6,borderRadius:5,border:i===activeKop?`1px solid ${palette.accent}`:"1px solid transparent",background:i===activeKop?"#fbeee6":"transparent",cursor:"pointer"}},React.createElement("span",null,"Kop ",k.nummer),countRejected(k)>0&&React.createElement("span",{style:{background:"#d9483a",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10}},countRejected(k))))),React.createElement("div",{style:{flex:1,padding:20,maxWidth:900}},React.createElement("div",{style:{display:"flex",gap:6,marginBottom:14}},[1,2,3].map(p=>btn(`${p}/3 ${p===1?"Demontage & inspectie":p===2?"Metingen kleppen":"Montage"}`,()=>setActivePage(p),{background:activePage===p?palette.accent:"#fff",color:activePage===p?"#fff":palette.ink,border:`1px solid ${activePage===p?palette.accent:palette.line}`}))),React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:20}},activePage===1&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Demontage & inspectie"),React.createElement(ChecklistTable,{rows:kop.disassembly,onChange:(i,v)=>updateRow("disassembly",i,v)}),React.createElement("div",{style:{fontWeight:700,margin:"18px 0 6px"}},"Zittingring"),React.createElement(SeatRingTable,{rows:kop.seatRing,onChange:(i,v)=>updateRow("seatRing",i,v)})),activePage===2&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Klepmetingen"),React.createElement(ValveTable,{rows:kop.valve,onChange:(i,v)=>updateRow("valve",i,v)}),React.createElement(ToleranceTable,{title:"Klepsteel",rows:kop.valveStem,onChange:(i,v)=>updateRow("valveStem",i,v)}),React.createElement(ToleranceTable,{title:"Klepgeleider",rows:kop.valveGuide,onChange:(i,v)=>updateRow("valveGuide",i,v)}),React.createElement(ChecklistTable,{rows:kop.valveChecks,onChange:(i,v)=>updateRow("valveChecks",i,v)})),activePage===3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Montage"),React.createElement(ChecklistTable,{rows:kop.assembly,onChange:(i,v)=>updateRow("assembly",i,v)}),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"160px 1fr",gap:14,marginTop:18}},React.createElement(Field,{label:"Werkuren"},React.createElement(TextInput,{type:"number",step:"0.25",value:kop.werkuren,onChange:e=>updateKop(activeKop,{werkuren:e.target.value})})),React.createElement(Field,{label:"Aanvullende informatie"},React.createElement("textarea",{rows:3,value:kop.aanvullendeInfo,onChange:e=>updateKop(activeKop,{aanvullendeInfo:e.target.value}),style:{...inputStyle,resize:"vertical"}}))))))));
   }
   return null;
 }
