@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <title>Werkorders - Nicoverken</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -14,8 +14,14 @@
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root"><div style="font-family:Arial,sans-serif;padding:24px;color:#1f231c">Applicatie laden...</div></div>
 <script>
+window.addEventListener("error",function(e){
+  const root=document.getElementById("root");
+  if(root && (!window.React || !window.ReactDOM)){
+    root.innerHTML='<div style="font-family:Arial,sans-serif;padding:24px"><h2>De applicatie kon niet laden</h2><p>Een externe JavaScript-library is niet bereikbaar. Vernieuw de pagina of probeer een ander netwerk/browser.</p></div>';
+  }
+});
 const { useState, useEffect, useRef } = React;
 const SUPABASE_URL = "https://aoqvxgfpqinzpauukfpw.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Ij1vK5VhIQH14LW-5YQxtw_eO9fQ6Q_";
