@@ -395,16 +395,16 @@ function kopMeasuredStatus(row,kind){
     const q=isRejected(row.measuredQ,row.limitQ,row.direction);
     const r=isRejected(row.measuredR,row.limitR,row.direction);
     if(q===null&&r===null) return "";
-    return (q||r)?"NOT OK":"OK";
+    return (q||r)?"NOT OK - EXCEEDING LIMITS":"OK";
   }
   if(kind==="guide"){
     if(row.measured===""||row.measured===null||row.measured===undefined) return "";
     const delta=parseFloat(row.measured)-Number(row.nominal||0);
     const bad=isRejected(delta,row.limit,row.direction);
-    return bad===null?"":(bad?"NOT OK":"OK");
+    return bad===null?"":(bad?"NOT OK - EXCEEDING LIMITS":"OK");
   }
   const bad=isRejected(row.measured,row.limit,row.direction);
-  return bad===null?"":(bad?"NOT OK":"OK");
+  return bad===null?"":(bad?"NOT OK - EXCEEDING LIMITS":"OK");
 }
 
 function suggestedKopMatrix(koppen,phase){
@@ -425,7 +425,7 @@ function suggestedKopMatrix(koppen,phase){
   if(phase==="after"){
     ["valves","guides","seats","seatPocket","rotator","cwChamber"].forEach(section=>{
       Object.keys(out[section]).forEach(row=>{
-        out[section][row]=out[section][row].map(v=>v==="NOT OK"?"":v);
+        out[section][row]=out[section][row].map(v=>String(v||"").startsWith("NOT OK")?"":v);
       });
     });
   }
@@ -449,28 +449,52 @@ function countMatrix(matrix,section,positions,value){
   return n;
 }
 
+function countMatrixPrefix(matrix,section,positions,prefix){
+  let n=0;
+  (positions||[]).forEach(pos=>((matrix&&matrix[section]&&matrix[section][pos])||[]).forEach(v=>{if(String(v||"").startsWith(prefix))n++;}));
+  return n;
+}
+function kopReasonCount(matrix,section,positions,reason){
+  return countMatrix(matrix,section,positions,"NOT OK - "+reason);
+}
+function kopReasonText(count,label,reason){
+  if(!count) return "";
+  const plural=count===1?" was":"s were";
+  const reasons={
+    "EXCEEDING LIMITS":" found exceeding maker limits. Renewal required. ",
+    "CAVITATED":" found cavitated. Renewal required. ",
+    "DAMAGED":" found damaged. Renewal required. ",
+    "OTHER":" found not acceptable during inspection. Renewal required. "
+  };
+  return count+" "+label+(count===1?"": "s")+plural+(reasons[reason]||" found not acceptable. Renewal required. ");
+}
+
 function suggestedKopTexts(koppen,matrix,phase){
   const heads=(koppen||[]).length;
   const s=["S1","S2"],e=["E1","E2"];
-  const sb=countMatrix(matrix,"valves",s,"NOT OK"),eb=countMatrix(matrix,"valves",e,"NOT OK");
+  const sb=countMatrixPrefix(matrix,"valves",s,"NOT OK"),eb=countMatrixPrefix(matrix,"valves",e,"NOT OK");
   const sr=countMatrix(matrix,"valves",s,"RENEWED"),er=countMatrix(matrix,"valves",e,"RENEWED");
   const sg=countMatrix(matrix,"valves",s,"GRINDED"),eg=countMatrix(matrix,"valves",e,"GRINDED");
-  const gsb=countMatrix(matrix,"guides",s,"NOT OK"),geb=countMatrix(matrix,"guides",e,"NOT OK");
+  const gsb=countMatrixPrefix(matrix,"guides",s,"NOT OK"),geb=countMatrixPrefix(matrix,"guides",e,"NOT OK");
   const gsr=countMatrix(matrix,"guides",s,"RENEWED"),ger=countMatrix(matrix,"guides",e,"RENEWED");
-  const ssb=countMatrix(matrix,"seats",s,"NOT OK"),seb=countMatrix(matrix,"seats",e,"NOT OK");
+  const ssb=countMatrixPrefix(matrix,"seats",s,"NOT OK"),seb=countMatrixPrefix(matrix,"seats",e,"NOT OK");
   const ssr=countMatrix(matrix,"seats",s,"RENEWED"),ser=countMatrix(matrix,"seats",e,"RENEWED");
   const dye=(koppen||[]).filter(k=>{const x=kopResultByLabel(k.disassembly,"Dye-check");return x&&x.result==="ja";}).length;
   const extra=(koppen||[]).map(k=>k.aanvullendeInfo).filter(Boolean).join(" ");
   let valves="",guides="",seats="";
   if(phase==="before"){
     if(sg) valves+=sg+" suction valve"+(sg===1?" was":"s were")+" found within limit after grinding. ";
-    if(sb) valves+=sb+" suction valve"+(sb===1?" was":"s were")+" found exceeding limit. Renewal required. ";
+    ["EXCEEDING LIMITS","CAVITATED","DAMAGED","OTHER"].forEach(r=>{valves+=kopReasonText(kopReasonCount(matrix,"valves",s,r),"suction valve",r);});
+    if(sb&&!["EXCEEDING LIMITS","CAVITATED","DAMAGED","OTHER"].some(r=>kopReasonCount(matrix,"valves",s,r))) valves+=sb+" suction valve"+(sb===1?" was":"s were")+" found not acceptable. Renewal required. ";
     if(eg) valves+=eg+" exhaust valve"+(eg===1?" was":"s were")+" found within limit after grinding. ";
-    if(eb) valves+=eb+" exhaust valve"+(eb===1?" was":"s were")+" found exceeding limit. Renewal required.";
+    ["EXCEEDING LIMITS","CAVITATED","DAMAGED","OTHER"].forEach(r=>{valves+=kopReasonText(kopReasonCount(matrix,"valves",e,r),"exhaust valve",r);});
+    if(eb&&!["EXCEEDING LIMITS","CAVITATED","DAMAGED","OTHER"].some(r=>kopReasonCount(matrix,"valves",e,r))) valves+=eb+" exhaust valve"+(eb===1?" was":"s were")+" found not acceptable. Renewal required. ";
     if(gsb) guides+=gsb+" suction valve guide"+(gsb===1?" was":"s were")+" found exceeding limit. ";
     if(geb) guides+=geb+" exhaust valve guide"+(geb===1?" was":"s were")+" found exceeding limit. Renewal required.";
-    if(ssb) seats+=ssb+" suction valve seat"+(ssb===1?" was":"s were")+" found exceeding limit. ";
-    if(seb) seats+=seb+" exhaust valve seat"+(seb===1?" was":"s were")+" found exceeding limit. Renewal required.";
+    ["EXCEEDING LIMITS","CAVITATED","DAMAGED","OTHER"].forEach(r=>{seats+=kopReasonText(kopReasonCount(matrix,"seats",s,r),"suction valve seat",r);});
+    if(ssb&&!["EXCEEDING LIMITS","CAVITATED","DAMAGED","OTHER"].some(r=>kopReasonCount(matrix,"seats",s,r))) seats+=ssb+" suction valve seat"+(ssb===1?" was":"s were")+" found not acceptable. Renewal required. ";
+    ["EXCEEDING LIMITS","CAVITATED","DAMAGED","OTHER"].forEach(r=>{seats+=kopReasonText(kopReasonCount(matrix,"seats",e,r),"exhaust valve seat",r);});
+    if(seb&&!["EXCEEDING LIMITS","CAVITATED","DAMAGED","OTHER"].some(r=>kopReasonCount(matrix,"seats",e,r))) seats+=seb+" exhaust valve seat"+(seb===1?" was":"s were")+" found not acceptable. Renewal required.";
   }else{
     if(sr) valves+=sr+" suction valve"+(sr===1?" was":"s were")+" renewed. ";
     if(er) valves+=er+" exhaust valve"+(er===1?" was":"s were")+" renewed. ";
@@ -510,9 +534,9 @@ function normaliseKopCustomerData(koppen,data){
 function kopOptions(section,phase){
   if(section==="heliCoils") return null;
   if(phase==="before"){
-    if(section==="valves") return ["","OK","NOT OK","GRINDED"];
-    if(section==="guides") return ["","OK","NOT OK"];
-    if(section==="seats") return ["","OK","NOT OK","GRINDED","OS TO 0.5 mm","OS TO 1.0 mm","OS TO 2.0 mm","OS TO 3.0 mm"];
+    if(section==="valves") return ["","OK","NOT OK - EXCEEDING LIMITS","NOT OK - CAVITATED","NOT OK - DAMAGED","NOT OK - OTHER","GRINDED"];
+    if(section==="guides") return ["","OK","NOT OK - EXCEEDING LIMITS","NOT OK"];
+    if(section==="seats") return ["","OK","NOT OK - EXCEEDING LIMITS","NOT OK - CAVITATED","NOT OK - DAMAGED","NOT OK - OTHER","GRINDED","OS TO 0.5 mm","OS TO 1.0 mm","OS TO 2.0 mm","OS TO 3.0 mm"];
     if(section==="seatPocket") return ["","OK","NOT OK","GRINDED","OS TO 0.5 mm","OS TO 1.0 mm","OS TO 2.0 mm","OS TO 3.0 mm"];
     if(section==="rotator") return ["","OK","NOT OK"];
     if(section==="cwChamber") return ["","OK","NOT OK"];
