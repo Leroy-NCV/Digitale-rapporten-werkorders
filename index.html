@@ -7,6 +7,7 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   html, body, #root { height: 100%; margin: 0; }
   body { font-family: Inter, system-ui, sans-serif; }
@@ -518,12 +519,107 @@ function suggestedKopTexts(koppen,matrix,phase){
   };
 }
 
+function newKopPart(values){
+  return Object.assign({
+    id:"part_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,7),
+    headNo:"",category:"",position:"",action:"",qty:1,partNo:"",description:"",remark:""
+  },values||{});
+}
+
+function suggestedKopParts(koppen,matrix,phase){
+  const result=[];
+  const defs=[
+    ["valves","Valve","Valve"],
+    ["guides","Valve guide","Valve guide"],
+    ["seats","Valve seat","Valve seat"],
+    ["rotator","Valve rotator","Valve rotator"]
+  ];
+  defs.forEach(([section,category,label])=>{
+    const rows=matrix&&matrix[section]||{};
+    Object.keys(rows).forEach(position=>{
+      (koppen||[]).forEach((kop,hi)=>{
+        const status=(rows[position]&&rows[position][hi])||"";
+        const needsPart=phase==="before"?status.indexOf("NOT OK")===0:status==="RENEWED";
+        if(!needsPart)return;
+        result.push(newKopPart({
+          headNo:String(kop.nummer||""),
+          category,
+          position,
+          action:phase==="before"?"PROPOSED":"RENEWED",
+          qty:1,
+          description:label+" "+position,
+          remark:status
+        }));
+      });
+    });
+  });
+  const coils=matrix&&matrix.heliCoils&&matrix.heliCoils.Qty||[];
+  (koppen||[]).forEach((kop,hi)=>{
+    const qty=parseInt(coils[hi],10)||0;
+    if(qty>0) result.push(newKopPart({
+      headNo:String(kop.nummer||""),
+      category:"Heli-coil",
+      position:"",
+      action:phase==="before"?"PROPOSED":"REQUIRED",
+      qty,
+      description:"Heli-coil",
+      remark:"Required according to cylinder head matrix"
+    }));
+  });
+  return result;
+}
+
+function mergeSuggestedKopParts(existing,suggested){
+  const out=Array.isArray(existing)?existing.slice():[];
+  const key=p=>[p.headNo,p.category,p.position,p.action].map(v=>String(v||"").trim().toLowerCase()).join("|");
+  const present=new Set(out.map(key));
+  (suggested||[]).forEach(p=>{const k=key(p);if(!present.has(k)){out.push(p);present.add(k);}});
+  return out;
+}
+
+function exportKopPartsExcel(werkorder,koppen,phaseData,phase){
+  if(!window.XLSX){ alert("Excel-module kon niet worden geladen. Probeer de pagina opnieuw te openen."); return; }
+  const parts=Array.isArray(phaseData&&phaseData.parts)?phaseData.parts:[];
+  if(!parts.length){ alert("Er staan nog geen onderdelen in de lijst."); return; }
+  const wop=werkorder&&werkorder.werkopdracht||{};
+  const detailRows=parts.map(p=>({
+    "Order no.":wop.order_nummer||"",
+    "Customer / Vessel":wop.schip_klant||"",
+    "Date":wop.datum||"",
+    "Engine type":werkorder&&werkorder.motortype&&werkorder.motortype!=="-"?werkorder.motortype:"",
+    "Phase":String(phase||"").toUpperCase(),
+    "Cylinder head":p.headNo||"",
+    "Category":p.category||"",
+    "Position":p.position||"",
+    "Action":p.action||"",
+    "Qty":Number(p.qty)||0,
+    "Part no.":p.partNo||"",
+    "Description":p.description||"",
+    "Remark":p.remark||""
+  }));
+  const summaryMap={};
+  parts.forEach(p=>{
+    const k=[p.partNo||"",p.description||p.category||"",p.action||""].join("|");
+    if(!summaryMap[k]) summaryMap[k]={"Part no.":p.partNo||"","Description":p.description||p.category||"","Action":p.action||"","Qty":0};
+    summaryMap[k]["Qty"]+=(Number(p.qty)||0);
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.json_to_sheet(detailRows);
+  ws["!cols"]=[{wch:15},{wch:24},{wch:12},{wch:18},{wch:9},{wch:14},{wch:18},{wch:12},{wch:12},{wch:8},{wch:16},{wch:28},{wch:34}];
+  XLSX.utils.book_append_sheet(wb,ws,"Onderdelen");
+  const summary=XLSX.utils.json_to_sheet(Object.values(summaryMap));
+  summary["!cols"]=[{wch:16},{wch:32},{wch:14},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,summary,"Samenvatting");
+  const order=(wop.order_nummer||"werkorder").replace(/[^a-zA-Z0-9_-]/g,"_");
+  XLSX.writeFile(wb,order+"_cilinderkop_onderdelen_"+phase+".xlsx");
+}
+
 function makeKopCustomerPhase(koppen,phase,existing){
   const matrix=mergeKopMatrix(suggestedKopMatrix(koppen,phase),existing&&existing.matrix);
   const sug=suggestedKopTexts(koppen,matrix,phase);
   const keys=["landing","findings","penetrant","landingSurfaces","valves","seats","cwConnection","guides","rotators"];
   const sections={}; keys.forEach(k=>sections[k]=(existing&&existing.sections&&existing.sections[k])||sug[k]||"");
-  return {matrix,actions:Object.assign({dyeCheck:"",pressureTest:"",painted:"",safetyValves:"",sealLips:""},existing&&existing.actions||{}),sections,partsText:existing&&existing.partsText||"",updatedAt:new Date().toISOString()};
+  return {matrix,actions:Object.assign({dyeCheck:"",pressureTest:"",painted:"",safetyValves:"",sealLips:""},existing&&existing.actions||{}),sections,parts:Array.isArray(existing&&existing.parts)?existing.parts:[],partsText:existing&&existing.partsText||"",updatedAt:new Date().toISOString()};
 }
 
 function normaliseKopCustomerData(koppen,data){
@@ -609,7 +705,24 @@ function CustomerCylinderHeadReport(props){
       React.createElement("h2",{style:{fontSize:12,margin:"0 0 2mm"}},"Inspection / overhaul summary"),
       React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginBottom:"4mm"}},React.createElement("thead",null,React.createElement("tr",null,React.createElement("th",{style:Object.assign({},cell,{textAlign:"left"})},"Activity"),...koppen.map(k=>React.createElement("th",{key:k.nummer,style:Object.assign({},cell,{textAlign:"center"})},k.nummer)))),React.createElement("tbody",null,...actions.map(item=>React.createElement("tr",{key:item[1]},React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},item[0]),...koppen.map((k,i)=>React.createElement("td",{key:i,style:Object.assign({},cell,{textAlign:"center"})},p.actions&&p.actions[item[1]]||"")))))),
       ...sections.map(item=>p.sections&&p.sections[item[0]]?React.createElement("div",{key:item[0],style:{pageBreakInside:"avoid",marginBottom:"3mm"}},React.createElement("div",{style:{fontWeight:700,fontSize:9.2,marginBottom:"1mm"}},item[1]+":"),React.createElement("div",{style:{fontSize:9,lineHeight:1.45,whiteSpace:"pre-wrap"}},p.sections[item[0]])):null),
-      p.partsText&&React.createElement("div",{style:{pageBreakInside:"avoid",marginTop:"4mm"}},React.createElement("div",{style:{fontWeight:700,fontSize:9.2,marginBottom:"1mm"}},"Parts renewed / proposed:"),React.createElement("div",{style:{fontSize:8.8,lineHeight:1.45,whiteSpace:"pre-wrap",border:"1px solid #c8cbc3",padding:"2mm"}},p.partsText)),
+      Array.isArray(p.parts)&&p.parts.length>0&&React.createElement("div",{style:{pageBreakInside:"avoid",marginTop:"4mm"}},
+        React.createElement("div",{style:{fontWeight:700,fontSize:9.2,marginBottom:"1mm"}},"Parts renewed / proposed:"),
+        React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:7.8}},
+          React.createElement("thead",null,React.createElement("tr",null,
+            ...["Head","Category","Pos.","Action","Qty","Part no.","Description"].map(h=>React.createElement("th",{key:h,style:Object.assign({},cell,{fontWeight:700,textAlign:"left",background:"#eef1f3"})},h))
+          )),
+          React.createElement("tbody",null,...p.parts.map((part,i)=>React.createElement("tr",{key:part.id||i},
+            React.createElement("td",{style:cell},part.headNo||""),
+            React.createElement("td",{style:cell},part.category||""),
+            React.createElement("td",{style:cell},part.position||""),
+            React.createElement("td",{style:cell},part.action||""),
+            React.createElement("td",{style:Object.assign({},cell,{textAlign:"center"})},part.qty||""),
+            React.createElement("td",{style:cell},part.partNo||""),
+            React.createElement("td",{style:cell},part.description||"")
+          )))
+        )
+      ),
+      p.partsText&&React.createElement("div",{style:{pageBreakInside:"avoid",marginTop:"3mm"}},React.createElement("div",{style:{fontWeight:700,fontSize:9.2,marginBottom:"1mm"}},"Additional parts note:"),React.createElement("div",{style:{fontSize:8.8,lineHeight:1.45,whiteSpace:"pre-wrap",border:"1px solid #c8cbc3",padding:"2mm"}},p.partsText)),
       React.createElement("div",{style:{borderTop:"2px solid #1664a8",paddingTop:"2mm",marginTop:"6mm",display:"flex",justifyContent:"space-between",fontSize:7.5,color:"#304564"}},React.createElement("span",null,"Nicoverken Engine Repair | Cylinderhead Report"),React.createElement("span",null,"Date: ",werkorder.werkopdracht&&werkorder.werkopdracht.datum||""," | Order no.: ",werkorder.werkopdracht&&werkorder.werkopdracht.order_nummer||""))
     )
   );
@@ -618,13 +731,19 @@ function CustomerCylinderHeadReport(props){
 
 function CylinderCustomerEditor(props){
   const {
-    palette,inputStyle,btn,koppen,kopKlantData,
+    palette,inputStyle,btn,koppen,kopKlantData,werkorder,
     setKopPhase,regenerateKopCustomerText,setKopView,downloadKopPdf,
     updateKopCustomerCell,updateKopCustomerAction,updateKopCustomerSection,
     updateKopCustomer
   }=props;
   const phase=kopKlantData.activePhase||"before";
   const p=makeKopCustomerPhase(koppen,phase,kopKlantData&&kopKlantData[phase]);
+  const parts=Array.isArray(p.parts)?p.parts:[];
+  const saveParts=next=>updateKopCustomer({...kopKlantData,[phase]:{...p,parts:next}});
+  const addPart=()=>saveParts([...parts,newKopPart({action:phase==="before"?"PROPOSED":"RENEWED"})]);
+  const updatePart=(index,key,value)=>saveParts(parts.map((part,i)=>i===index?{...part,[key]:key==="qty"?value:value}:part));
+  const removePart=index=>saveParts(parts.filter((_,i)=>i!==index));
+  const proposeParts=()=>saveParts(mergeSuggestedKopParts(parts,suggestedKopParts(koppen,p.matrix,phase)));
   const secLabels={landing:"Landing",findings:"Findings",penetrant:"Penetrant test",landingSurfaces:"Landing surfaces",valves:"Suction- and exhaust valves",seats:"Suction- and exhaust valve seats",cwConnection:"Cylinder head CW connection (flange)",guides:"Suction- and exhaust valve guides",rotators:"Valve rotators"};
   const actionDefs=[["dyeCheck","Dye Check Combustion surface"],["pressureTest","Pressure test cylinder head"],["painted","Painted cylinder head"],["safetyValves","Safety valves tested"],["sealLips","Placed new seal lips"]];
   const photoCats=["Finding","Dye check","Pressure test","Valve","Valve seat","Guide","Damage","Final result"];
@@ -676,8 +795,40 @@ function CylinderCustomerEditor(props){
           )
         )
       ),
-      React.createElement(Field,{label:"Parts renewed / proposed"},
-        React.createElement("textarea",{rows:5,value:p.partsText||"",onChange:e=>updateKopCustomer({...kopKlantData,[phase]:{...p,partsText:e.target.value}}),placeholder:"Part no. - description - qty",style:{...inputStyle,width:"100%",boxSizing:"border-box",resize:"vertical"}})
+      React.createElement(Field,{label:"Aanvullende onderdelen-notitie (legacy / vrije tekst)"},
+        React.createElement("textarea",{rows:3,value:p.partsText||"",onChange:e=>updateKopCustomer({...kopKlantData,[phase]:{...p,partsText:e.target.value}}),placeholder:"Alleen gebruiken voor extra toelichting die niet in de tabel past.",style:{...inputStyle,width:"100%",boxSizing:"border-box",resize:"vertical"}})
+      )
+    ),
+    React.createElement("div",{style:{background:"#fff",border:"1px solid "+palette.line,borderRadius:8,padding:18,marginBottom:14}},
+      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:12}},
+        React.createElement("h3",{style:{margin:0}},"Onderdelenlijst"),
+        React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:8,flexWrap:"wrap"}},
+          btn("Voorstel uit matrix",proposeParts),
+          btn("+ Regel",addPart),
+          btn("Excel export",()=>exportKopPartsExcel(werkorder,koppen,p,phase),{background:palette.accent,color:"#fff",border:"none"})
+        )
+      ),
+      React.createElement("div",{style:{fontSize:12,color:"#666",marginBottom:10}},"Voorstel uit matrix voegt alleen ontbrekende regels toe. Bestaande artikelnummers, aantallen en opmerkingen blijven behouden."),
+      React.createElement("div",{style:{overflowX:"auto"}},
+        React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",minWidth:980,fontSize:12}},
+          React.createElement("thead",null,React.createElement("tr",null,
+            ...["Kop","Categorie","Positie","Actie","Aantal","Artikelnummer","Omschrijving","Opmerking",""].map(h=>React.createElement("th",{key:h,style:{textAlign:"left",padding:"7px 5px",borderBottom:"1px solid "+palette.line,background:"#f4f4ef",whiteSpace:"nowrap"}},h))
+          )),
+          React.createElement("tbody",null,
+            parts.length===0?React.createElement("tr",null,React.createElement("td",{colSpan:9,style:{padding:14,color:"#777",textAlign:"center"}},"Nog geen onderdelen. Gebruik 'Voorstel uit matrix' of voeg handmatig een regel toe.")):
+            ...parts.map((part,i)=>React.createElement("tr",{key:part.id||i},
+              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.headNo||"",onChange:e=>updatePart(i,"headNo",e.target.value),style:{...inputStyle,width:60}})),
+              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.category||"",onChange:e=>updatePart(i,"category",e.target.value),style:{...inputStyle,width:130}})),
+              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.position||"",onChange:e=>updatePart(i,"position",e.target.value),style:{...inputStyle,width:75}})),
+              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("select",{value:part.action||"",onChange:e=>updatePart(i,"action",e.target.value),style:{...inputStyle,width:115}},...["","PROPOSED","REQUIRED","RENEWED","REPAIRED","GRINDED"].map(v=>React.createElement("option",{key:v,value:v},v||"—")))),
+              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{type:"number",min:"0",step:"1",value:part.qty===undefined?1:part.qty,onChange:e=>updatePart(i,"qty",e.target.value),style:{...inputStyle,width:65}})),
+              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.partNo||"",onChange:e=>updatePart(i,"partNo",e.target.value),placeholder:"Part no.",style:{...inputStyle,width:130}})),
+              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.description||"",onChange:e=>updatePart(i,"description",e.target.value),style:{...inputStyle,width:180}})),
+              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},React.createElement("input",{value:part.remark||"",onChange:e=>updatePart(i,"remark",e.target.value),style:{...inputStyle,width:220}})),
+              React.createElement("td",{style:{padding:4,borderBottom:"1px solid "+palette.line}},btn("×",()=>removePart(i),{padding:"5px 9px",color:"#a22"}))
+            ))
+          )
+        )
       )
     )
   );
@@ -1084,7 +1235,7 @@ function App() {
       );
       return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,header,
         React.createElement(CylinderCustomerEditor,{
-          palette,inputStyle,btn,koppen,kopKlantData,setKopPhase,regenerateKopCustomerText,setKopView,downloadKopPdf,
+          palette,inputStyle,btn,koppen,kopKlantData,werkorder:activeWerkorder,setKopPhase,regenerateKopCustomerText,setKopView,downloadKopPdf,
           updateKopCustomerCell,updateKopCustomerAction,updateKopCustomerSection,updateKopCustomer
         }),
         React.createElement("div",{style:{position:"fixed",left:"-10000px",top:0,width:"794px",zIndex:-1}},report)
