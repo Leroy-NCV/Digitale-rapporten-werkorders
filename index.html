@@ -1216,8 +1216,34 @@ function App() {
   function regenerateKopCustomerText(){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); updateKopCustomer({...kopKlantData,[phase]:{...p,sections:suggestedKopTexts(koppen,p.matrix,phase)}}); }
   async function downloadKopPdf(){ const el=document.getElementById("cilinderkop-klantrapport"); if(!el||!window.html2pdf){setLoadError("PDF-module kon niet worden geladen. Probeer de pagina opnieuw te openen.");return;} const order=(activeWerkorder?.werkopdracht?.order_nummer||"werkorder").replace(/[^a-zA-Z0-9_-]/g,"_"); const phase=kopKlantData.activePhase||"before"; await window.html2pdf().set({margin:[4,4,4,4],filename:`${order}_cilinderkop_${phase}.pdf`,image:{type:"jpeg",quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},pagebreak:{mode:["css","legacy"]}}).from(el).save(); }
 
+  function controleWaarschuwingen(){
+    if(!activeWerkorder) return [];
+    const out=[];
+    if(!activeWerkorder.uitgevoerd) out.push("Werk is nog niet als uitgevoerd gemarkeerd.");
+    if(isCilinderkopKlustype(activeWerkorder.klustype)){
+      (koppen||[]).forEach(k=>(k.onderdelen||[]).forEach(p=>{
+        if(["Required","Ordered"].includes(p.beforeStatus||"") && !p.afterStatus) out.push(`Kop ${k.nummer}: ${p.name} is ${p.beforeStatus}, maar AFTER is nog leeg.`);
+      }));
+    }
+    if(isDrijfstangKlustype(activeWerkorder.klustype)){
+      (drijfstangRapporten||[]).forEach(d=>{
+        const vals=(d.metingen?.positions||[]).flatMap(r=>[r.bigEnd,r.smallEnd]).filter(v=>String(v??"").trim()!=="");
+        if(!vals.length) out.push(`Connecting rod ${d.nummer}: nog geen maatmetingen ingevuld.`);
+      });
+    }
+    if(isKrukasKlustype(activeWerkorder.klustype)&&krukasRapport){
+      const vals=[...(krukasRapport.main_journals||[]),...(krukasRapport.crankpins||[])].flatMap(r=>[r.a1,r.a2,r.b1,r.b2]).filter(v=>String(v??"").trim()!=="");
+      if(!vals.length) out.push("Krukas: nog geen A1/A2/B1/B2 metingen ingevuld.");
+      if(activeWerkorder.klustype==="krukas_inspectie" && !String(krukasRapport.ndt?.result||"").trim()) out.push("Krukas inspectie: NDT Findings & result is nog leeg.");
+    }
+    return out;
+  }
   async function indienenTerControle(){ try{const history=Array.isArray(activeWerkorder.rapport_monteurs)?activeWerkorder.rapport_monteurs.filter(Boolean):[];const nextHistory=monteurNaam&&!history.includes(monteurNaam)?[...history,monteurNaam]:history;const patch={status:"ter_controle",uitgevoerd:true,rapport_monteurs:nextHistory};if(!activeWerkorder.monteur&&monteurNaam)patch.monteur=monteurNaam;await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify(patch),prefer:"return=minimal"});setView("overzicht");setActiveWerkorder(null);}catch(e){setLoadError(e.message)} }
-  async function goedkeuren(){ if(!heeftVolledigeRechten(monteurNaam)){setLoadError("Alleen Leroy, Daan, Brito of Frank Verschaick kan definitief goedkeuren.");return;} try{await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({status:"goedgekeurd"}),prefer:"return=minimal"});setView("overzicht");setActiveWerkorder(null);}catch(e){setLoadError(e.message)} }
+  async function goedkeuren(){
+    if(!heeftVolledigeRechten(monteurNaam)){setLoadError("Alleen Leroy, Daan, Brito of Frank Verschaick kan definitief goedkeuren.");return;}
+    const waarschuwingen=controleWaarschuwingen();
+    if(waarschuwingen.length && !confirm("Controlecheck heeft nog aandachtspunten:\n\n- "+waarschuwingen.join("\n- ")+"\n\nToch definitief goedkeuren?")) return;
+    try{await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({status:"goedgekeurd"}),prefer:"return=minimal"});setView("overzicht");setActiveWerkorder(null);}catch(e){setLoadError(e.message)} }
   async function terugsturen(){ try{await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({status:"teruggestuurd",opmerking_controle:terugOpmerking}),prefer:"return=minimal"});setView("overzicht");setActiveWerkorder(null);}catch(e){setLoadError(e.message)} }
   async function verwijderWerkopdracht(wop){
     if(!heeftVolledigeRechten(monteurNaam)){setLoadError("Alleen Leroy, Daan, Brito of Frank Verschaick kan werkopdrachten verwijderen.");return;}
@@ -1319,7 +1345,12 @@ function App() {
       React.createElement("div",{style:{fontSize:11,fontWeight:800,letterSpacing:".04em",color:activeWerkorder.status==="teruggestuurd"?"#b5362a":"#5b5f52",marginBottom:4}},activeWerkorder.status==="teruggestuurd"?"TERUGGESTUURD DOOR CONTROLE":"LAATSTE CONTROLEOPMERKING"),
       React.createElement("div",{style:{whiteSpace:"pre-wrap"}},activeWerkorder.opmerking_controle)
     ):null;
-    const pageHeader=React.createElement(React.Fragment,null,header,controleFeedback);
+    const controlePunten=activeWerkorder.status==="ter_controle"?controleWaarschuwingen():[];
+    const controleCheck=activeWerkorder.status==="ter_controle"?React.createElement("div",{style:{maxWidth:1050,margin:"10px auto 0",padding:"11px 14px",borderRadius:7,border:`1px solid ${controlePunten.length?"#c25a2c":"#3f7a4f"}`,background:controlePunten.length?"#fff8ef":"#f1f8f3",fontSize:12}},
+      React.createElement("div",{style:{fontWeight:800,marginBottom:4}},controlePunten.length?`CONTROLECHECK — ${controlePunten.length} aandachtspunt(en)`:"CONTROLECHECK — geen aandachtspunten"),
+      controlePunten.length?React.createElement("ul",{style:{margin:"5px 0 0",paddingLeft:20}},...controlePunten.slice(0,8).map((x,i)=>React.createElement("li",{key:i},x))):React.createElement("div",null,"De automatische basiscontrole heeft geen ontbrekende kerngegevens gevonden.")
+    ):null;
+    const pageHeader=React.createElement(React.Fragment,null,header,controleFeedback,controleCheck);
 
     if(isZuigerKlustype(activeWerkorder.klustype)&&zuigerRapporten.length){
       const z=zuigerRapporten[activeZuiger] || zuigerRapporten[0];
