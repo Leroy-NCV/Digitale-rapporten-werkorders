@@ -1018,6 +1018,7 @@ function App() {
   const [drijfstangRapporten, setDrijfstangRapporten] = useState([]);
   const [activeDrijfstang, setActiveDrijfstang] = useState(0);
   const [krukasRapport, setKrukasRapport] = useState(null);
+  const [componentRapport, setComponentRapport] = useState(null);
   const [activeZuiger, setActiveZuiger] = useState(0);
   const [showZuigerKlantRapport, setShowZuigerKlantRapport] = useState(false);
   const [showGenericKlantRapport, setShowGenericKlantRapport] = useState(false);
@@ -1032,6 +1033,7 @@ function App() {
   const getKlustype = code => KLUSTYPEN.find(k => (k.value||k.code) === code) || KLUSTYPEN_FALLBACK.find(k=>k.value===code);
   const getKlustypeNaam = code => getKlustype(code)?.label || code;
   const getWerkbeschrijving = code => getKlustype(code)?.werkbeschrijving || "";
+  const engineTypeOptions = Array.from(new Set([...zuigerTemplates,...drijfstangTemplates,...krukasTemplates].map(t=>String(t?.naam||"").trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:"base"}));
 
   useEffect(()=>lsSet("wo_mode", mode),[mode]);
   useEffect(()=>lsSet("wo_monteur_naam", monteurNaam),[monteurNaam]);
@@ -1107,7 +1109,7 @@ function App() {
   }
 
   async function openWerkorder(wo,werkopdrachtInfo){
-    setLoadError(""); setKoppen([]); setZuigerRapporten([]); setDrijfstangRapporten([]); setActiveDrijfstang(0); setKrukasRapport(null); setActiveZuiger(0); setShowZuigerKlantRapport(false); setShowGenericKlantRapport(false); setKopView("intern");
+    setLoadError(""); setKoppen([]); setZuigerRapporten([]); setDrijfstangRapporten([]); setActiveDrijfstang(0); setKrukasRapport(null); setComponentRapport(null); setActiveZuiger(0); setShowZuigerKlantRapport(false); setShowGenericKlantRapport(false); setKopView("intern");
     try{
       let opened=wo;
       if(mode==="monteur"&&monteurNaam){
@@ -1144,6 +1146,15 @@ function App() {
         if(!rows||!rows.length){const k=makeKrukasRapport(fase);rows=await sb("krukas_rapporten",{method:"POST",body:JSON.stringify({werkorder_id:wo.id,...k})});}
         setKrukasRapport(normaliseKrukas(rows?.[0],fase));
       }
+      let compRows=await sb(`component_rapporten?werkorder_id=eq.${wo.id}&rapport_type=eq.${encodeURIComponent(wo.klustype)}&select=*&order=created_at.asc&limit=1`);
+      if(!compRows||!compRows.length){
+        compRows=await sb("component_rapporten",{method:"POST",body:JSON.stringify({
+          werkorder_id:wo.id,nummer:1,fase:wo.klustype.endsWith("_na")||wo.klustype.endsWith("_after")?"after":wo.klustype.endsWith("_voor")||wo.klustype.endsWith("_before")?"before":"inspection",
+          rapport_type:wo.klustype,template_code:wo.rapport_template_code||null,markering:"",
+          data:{illustration_image:"",illustration_caption:"",source_ref:""},onderdelen:[],remarks:""
+        })});
+      }
+      setComponentRapport(compRows?.[0]||null);
       setView("werkorder");
     }catch(e){setLoadError(e.message)}
   }
@@ -1151,6 +1162,23 @@ function App() {
   function debounce(fn){ setSaving(true); clearTimeout(saveTimer.current); saveTimer.current=setTimeout(async()=>{try{await fn()}catch(e){setLoadError(e.message)}finally{setSaving(false)}},600); }
   function updateWerkbeschrijving(text){ setActiveWerkorder(p=>({...p,werkbeschrijving:text})); debounce(()=>sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({werkbeschrijving:text}),prefer:"return=minimal"})); }
   function updateWerkorderMeta(patch){ setActiveWerkorder(p=>({...p,...patch})); debounce(()=>sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify(patch),prefer:"return=minimal"})); }
+  function saveComponentRapport(next){
+    setComponentRapport(next);
+    if(next?.id) debounce(()=>sb(`component_rapporten?id=eq.${next.id}`,{method:"PATCH",body:JSON.stringify({template_code:next.template_code||null,markering:next.markering||"",data:next.data||{},onderdelen:next.onderdelen||[],remarks:next.remarks||""}),prefer:"return=minimal"}));
+  }
+  function updateComponentData(patch){ if(!componentRapport)return; saveComponentRapport({...componentRapport,data:{...(componentRapport.data||{}),...patch}}); }
+  function addComponentPart(){ if(!componentRapport)return; const parts=[...(componentRapport.onderdelen||[]),{id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),ref:"",partNo:"",description:"",qty:1,status:"",remark:""}]; saveComponentRapport({...componentRapport,onderdelen:parts}); }
+  function updateComponentPart(i,key,value){ if(!componentRapport)return; const parts=(componentRapport.onderdelen||[]).map((p,idx)=>idx===i?{...p,[key]:value}:p); saveComponentRapport({...componentRapport,onderdelen:parts}); }
+  function removeComponentPart(i){ if(!componentRapport)return; const parts=(componentRapport.onderdelen||[]).filter((_,idx)=>idx!==i); saveComponentRapport({...componentRapport,onderdelen:parts}); }
+  async function setComponentIllustration(file){ if(!file||!componentRapport)return; try{const image=await compressImage(file,1400,.74); updateComponentData({illustration_image:image});}catch(e){setLoadError(e.message)} }
+  function exportComponentParts(){
+    if(!window.XLSX){setLoadError("Excel-module kon niet worden geladen.");return;}
+    const parts=componentRapport?.onderdelen||[]; if(!parts.length){alert("De bestellijst is nog leeg.");return;}
+    const rows=parts.map(p=>({"Order no.":activeWerkorder?.werkopdracht?.order_nummer||"","Engine type":activeWerkorder?.motortype==="-"?"":activeWerkorder?.motortype||"","Report":getKlustypeNaam(activeWerkorder?.klustype),"Ref.":p.ref||"","Part no.":p.partNo||"","Description":p.description||"","Qty":Number(p.qty)||0,"Status":p.status||"","Remark":p.remark||""}));
+    const ws=XLSX.utils.json_to_sheet(rows); ws["!cols"]=[{wch:15},{wch:24},{wch:26},{wch:10},{wch:18},{wch:34},{wch:8},{wch:14},{wch:34}];
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Bestellijst");
+    const order=(activeWerkorder?.werkopdracht?.order_nummer||"werkorder").replace(/[^a-zA-Z0-9_-]/g,"_"); XLSX.writeFile(wb,order+"_"+String(activeWerkorder?.klustype||"rapport")+"_bestellijst.xlsx");
+  }
   function toggleDraftMonteur(naam){ setWorDraft(p=>{const a=p.monteurs||[];return {...p,monteurs:a.includes(naam)?a.filter(x=>x!==naam):[...a,naam]};}); }
   async function toggleAssignedMonteur(naam){
     if(!activeWerkorder||!magToewijzen(monteurNaam)) return;
@@ -1255,6 +1283,7 @@ function App() {
         await sb(`zuiger_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{});
         await sb(`drijfstang_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{});
         await sb(`krukas_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{});
+        await sb(`component_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{});
       }
       await sb(`werkorders?werkopdracht_id=eq.${wop.id}`,{method:"DELETE",prefer:"return=minimal"});
       await sb(`werkopdrachten?id=eq.${wop.id}`,{method:"DELETE",prefer:"return=minimal"}); loadOverzicht();
@@ -1348,7 +1377,47 @@ function App() {
       React.createElement("div",{style:{fontWeight:800,marginBottom:4}},controlePunten.length?`CONTROLECHECK — ${controlePunten.length} aandachtspunt(en)`:"CONTROLECHECK — geen aandachtspunten"),
       controlePunten.length?React.createElement("ul",{style:{margin:"5px 0 0",paddingLeft:20}},...controlePunten.slice(0,8).map((x,i)=>React.createElement("li",{key:i},x))):React.createElement("div",null,"De automatische basiscontrole heeft geen ontbrekende kerngegevens gevonden.")
     ):null;
-    const pageHeader=React.createElement(React.Fragment,null,header,controleFeedback,controleCheck);
+    const partsPanel=componentRapport?React.createElement("div",{style:{maxWidth:1050,margin:"12px auto 0",padding:"14px",background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8}},
+      React.createElement("div",{style:{display:"flex",alignItems:"end",gap:10,flexWrap:"wrap",marginBottom:12}},
+        React.createElement("div",{style:{fontSize:14,fontWeight:900,marginRight:8}},"TYPE / ILLUSTRATIE / BESTELLIJST"),
+        React.createElement(Field,{label:"Motortype"},React.createElement(React.Fragment,null,
+          React.createElement("input",{list:"engine-type-list",value:activeWerkorder.motortype==="-"?"":activeWerkorder.motortype||"",onChange:e=>updateWerkorderMeta({motortype:e.target.value}),placeholder:"Kies of typ motortype",style:{...inputStyle,minWidth:240}}),
+          React.createElement("datalist",{id:"engine-type-list"},...engineTypeOptions.map(x=>React.createElement("option",{key:x,value:x})))
+        )),
+        React.createElement(Field,{label:"Bron / plate / manual"},React.createElement(TextInput,{value:componentRapport.data?.source_ref||"",onChange:e=>updateComponentData({source_ref:e.target.value}),placeholder:"Bijv. plate 191-0018B / manual section",style:{minWidth:260}})),
+        React.createElement("div",{style:{marginLeft:"auto"}},btn("Bestellijst Excel",exportComponentParts))
+      ),
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"minmax(250px,0.9fr) minmax(460px,1.7fr)",gap:14,alignItems:"start"}},
+        React.createElement("div",{style:{border:`1px solid ${palette.line}`,borderRadius:7,padding:10,background:"#fafaf7"}},
+          React.createElement("div",{style:{fontWeight:800,fontSize:12,marginBottom:7}},"ILLUSTRATIE / EXPLODED VIEW"),
+          componentRapport.data?.illustration_image?React.createElement("img",{src:componentRapport.data.illustration_image,style:{display:"block",width:"100%",maxHeight:320,objectFit:"contain",background:"#fff"}}):React.createElement("div",{style:{height:180,display:"flex",alignItems:"center",justifyContent:"center",textAlign:"center",padding:18,color:"#777",background:"#fff",border:"1px dashed #bfc3b8"}},"Nog geen illustratie gekoppeld aan deze werkorder. Voeg de juiste exploded view / referentietekening toe."),
+          React.createElement("input",{type:"file",accept:"image/*",style:{marginTop:9,width:"100%"},onChange:e=>{const file=e.target.files?.[0];setComponentIllustration(file);e.target.value="";}}),
+          React.createElement("input",{value:componentRapport.data?.illustration_caption||"",onChange:e=>updateComponentData({illustration_caption:e.target.value}),placeholder:"Onderschrift / illustratienummer",style:{...inputStyle,width:"100%",boxSizing:"border-box",marginTop:7}})
+        ),
+        React.createElement("div",{style:{overflowX:"auto"}},
+          React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}},
+            React.createElement("div",{style:{fontWeight:800,fontSize:12}},"BESTELLIJST / PARTS ORDER LIST"),
+            btn("+ Onderdeel",addComponentPart,{padding:"6px 10px"})
+          ),
+          React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",minWidth:720,fontSize:11}},
+            React.createElement("thead",null,React.createElement("tr",null,...["Ref.","Part no.","Description","Qty","Status","Remark",""].map(h=>React.createElement("th",{key:h,style:{padding:6,textAlign:"left",background:"#f4f4ef",borderBottom:`1px solid ${palette.line}`}},h)))),
+            React.createElement("tbody",null,
+              ...(componentRapport.onderdelen||[]).map((p,i)=>React.createElement("tr",{key:p.id||i},
+                React.createElement("td",{style:{padding:4,borderBottom:`1px solid ${palette.line}`}},React.createElement("input",{value:p.ref||"",onChange:e=>updateComponentPart(i,"ref",e.target.value),style:{...inputStyle,width:60,padding:6}})),
+                React.createElement("td",{style:{padding:4,borderBottom:`1px solid ${palette.line}`}},React.createElement("input",{value:p.partNo||"",onChange:e=>updateComponentPart(i,"partNo",e.target.value),style:{...inputStyle,width:120,padding:6}})),
+                React.createElement("td",{style:{padding:4,borderBottom:`1px solid ${palette.line}`}},React.createElement("input",{value:p.description||"",onChange:e=>updateComponentPart(i,"description",e.target.value),style:{...inputStyle,width:190,padding:6}})),
+                React.createElement("td",{style:{padding:4,borderBottom:`1px solid ${palette.line}`}},React.createElement("input",{type:"number",min:0,value:p.qty??1,onChange:e=>updateComponentPart(i,"qty",e.target.value),style:{...inputStyle,width:60,padding:6}})),
+                React.createElement("td",{style:{padding:4,borderBottom:`1px solid ${palette.line}`}},React.createElement("select",{value:p.status||"",onChange:e=>updateComponentPart(i,"status",e.target.value),style:{...inputStyle,padding:6}},React.createElement("option",{value:""},"—"),React.createElement("option",{value:"Required"},"Required"),React.createElement("option",{value:"Ordered"},"Ordered"),React.createElement("option",{value:"Renewed"},"Renewed"),React.createElement("option",{value:"Installed"},"Installed"),React.createElement("option",{value:"Repaired"},"Repaired"))),
+                React.createElement("td",{style:{padding:4,borderBottom:`1px solid ${palette.line}`}},React.createElement("input",{value:p.remark||"",onChange:e=>updateComponentPart(i,"remark",e.target.value),style:{...inputStyle,width:160,padding:6}})),
+                React.createElement("td",{style:{padding:4,borderBottom:`1px solid ${palette.line}`}},btn("×",()=>removeComponentPart(i),{padding:"5px 8px",color:"#a22"}))
+              )),
+              !(componentRapport.onderdelen||[]).length&&React.createElement("tr",null,React.createElement("td",{colSpan:7,style:{padding:16,textAlign:"center",color:"#777"}},"Nog geen onderdelen toegevoegd."))
+            )
+          )
+        )
+      )
+    ):null;
+    const pageHeader=React.createElement(React.Fragment,null,header,controleFeedback,controleCheck,partsPanel);
 
     if(isZuigerKlustype(activeWerkorder.klustype)&&zuigerRapporten.length){
       const z=zuigerRapporten[activeZuiger] || zuigerRapporten[0];
