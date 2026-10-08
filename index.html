@@ -43,7 +43,7 @@ async function sb(path, options = {}) {
   const text = await res.text();
   return text ? JSON.parse(text) : null;
 }
-const KOP_FIELDS = ["disassembly", "seatRing", "valve", "valveStem", "valveGuide", "valveChecks", "assembly", "werkuren", "aanvullendeInfo"];
+const KOP_FIELDS = ["disassembly", "seatRing", "valve", "valveStem", "valveGuide", "valveChecks", "assembly", "onderdelen", "werkuren", "aanvullendeInfo"];
 const KOP_COLUMN_MAP = {
   seatRing: "seat_ring",
   valveStem: "valve_stem",
@@ -65,6 +65,7 @@ function rowToKop(row) {
   KOP_FIELDS.forEach((f) => {
     let value = row[KOP_COLUMN_MAP[f] || f];
     if (f === "werkuren" && (value === null || value === void 0)) value = "";
+    if (f === "onderdelen" && (!Array.isArray(value) || !value.length)) value = makeCylinderHeadParts();
     kop[f] = value;
   });
   return kop;
@@ -130,6 +131,10 @@ const ASSEMBLY_CHECKLIST = [
 function emptyRows(rows) {
   return rows.map((r) => ({ ...r, measured: "" }));
 }
+const CYLINDER_HEAD_PARTS = ["Inlet valves","Exhaust valves","Valve guides","Valve seats","Valve stem seals","Valve spring retainers","Valve springs","Spring seats","Valve rotators","Cooling plugs","Heli-coils"];
+function makeCylinderHeadParts(){
+  return CYLINDER_HEAD_PARTS.map((name,i)=>({id:"part_"+(i+1),name,qty:1,beforeStatus:"",afterStatus:"",remark:"",photosBefore:[],photosAfter:[]}));
+}
 function makeCilinderkop(nummer) {
   return {
     nummer,
@@ -140,6 +145,7 @@ function makeCilinderkop(nummer) {
     valveGuide: emptyRows(VALVE_GUIDE_ROWS),
     valveChecks: VALVE_CHECKS.map((label) => ({ label, result: "", remarks: "" })),
     assembly: ASSEMBLY_CHECKLIST.map((label) => ({ label, result: "", remarks: "" })),
+    onderdelen: makeCylinderHeadParts(),
     werkuren: "",
     aanvullendeInfo: ""
   };
@@ -298,6 +304,43 @@ function isZuigerKlustype(code) { return ["zuiger","zuiger_voor","zuiger_na"].in
 function isDrijfstangKlustype(code) { return ["connecting_rod_before","connecting_rod_after"].includes(code); }
 function isKrukasKlustype(code) { return ["krukas_inspectie","krukas_voor","krukas_na"].includes(code); }
 function isMotortypeTemplateKlustype(code) { return isZuigerKlustype(code)||isDrijfstangKlustype(code)||isKrukasKlustype(code); }
+function makeDrijfstangRapport(nummer=1,fase="before",positions=["AA","BB","CC","DD","EE","FF","GG"]){
+  return {nummer,markering:"",fase,metingen:{positions:positions.map(position=>({position,bigEnd:"",smallEnd:""}))},serration_condition:"",cracks:"",new_bolts:"",straightness:"",remarks:""};
+}
+function normaliseDrijfstang(row,positions){
+  const base=makeDrijfstangRapport(row?.nummer||1,row?.fase||"before",positions);
+  const src=row?.metingen&&Array.isArray(row.metingen.positions)?row.metingen.positions:[];
+  return {...base,...row,metingen:{...(row?.metingen||{}),positions:base.metingen.positions.map((p,i)=>({...p,...(src[i]||{})}))}};
+}
+function makeKrukasRapport(fase="before"){
+  const main=Array.from({length:9},(_,i)=>({no:i+1,a1:"",a2:"",b1:"",b2:"",hs:"",roughness:"",supported:"",betweenCenters:""}));
+  const pins=Array.from({length:8},(_,i)=>({no:i+1,a1:"",a2:"",b1:"",b2:"",hs:"",roughness:""}));
+  return {fase,main_journals:main,crankpins:pins,eccentricity:{supported:"",betweenCenters:""},flange_flywheel:{C:"",D:"",E:"",F:""},ndt:{method:"Magnetic Examination / UV-testing",result:"",inspector:"",date:""},width_thrustbearing:"",hardness:"",cracks:"",remarks:""};
+}
+function normaliseKrukas(row,fase){
+  const base=makeKrukasRapport(fase);
+  if(!row) return base;
+  return {...base,...row,
+    main_journals:base.main_journals.map((x,i)=>({...x,...((row.main_journals||[])[i]||{})})),
+    crankpins:base.crankpins.map((x,i)=>({...x,...((row.crankpins||[])[i]||{})})),
+    eccentricity:{...base.eccentricity,...(row.eccentricity||{})},
+    flange_flywheel:{...base.flange_flywheel,...(row.flange_flywheel||{})},
+    ndt:{...base.ndt,...(row.ndt||{})}
+  };
+}
+function measureSpread(row){
+  const vals=["a1","a2","b1","b2"].map(k=>Number(String(row?.[k]??"").replace(",","."))).filter(Number.isFinite);
+  return vals.length>=2?(Math.max(...vals)-Math.min(...vals)).toFixed(3):"";
+}
+function compressImage(file,maxSide=1100,quality=.68){
+  return new Promise((resolve,reject)=>{
+    if(!file){resolve("");return;}
+    const reader=new FileReader();
+    reader.onerror=()=>reject(new Error("Foto kon niet worden gelezen."));
+    reader.onload=()=>{const img=new Image();img.onload=()=>{const scale=Math.min(1,maxSide/Math.max(img.width,img.height));const w=Math.max(1,Math.round(img.width*scale)),h=Math.max(1,Math.round(img.height*scale));const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;canvas.getContext("2d").drawImage(img,0,0,w,h);resolve(canvas.toDataURL("image/jpeg",quality));};img.onerror=()=>reject(new Error("Fotoformaat niet ondersteund."));img.src=reader.result;};
+    reader.readAsDataURL(file);
+  });
+}
 function makeZuigerRapport(nummer=1) {
   return { nummer, markering: "", type_variant: "", metingen: { tolerance_profile:"standaard", angles: PISTON_ANGLES.map(angle => ({ angle, groove1:"", groove2:"", groove3:"", oil:"", pinA:"", pinB:"" })) }, remarks: "" };
 }
@@ -976,6 +1019,9 @@ function App() {
   const [zuigerTemplates, setZuigerTemplates] = useState([]);
   const [drijfstangTemplates, setDrijfstangTemplates] = useState([]);
   const [krukasTemplates, setKrukasTemplates] = useState([]);
+  const [drijfstangRapporten, setDrijfstangRapporten] = useState([]);
+  const [activeDrijfstang, setActiveDrijfstang] = useState(0);
+  const [krukasRapport, setKrukasRapport] = useState(null);
   const [activeZuiger, setActiveZuiger] = useState(0);
   const [showZuigerKlantRapport, setShowZuigerKlantRapport] = useState(false);
   const [showGenericKlantRapport, setShowGenericKlantRapport] = useState(false);
@@ -995,6 +1041,7 @@ function App() {
   useEffect(()=>lsSet("wo_monteur_naam", monteurNaam),[monteurNaam]);
   useEffect(()=>lsSet("wo_logged_in", isLoggedIn?"1":"0"),[isLoggedIn]);
   useEffect(()=>{ loadKlustypen(); loadZuigerTemplates(); loadDrijfstangTemplates(); loadKrukasTemplates(); },[]);
+  useEffect(()=>{ if(isLoggedIn && monteurNaam && !toegestaneModi(monteurNaam).includes(mode)){ setMode(toegestaneModi(monteurNaam)[0]||"monteur"); } },[isLoggedIn,monteurNaam,mode]);
   useEffect(()=>{ if(view!=="overzicht") return; mode==="monteur"?loadMonteurLijst():loadOverzicht(); },[view,mode,monteurNaam]);
 
   async function loadKlustypen(){
@@ -1038,7 +1085,7 @@ function App() {
       const kt=getKlustype(worDraft.klustype);
       const [createdWO]=await sb("werkorders",{method:"POST",body:JSON.stringify({
         werkopdracht_id:huidigeWerkopdracht.id, klustype:worDraft.klustype, motortype:worDraft.motortype || "-", rapport_template_code: isMotortypeTemplateKlustype(worDraft.klustype)&&worDraft.rapportTemplateCode!=="__manual__"?(worDraft.rapportTemplateCode||null):null, monteur:(worDraft.monteurs||[])[0]||"", assigned_monteurs:worDraft.monteurs||[], rapport_monteurs:[],
-        aantal_koppen:(isCilinderkopKlustype(worDraft.klustype)||isZuigerKlustype(worDraft.klustype))?(Number(worDraft.aantal)||1):1, werkbeschrijving:worDraft.werkbeschrijving, rapport_type:kt?.rapport_type||worDraft.klustype||"generiek"
+        aantal_koppen:(isCilinderkopKlustype(worDraft.klustype)||isZuigerKlustype(worDraft.klustype)||isDrijfstangKlustype(worDraft.klustype))?(Number(worDraft.aantal)||1):1, werkbeschrijving:worDraft.werkbeschrijving, rapport_type:kt?.rapport_type||worDraft.klustype||"generiek"
       })});
       if(isCilinderkopKlustype(worDraft.klustype)){
         const blanks=Array.from({length:Number(worDraft.aantal)||1},(_,i)=>makeCilinderkop(i+1));
@@ -1049,13 +1096,22 @@ function App() {
         const reports=Array.from({length:count},(_,i)=>{const z=makeZuigerRapport(i+1);return {werkorder_id:createdWO.id,nummer:i+1,markering:"",type_variant:z.type_variant,metingen:z.metingen,remarks:"",werkuren:null};});
         await sb("zuiger_rapporten",{method:"POST",body:JSON.stringify(reports)});
       }
+      if(isDrijfstangKlustype(worDraft.klustype)){
+        const count=Number(worDraft.aantal)||1; const t=drijfstangTemplates.find(x=>x.code===worDraft.rapportTemplateCode); const positions=t?.positions||["AA","BB","CC","DD","EE","FF","GG"]; const fase=worDraft.klustype==="connecting_rod_after"?"after":"before";
+        const reports=Array.from({length:count},(_,i)=>{const d=makeDrijfstangRapport(i+1,fase,positions);return {werkorder_id:createdWO.id,nummer:d.nummer,markering:"",fase,metingen:d.metingen,serration_condition:"",cracks:"",new_bolts:"",straightness:"",remarks:""};});
+        await sb("drijfstang_rapporten",{method:"POST",body:JSON.stringify(reports)});
+      }
+      if(isKrukasKlustype(worDraft.klustype)){
+        const fase=worDraft.klustype==="krukas_na"?"after":worDraft.klustype==="krukas_voor"?"before":"inspection"; const k=makeKrukasRapport(fase);
+        await sb("krukas_rapporten",{method:"POST",body:JSON.stringify({werkorder_id:createdWO.id,...k})});
+      }
       setToegevoegdeWerkorders(p=>[...p,createdWO]);
       setWorDraft({klustype:worDraft.klustype,motortype:"",rapportTemplateCode:"",monteurs:[],aantal:1,werkbeschrijving:getWerkbeschrijving(worDraft.klustype)});
     }catch(e){setLoadError(e.message)}
   }
 
   async function openWerkorder(wo,werkopdrachtInfo){
-    setLoadError(""); setKoppen([]); setZuigerRapporten([]); setActiveZuiger(0); setShowZuigerKlantRapport(false); setShowGenericKlantRapport(false); setKopView("intern");
+    setLoadError(""); setKoppen([]); setZuigerRapporten([]); setDrijfstangRapporten([]); setActiveDrijfstang(0); setKrukasRapport(null); setActiveZuiger(0); setShowZuigerKlantRapport(false); setShowGenericKlantRapport(false); setKopView("intern");
     try{
       let opened=wo;
       if(mode==="monteur"&&monteurNaam){
@@ -1081,6 +1137,16 @@ function App() {
           rows=await sb("zuiger_rapporten",{method:"POST",body:JSON.stringify(reports)});
         }
         setZuigerRapporten((rows||[]).map(normaliseZuiger));
+      }else if(isDrijfstangKlustype(wo.klustype)){
+        const t=drijfstangTemplates.find(x=>x.code===wo.rapport_template_code); const positions=t?.positions||["AA","BB","CC","DD","EE","FF","GG"]; const fase=wo.klustype==="connecting_rod_after"?"after":"before";
+        let rows=await sb(`drijfstang_rapporten?werkorder_id=eq.${wo.id}&select=*&order=nummer.asc`);
+        if(!rows||!rows.length){const count=Number(wo.aantal_koppen)||1;const reports=Array.from({length:count},(_,i)=>{const d=makeDrijfstangRapport(i+1,fase,positions);return {werkorder_id:wo.id,nummer:d.nummer,markering:"",fase,metingen:d.metingen,serration_condition:"",cracks:"",new_bolts:"",straightness:"",remarks:""};});rows=await sb("drijfstang_rapporten",{method:"POST",body:JSON.stringify(reports)});}
+        setDrijfstangRapporten((rows||[]).map(r=>normaliseDrijfstang(r,positions)));
+      }else if(isKrukasKlustype(wo.klustype)){
+        const fase=wo.klustype==="krukas_na"?"after":wo.klustype==="krukas_voor"?"before":"inspection";
+        let rows=await sb(`krukas_rapporten?werkorder_id=eq.${wo.id}&select=*&limit=1`);
+        if(!rows||!rows.length){const k=makeKrukasRapport(fase);rows=await sb("krukas_rapporten",{method:"POST",body:JSON.stringify({werkorder_id:wo.id,...k})});}
+        setKrukasRapport(normaliseKrukas(rows?.[0],fase));
       }
       setView("werkorder");
     }catch(e){setLoadError(e.message)}
@@ -1104,6 +1170,16 @@ function App() {
   function updateZuiger(patch){
     setZuigerRapporten(prev=>{const next=prev.map((z,i)=>i===activeZuiger?{...z,...patch}:z); const z=next[activeZuiger]; if(z) debounce(()=>sb(`zuiger_rapporten?id=eq.${z.id}`,{method:"PATCH",body:JSON.stringify({markering:z.markering||"",type_variant:z.type_variant,metingen:z.metingen,remarks:z.remarks}),prefer:"return=minimal"})); return next;});
   }
+  function updateDrijfstang(patch){
+    setDrijfstangRapporten(prev=>{const next=prev.map((d,i)=>i===activeDrijfstang?{...d,...patch}:d);const d=next[activeDrijfstang];if(d)debounce(()=>sb(`drijfstang_rapporten?id=eq.${d.id}`,{method:"PATCH",body:JSON.stringify({markering:d.markering||"",metingen:d.metingen,fase:d.fase,serration_condition:d.serration_condition||"",cracks:d.cracks||"",new_bolts:d.new_bolts||"",straightness:d.straightness||"",remarks:d.remarks||""}),prefer:"return=minimal"}));return next;});
+  }
+  function updateDrijfstangMeting(index,key,value){const d=drijfstangRapporten[activeDrijfstang];if(!d)return;const positions=(d.metingen?.positions||[]).map((r,i)=>i===index?{...r,[key]:value}:r);updateDrijfstang({metingen:{...(d.metingen||{}),positions}});}
+  function updateKrukas(patch){setKrukasRapport(prev=>{const next={...(prev||makeKrukasRapport()),...patch};if(next.id)debounce(()=>sb(`krukas_rapporten?id=eq.${next.id}`,{method:"PATCH",body:JSON.stringify({fase:next.fase,main_journals:next.main_journals,crankpins:next.crankpins,eccentricity:next.eccentricity,flange_flywheel:next.flange_flywheel,ndt:next.ndt,width_thrustbearing:next.width_thrustbearing||"",hardness:next.hardness||"",cracks:next.cracks||"",remarks:next.remarks||""}),prefer:"return=minimal"}));return next;});}
+  function updateKrukasRow(section,index,key,value){if(!krukasRapport)return;const arr=(krukasRapport[section]||[]).map((r,i)=>i===index?{...r,[key]:value}:r);updateKrukas({[section]:arr});}
+  async function addKopPartPhoto(partIndex,phase,file){
+    if(!file)return;try{const data=await compressImage(file);setKoppen(prev=>prev.map((k,ki)=>{if(ki!==activeKop)return k;const parts=(k.onderdelen||makeCylinderHeadParts()).map((p,pi)=>{if(pi!==partIndex)return p;const key=phase==="before"?"photosBefore":"photosAfter";return {...p,[key]:[...(p[key]||[]),data].slice(-4)};});const updated={...k,onderdelen:parts};scheduleSaveKop(updated);return updated;}));}catch(e){setLoadError(e.message);}
+  }
+  function updateKopPart(partIndex,key,value){setKoppen(prev=>prev.map((k,ki)=>{if(ki!==activeKop)return k;const parts=(k.onderdelen||makeCylinderHeadParts()).map((p,pi)=>pi===partIndex?{...p,[key]:value}:p);const updated={...k,onderdelen:parts};scheduleSaveKop(updated);return updated;}));}
   function updateZuigerMeting(angleIndex,key,value){
     const z=zuigerRapporten[activeZuiger]; if(!z) return;
     const angles=z.metingen.angles.map((r,i)=>i===angleIndex?{...r,[key]:value}:r);
