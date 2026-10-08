@@ -953,6 +953,10 @@ function App() {
     return ["kantoor","controle","monteur"].includes(saved)?saved:"kantoor";
   });
   const [monteurNaam, setMonteurNaam] = useState(() => lsGet("wo_monteur_naam", ""));
+  const [isLoggedIn, setIsLoggedIn] = useState(() => lsGet("wo_logged_in","")==="1");
+  const [loginNaam, setLoginNaam] = useState("");
+  const [loginCode, setLoginCode] = useState("");
+  const [loginError, setLoginError] = useState("");
   const [view, setView] = useState("overzicht");
   const [werkopdrachten, setWerkopdrachten] = useState([]);
   const [monteurWerkorders, setMonteurWerkorders] = useState([]);
@@ -989,6 +993,7 @@ function App() {
 
   useEffect(()=>lsSet("wo_mode", mode),[mode]);
   useEffect(()=>lsSet("wo_monteur_naam", monteurNaam),[monteurNaam]);
+  useEffect(()=>lsSet("wo_logged_in", isLoggedIn?"1":"0"),[isLoggedIn]);
   useEffect(()=>{ loadKlustypen(); loadZuigerTemplates(); loadDrijfstangTemplates(); loadKrukasTemplates(); },[]);
   useEffect(()=>{ if(view!=="overzicht") return; mode==="monteur"?loadMonteurLijst():loadOverzicht(); },[view,mode,monteurNaam]);
 
@@ -1155,9 +1160,32 @@ function App() {
 
   function countRejected(kop){let n=0;kop.seatRing.forEach(r=>{if(isRejected(r.measured,r.limit,r.direction))n++});kop.valve.forEach(r=>{if(isRejected(r.measuredQ,r.limitQ,r.direction)||isRejected(r.measuredR,r.limitR,r.direction))n++});kop.valveStem.forEach(r=>{const v=r.measured===""?"":parseFloat(r.measured)-r.nominal;if(isRejected(v,r.limit,r.direction))n++});kop.valveGuide.forEach(r=>{const v=r.measured===""?"":parseFloat(r.measured)-r.nominal;if(isRejected(v,r.limit,r.direction))n++});return n;}
 
-  const beschikbareModi=["kantoor","controle","monteur"];
-  const ModeSwitch=React.createElement("div",{style:{display:"flex",gap:6,padding:"10px 20px",background:"#1f231c",alignItems:"center",flexWrap:"wrap"}},beschikbareModi.map(m=>React.createElement("button",{key:m,onClick:()=>{setMode(m);setView("overzicht");setActiveWerkorder(null)},style:{padding:"6px 14px",borderRadius:5,border:"none",background:mode===m?palette.accent:"transparent",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",textTransform:"uppercase"}},m)),React.createElement("select",{value:monteurNaam,onChange:e=>{setMonteurNaam(e.target.value);setView("overzicht");setActiveWerkorder(null);},style:{marginLeft:"auto",border:"none",borderRadius:4,padding:"5px 10px",fontSize:12,width:200,background:"#fff"}},React.createElement("option",{value:""},"Kies jouw naam..."),...GEBRUIKERS.map(n=>React.createElement("option",{key:n,value:n},n))));
+  function login(){
+    const naam=GEBRUIKERS.find(n=>n.toLowerCase()===String(loginNaam||"").trim().toLowerCase());
+    if(!naam){ setLoginError("Kies een geldige naam."); return; }
+    if(String(loginCode)!=="0000"){ setLoginError("Onjuiste inlogcode."); return; }
+    setMonteurNaam(naam); setIsLoggedIn(true); setLoginError(""); setLoginCode("");
+    const allowed=toegestaneModi(naam); setMode(allowed[0]||"monteur"); setView("overzicht"); setActiveWerkorder(null);
+  }
+  function logout(){
+    setIsLoggedIn(false); setMonteurNaam(""); setLoginNaam(""); setLoginCode(""); setLoginError(""); setView("overzicht"); setActiveWerkorder(null);
+    try{ localStorage.removeItem("wo_monteur_naam"); }catch(e){}
+  }
+  const beschikbareModi=toegestaneModi(monteurNaam);
+  const ModeSwitch=React.createElement("div",{style:{display:"flex",gap:6,padding:"10px 20px",background:"#1f231c",alignItems:"center",flexWrap:"wrap"}},beschikbareModi.map(m=>React.createElement("button",{key:m,onClick:()=>{setMode(m);setView("overzicht");setActiveWerkorder(null)},style:{padding:"6px 14px",borderRadius:5,border:"none",background:mode===m?palette.accent:"transparent",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",textTransform:"uppercase"}},m)),React.createElement("span",{style:{marginLeft:"auto",color:"#fff",fontWeight:700,fontSize:12}},monteurNaam),React.createElement("button",{onClick:logout,style:{border:"1px solid #777",background:"transparent",color:"#fff",borderRadius:5,padding:"6px 10px",cursor:"pointer",fontSize:12}},"Uitloggen"));
   const ErrorBanner=loadError?React.createElement("div",{style:{background:"#fbeae7",border:"1px solid #d9483a",color:"#8a2e22",borderRadius:6,padding:10,fontSize:12,marginBottom:14}},loadError):null;
+
+  if(!isLoggedIn) return React.createElement("div",{style:{minHeight:"100vh",background:palette.bg,display:"grid",placeItems:"center",padding:20}},
+    React.createElement("div",{style:{width:"100%",maxWidth:390,background:"#fff",border:`1px solid ${palette.line}`,borderRadius:10,padding:24,boxShadow:"0 12px 30px rgba(0,0,0,.08)"}},
+      React.createElement("h1",{style:{margin:"0 0 6px",fontSize:22}},"Nicoverken Werkorders"),
+      React.createElement("div",{style:{fontSize:13,color:"#666",marginBottom:18}},"Log in met je naam en inlogcode."),
+      React.createElement(Field,{label:"Naam"},React.createElement("select",{value:loginNaam,onChange:e=>setLoginNaam(e.target.value),style:{...inputStyle,width:"100%",boxSizing:"border-box"}},React.createElement("option",{value:""},"Kies jouw naam..."),...GEBRUIKERS.map(n=>React.createElement("option",{key:n,value:n},n)))),
+      React.createElement("div",{style:{height:12}}),
+      React.createElement(Field,{label:"Inlogcode"},React.createElement(TextInput,{type:"password",inputMode:"numeric",value:loginCode,onChange:e=>setLoginCode(e.target.value),onKeyDown:e=>{if(e.key==="Enter")login();},placeholder:"0000",style:{width:"100%",boxSizing:"border-box"}})),
+      loginError&&React.createElement("div",{style:{marginTop:10,color:"#b5362a",fontSize:12,fontWeight:700}},loginError),
+      React.createElement("button",{onClick:login,disabled:!loginNaam||!loginCode,style:{marginTop:16,width:"100%",padding:"11px 14px",border:0,borderRadius:6,background:palette.accent,color:"#fff",fontWeight:800,cursor:"pointer"}},"Inloggen")
+    )
+  );
   const btn=(label,onClick,extra={})=>React.createElement("button",{onClick,style:{padding:"9px 13px",borderRadius:6,border:`1px solid ${palette.line}`,background:"#fff",fontWeight:700,cursor:"pointer",...extra}},label);
 
   if(mode==="kantoor"&&view==="overzicht") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg,color:palette.ink}},ModeSwitch,React.createElement("div",{style:{padding:24,maxWidth:900,margin:"0 auto"}},React.createElement("div",{style:{display:"flex",gap:10,alignItems:"center",marginBottom:18}},React.createElement("h1",{style:{fontSize:21,margin:0}},"Werkopdrachten"),React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:8}},btn("Werkopdrachten beheren",()=>setView("klustypen")),React.createElement("button",{onClick:()=>setView("nieuwe_werkopdracht"),style:{padding:"10px 14px",border:0,borderRadius:6,background:palette.accent,color:"white",fontWeight:700,cursor:"pointer"}},"+ Nieuwe werkopdracht"))),ErrorBanner,React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:12}},werkopdrachten.map(wop=>React.createElement("div",{key:wop.id,style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:16}},React.createElement("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10}},React.createElement("b",null,wop.order_nummer),React.createElement("span",null,wop.schip_klant),React.createElement("span",{style:{color:"#777"}},wop.datum),heeftVolledigeRechten(monteurNaam)&&React.createElement("button",{onClick:()=>verwijderWerkopdracht(wop),style:{marginLeft:"auto",border:"1px solid #d9483a",color:"#d9483a",background:"#fff",borderRadius:5,padding:"6px 9px",cursor:"pointer"}},"Verwijderen")),React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:6}},(wop.werkorders||[]).map(wor=>React.createElement("button",{key:wor.id,onClick:()=>openWerkorder(wor,wop),style:{display:"flex",gap:10,alignItems:"center",padding:"9px 10px",borderRadius:5,border:`1px solid ${palette.line}`,background:"#fafaf7",cursor:"pointer"}},React.createElement("b",null,getKlustypeNaam(wor.klustype)),React.createElement("span",null,wor.motortype==="-"?"":wor.motortype),React.createElement("span",null,(Array.isArray(wor.assigned_monteurs)&&wor.assigned_monteurs.length?wor.assigned_monteurs.join(", "):(wor.monteur||"nog niet toegewezen"))),wor.uitgevoerd&&React.createElement("span",{style:{color:"#3f7a4f",fontWeight:700}},"✓ uitgevoerd"),React.createElement("span",{style:{marginLeft:"auto"}},React.createElement(StatusBadge,{status:wor.status}))))))))));
