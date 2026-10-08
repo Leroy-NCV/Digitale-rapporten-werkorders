@@ -329,7 +329,7 @@ function normaliseKrukas(row,fase){
   };
 }
 function measureSpread(row){
-  const vals=["a1","a2","b1","b2"].map(k=>Number(String(row?.[k]??"").replace(",","."))).filter(Number.isFinite);
+  const vals=["a1","a2","b1","b2"].map(k=>String(row?.[k]??"").trim()).filter(Boolean).map(v=>Number(v.replace(",","."))).filter(Number.isFinite);
   return vals.length>=2?(Math.max(...vals)-Math.min(...vals)).toFixed(3):"";
 }
 function compressImage(file,maxSide=1100,quality=.68){
@@ -996,7 +996,7 @@ function App() {
     return ["kantoor","controle","monteur"].includes(saved)?saved:"kantoor";
   });
   const [monteurNaam, setMonteurNaam] = useState(() => lsGet("wo_monteur_naam", ""));
-  const [isLoggedIn, setIsLoggedIn] = useState(() => lsGet("wo_logged_in","")==="1");
+  const [isLoggedIn, setIsLoggedIn] = useState(() => lsGet("wo_logged_in","")==="1" && GEBRUIKERS.includes(lsGet("wo_monteur_naam","")));
   const [loginNaam, setLoginNaam] = useState("");
   const [loginCode, setLoginCode] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -1228,7 +1228,12 @@ function App() {
     if(!confirm(`Werkopdracht ${orderNummer} definitief verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
     try{
       const ids=(await sb(`werkorders?werkopdracht_id=eq.${wop.id}&select=id`))||[];
-      for(const x of ids){ await sb(`cilinderkop_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{}); await sb(`zuiger_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{}); }
+      for(const x of ids){
+        await sb(`cilinderkop_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{});
+        await sb(`zuiger_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{});
+        await sb(`drijfstang_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{});
+        await sb(`krukas_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{});
+      }
       await sb(`werkorders?werkopdracht_id=eq.${wop.id}`,{method:"DELETE",prefer:"return=minimal"});
       await sb(`werkopdrachten?id=eq.${wop.id}`,{method:"DELETE",prefer:"return=minimal"}); loadOverzicht();
     }catch(e){setLoadError(e.message)}
@@ -1565,7 +1570,7 @@ class AppErrorBoundary extends React.Component {
       return React.createElement("div",{style:{fontFamily:"Arial,sans-serif",padding:24,color:"#1f231c"}},
         React.createElement("h2",null,"De applicatie kon niet starten"),
         React.createElement("p",null,"Fout: "+String(this.state.error&&this.state.error.message||this.state.error)),
-        React.createElement("button",{onClick:()=>{try{localStorage.removeItem("wo_mode");localStorage.removeItem("wo_monteur_naam");}catch(e){} location.reload();},style:{padding:"10px 14px",cursor:"pointer"}},"Herstel opgeslagen schermstatus")
+        React.createElement("button",{onClick:()=>{try{localStorage.removeItem("wo_mode");localStorage.removeItem("wo_monteur_naam");localStorage.removeItem("wo_logged_in");}catch(e){} location.reload();},style:{padding:"10px 14px",cursor:"pointer"}},"Herstel opgeslagen schermstatus")
       );
     }
     return this.props.children;
