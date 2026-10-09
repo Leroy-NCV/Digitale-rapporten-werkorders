@@ -1019,6 +1019,7 @@ function App() {
   const [activeDrijfstang, setActiveDrijfstang] = useState(0);
   const [krukasRapport, setKrukasRapport] = useState(null);
   const [componentRapport, setComponentRapport] = useState(null);
+  const [partsTemplates, setPartsTemplates] = useState([]);
   const [activeZuiger, setActiveZuiger] = useState(0);
   const [showZuigerKlantRapport, setShowZuigerKlantRapport] = useState(false);
   const [showGenericKlantRapport, setShowGenericKlantRapport] = useState(false);
@@ -1033,12 +1034,27 @@ function App() {
   const getKlustype = code => KLUSTYPEN.find(k => (k.value||k.code) === code) || KLUSTYPEN_FALLBACK.find(k=>k.value===code);
   const getKlustypeNaam = code => getKlustype(code)?.label || code;
   const getWerkbeschrijving = code => getKlustype(code)?.werkbeschrijving || "";
-  const engineTypeOptions = Array.from(new Set([...zuigerTemplates,...drijfstangTemplates,...krukasTemplates].map(t=>String(t?.naam||"").trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:"base"}));
+  const normaliseEngineName = value => String(value||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
+  const engineTypeOptions = Array.from(new Set([
+    ...zuigerTemplates.map(t=>t?.naam),
+    ...drijfstangTemplates.map(t=>t?.naam),
+    ...krukasTemplates.map(t=>t?.naam),
+    ...partsTemplates.flatMap(t=>[t?.engine_type,...(Array.isArray(t?.engine_aliases)?t.engine_aliases:[])])
+  ].map(x=>String(x||"").trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:"base"}));
+  function findPartsTemplate(engineType,reportCode){
+    const n=normaliseEngineName(engineType);
+    if(!n||!reportCode) return null;
+    return partsTemplates.find(t=>{
+      if(!Array.isArray(t.report_codes)||!t.report_codes.includes(reportCode)) return false;
+      const names=[t.engine_type,...(Array.isArray(t.engine_aliases)?t.engine_aliases:[])];
+      return names.some(x=>normaliseEngineName(x)===n);
+    })||null;
+  }
 
   useEffect(()=>lsSet("wo_mode", mode),[mode]);
   useEffect(()=>lsSet("wo_monteur_naam", monteurNaam),[monteurNaam]);
   useEffect(()=>lsSet("wo_logged_in", isLoggedIn?"1":"0"),[isLoggedIn]);
-  useEffect(()=>{ loadKlustypen(); loadZuigerTemplates(); loadDrijfstangTemplates(); loadKrukasTemplates(); },[]);
+  useEffect(()=>{ loadKlustypen(); loadZuigerTemplates(); loadDrijfstangTemplates(); loadKrukasTemplates(); loadPartsTemplates(); },[]);
   useEffect(()=>{ if(isLoggedIn && monteurNaam && !toegestaneModi(monteurNaam).includes(mode)){ setMode(toegestaneModi(monteurNaam)[0]||"monteur"); } },[isLoggedIn,monteurNaam,mode]);
   useEffect(()=>{ if(view!=="overzicht") return; mode==="monteur"?loadMonteurLijst():loadOverzicht(); },[view,mode,monteurNaam]);
 
@@ -1060,6 +1076,9 @@ function App() {
   }
   async function loadKrukasTemplates(){
     try{ setKrukasTemplates((await sb("krukas_templates?select=*&actief=eq.true&order=sort_order.asc"))||[]); }catch(e){ console.warn(e); }
+  }
+  async function loadPartsTemplates(){
+    try{ setPartsTemplates((await sb("parts_templates?select=*&actief=eq.true&order=manufacturer.asc,engine_type.asc,sort_order.asc"))||[]); }catch(e){ console.warn(e); }
   }
   function motortypeTemplatesVoor(code){
     if(isZuigerKlustype(code)) return zuigerTemplates;
@@ -1168,6 +1187,14 @@ function App() {
   }
   function updateComponentData(patch){ if(!componentRapport)return; saveComponentRapport({...componentRapport,data:{...(componentRapport.data||{}),...patch}}); }
   function addComponentPart(){ if(!componentRapport)return; const parts=[...(componentRapport.onderdelen||[]),{id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),ref:"",partNo:"",description:"",qty:1,status:"",remark:""}]; saveComponentRapport({...componentRapport,onderdelen:parts}); }
+  function addOemComponentPart(part){
+    if(!componentRapport||!part)return;
+    const existing=componentRapport.onderdelen||[];
+    const key=p=>[p.partNo||"",p.ref||"",p.description||""].map(x=>String(x).trim().toLowerCase()).join("|");
+    const candidate={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),ref:part.ref||"",partNo:part.partNo||"",description:part.description||"",qty:Number(part.qty)||1,status:"Required",remark:""};
+    if(existing.some(p=>key(p)===key(candidate))) return;
+    saveComponentRapport({...componentRapport,onderdelen:[...existing,candidate]});
+  }
   function updateComponentPart(i,key,value){ if(!componentRapport)return; const parts=(componentRapport.onderdelen||[]).map((p,idx)=>idx===i?{...p,[key]:value}:p); saveComponentRapport({...componentRapport,onderdelen:parts}); }
   function removeComponentPart(i){ if(!componentRapport)return; const parts=(componentRapport.onderdelen||[]).filter((_,idx)=>idx!==i); saveComponentRapport({...componentRapport,onderdelen:parts}); }
   async function setComponentIllustration(file){ if(!file||!componentRapport)return; try{const image=await compressImage(file,1400,.74); updateComponentData({illustration_image:image});}catch(e){setLoadError(e.message)} }
@@ -1380,6 +1407,8 @@ function App() {
       React.createElement("div",{style:{fontWeight:800,marginBottom:4}},controlePunten.length?`CONTROLECHECK — ${controlePunten.length} aandachtspunt(en)`:"CONTROLECHECK — geen aandachtspunten"),
       controlePunten.length?React.createElement("ul",{style:{margin:"5px 0 0",paddingLeft:20}},...controlePunten.slice(0,8).map((x,i)=>React.createElement("li",{key:i},x))):React.createElement("div",null,"De automatische basiscontrole heeft geen ontbrekende kerngegevens gevonden.")
     ):null;
+    const oemPartsTemplate=findPartsTemplate(activeWerkorder.motortype,activeWerkorder.klustype);
+    const oemParts=Array.isArray(oemPartsTemplate?.parts)?oemPartsTemplate.parts:[];
     const partsPanel=componentRapport?React.createElement("div",{style:{maxWidth:1050,margin:"12px auto 0",padding:"14px",background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8}},
       React.createElement("div",{style:{display:"flex",alignItems:"end",gap:10,flexWrap:"wrap",marginBottom:12}},
         React.createElement("div",{style:{fontSize:14,fontWeight:900,marginRight:8}},"TYPE / ILLUSTRATIE / BESTELLIJST"),
@@ -1393,11 +1422,44 @@ function App() {
       React.createElement("div",{style:{display:"grid",gridTemplateColumns:"minmax(250px,0.9fr) minmax(460px,1.7fr)",gap:14,alignItems:"start"}},
         React.createElement("div",{style:{border:`1px solid ${palette.line}`,borderRadius:7,padding:10,background:"#fafaf7"}},
           React.createElement("div",{style:{fontWeight:800,fontSize:12,marginBottom:7}},"ILLUSTRATIE / EXPLODED VIEW"),
-          componentRapport.data?.illustration_image?React.createElement("img",{src:componentRapport.data.illustration_image,style:{display:"block",width:"100%",maxHeight:320,objectFit:"contain",background:"#fff"}}):React.createElement("div",{style:{height:180,display:"flex",alignItems:"center",justifyContent:"center",textAlign:"center",padding:18,color:"#777",background:"#fff",border:"1px dashed #bfc3b8"}},"Nog geen illustratie gekoppeld aan deze werkorder. Voeg de juiste exploded view / referentietekening toe."),
+          componentRapport.data?.illustration_image
+            ?React.createElement("img",{src:componentRapport.data.illustration_image,style:{display:"block",width:"100%",maxHeight:320,objectFit:"contain",background:"#fff"}})
+            :oemPartsTemplate
+              ?React.createElement("div",{style:{minHeight:250,padding:12,background:"#fff",border:"1px solid #cfd3c8",boxSizing:"border-box"}},
+                React.createElement("div",{style:{textAlign:"center",fontWeight:900,fontSize:14,margin:"6px 0 12px"}},oemPartsTemplate.title),
+                React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:7}},
+                  ...oemParts.slice(0,10).map((p,i)=>React.createElement("div",{key:(p.partNo||p.ref||i),style:{border:"1px solid #d7dad0",borderRadius:6,padding:"7px 8px",background:i%2?"#fafaf7":"#fff"}},
+                    React.createElement("div",{style:{display:"flex",gap:7,alignItems:"center"}},
+                      React.createElement("span",{style:{minWidth:25,height:25,borderRadius:13,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"#1f231c",color:"#fff",fontSize:10,fontWeight:800}},p.ref||String(i+1)),
+                      React.createElement("div",{style:{fontSize:10,lineHeight:1.25}},React.createElement("b",null,p.description||"Part"),p.partNo&&React.createElement("div",{style:{color:"#56606a",marginTop:2}},p.partNo))
+                    )
+                  ))
+                ),
+                React.createElement("div",{style:{fontSize:9.5,color:"#68706a",marginTop:10,textAlign:"center"}},"Schematische onderdelenkaart op basis van de OEM-catalogus; niet op schaal.")
+              )
+              :React.createElement("div",{style:{height:180,display:"flex",alignItems:"center",justifyContent:"center",textAlign:"center",padding:18,color:"#777",background:"#fff",border:"1px dashed #bfc3b8"}},"Nog geen OEM-illustratie voor deze combinatie. Handmatig toevoegen blijft mogelijk."),
+          oemPartsTemplate&&React.createElement("div",{style:{marginTop:8,padding:"8px 9px",background:"#eef3f6",borderRadius:5,fontSize:10.5,lineHeight:1.4}},
+            React.createElement("b",null,oemPartsTemplate.manufacturer," · ",oemPartsTemplate.engine_type),
+            React.createElement("div",null,oemPartsTemplate.source_ref||"",oemPartsTemplate.source_page?" · p. "+oemPartsTemplate.source_page:""),
+            React.createElement("div",{style:{color:"#60666c"}},oemPartsTemplate.source_file||""),
+            oemPartsTemplate.notes&&React.createElement("div",{style:{marginTop:4,color:"#7a5224"}},oemPartsTemplate.notes)
+          ),
           React.createElement("input",{type:"file",accept:"image/*",style:{marginTop:9,width:"100%"},onChange:e=>{const file=e.target.files?.[0];setComponentIllustration(file);e.target.value="";}}),
           React.createElement("input",{value:componentRapport.data?.illustration_caption||"",onChange:e=>updateComponentData({illustration_caption:e.target.value}),placeholder:"Onderschrift / illustratienummer",style:{...inputStyle,width:"100%",boxSizing:"border-box",marginTop:7}})
         ),
         React.createElement("div",{style:{overflowX:"auto"}},
+          oemPartsTemplate?React.createElement("div",{style:{marginBottom:14,border:"1px solid #d7dad0",borderRadius:7,overflow:"hidden"}},
+            React.createElement("div",{style:{padding:"8px 10px",background:"#eef1ec",fontSize:12,fontWeight:900}},"OEM ONDERDELEN UIT CATALOGUS"),
+            React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",minWidth:600,fontSize:10.5}},
+              React.createElement("thead",null,React.createElement("tr",null,...["Ref.","Part no.","Description",""].map(h=>React.createElement("th",{key:h,style:{padding:6,textAlign:"left",borderBottom:"1px solid #d7dad0"}},h)))),
+              React.createElement("tbody",null,...oemParts.map((p,i)=>React.createElement("tr",{key:(p.partNo||p.ref||i)},
+                React.createElement("td",{style:{padding:5,borderBottom:"1px solid #eceee8",fontWeight:700}},p.ref||""),
+                React.createElement("td",{style:{padding:5,borderBottom:"1px solid #eceee8"}},p.partNo||"—"),
+                React.createElement("td",{style:{padding:5,borderBottom:"1px solid #eceee8"}},p.description||""),
+                React.createElement("td",{style:{padding:5,borderBottom:"1px solid #eceee8",textAlign:"right"}},btn("+",()=>addOemComponentPart(p),{padding:"4px 9px",fontWeight:900}))
+              )))
+            )
+          ):React.createElement("div",{style:{marginBottom:12,padding:10,border:"1px dashed #c6c9c0",borderRadius:6,color:"#777",fontSize:11}},"Voor dit motortype + rapport staat nog geen OEM-onderdelenlijst in de bibliotheek. De handmatige bestellijst blijft beschikbaar."),
           React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}},
             React.createElement("div",{style:{fontWeight:800,fontSize:12}},"BESTELLIJST / PARTS ORDER LIST"),
             btn("+ Onderdeel",addComponentPart,{padding:"6px 10px"})
