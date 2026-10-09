@@ -892,6 +892,71 @@ function CylinderCustomerEditor(props){
 }
 
 
+function ConnectingRodMeasurementDiagram({ template, werkorder, compact=false }) {
+  const n=String(template?.naam||werkorder?.motortype||"").toLowerCase();
+  const code=String(template?.code||werkorder?.rapport_template_code||"").toLowerCase();
+  const ey26=code==="yanmar_ey26"||n.includes("ey26");
+  const common={fill:"none",stroke:"#30343a",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"};
+  if(ey26){
+    return React.createElement("svg",{viewBox:"0 0 520 250",role:"img","aria-label":"Yanmar EY26 connecting rod measurement positions",style:{display:"block",width:"100%",maxHeight:compact?150:240,background:"#fff"}},
+      React.createElement("text",{x:20,y:30,fontSize:18,fontWeight:700,fill:"#111"},"Small-end"),
+      React.createElement("ellipse",{cx:85,cy:82,rx:44,ry:25,...common}),
+      React.createElement("ellipse",{cx:85,cy:82,rx:27,ry:14,...common}),
+      React.createElement("line",{x1:85,y1:50,x2:85,y2:114,...common}),
+      React.createElement("text",{x:27,y:88,fontSize:16,fill:"#111"},"G"),
+      React.createElement("text",{x:75,y:126,fontSize:16,fill:"#111"},"F"),
+      React.createElement("line",{x1:180,y1:35,x2:180,y2:170,...common}),
+      React.createElement("line",{x1:220,y1:35,x2:220,y2:170,...common}),
+      React.createElement("line",{x1:170,y1:48,x2:230,y2:48,...common}),
+      React.createElement("line",{x1:170,y1:156,x2:230,y2:156,...common}),
+      React.createElement("line",{x1:192,y1:62,x2:192,y2:144,...common}),
+      React.createElement("line",{x1:208,y1:62,x2:208,y2:144,...common}),
+      React.createElement("text",{x:166,y:42,fontSize:14,fill:"#111"},"20"),
+      React.createElement("text",{x:216,y:42,fontSize:14,fill:"#111"},"20"),
+      React.createElement("text",{x:182,y:109,fontSize:16,fill:"#111"},"D₁"),
+      React.createElement("text",{x:207,y:109,fontSize:16,fill:"#111"},"D₂"),
+      React.createElement("path",{d:"M315 42 Q365 18 415 42 L438 75 L438 158 L415 196 Q365 220 315 196 L292 158 L292 75 Z",...common}),
+      React.createElement("circle",{cx:365,cy:120,r:58,...common}),
+      React.createElement("circle",{cx:365,cy:120,r:43,...common}),
+      React.createElement("line",{x1:307,y1:120,x2:423,y2:120,...common}),
+      React.createElement("line",{x1:365,y1:62,x2:365,y2:178,...common}),
+      React.createElement("line",{x1:318,y1:85,x2:412,y2:155,...common}),
+      React.createElement("line",{x1:318,y1:155,x2:412,y2:85,...common}),
+      React.createElement("text",{x:360,y:72,fontSize:18,fontWeight:700,fill:"#111"},"A"),
+      React.createElement("text",{x:360,y:210,fontSize:18,fontWeight:700,fill:"#111"},"B"),
+      React.createElement("text",{x:432,y:198,fontSize:18,fontWeight:700,fill:"#111"},"C"),
+      React.createElement("text",{x:446,y:150,fontSize:18,fontWeight:700,fill:"#111"},"D"),
+      React.createElement("text",{x:446,y:100,fontSize:18,fontWeight:700,fill:"#111"},"E"),
+      React.createElement("text",{x:402,y:97,fontSize:14,fill:"#111"},"15°"),
+      React.createElement("text",{x:403,y:148,fontSize:14,fill:"#111"},"15°")
+    );
+  }
+  return React.createElement("svg",{viewBox:"0 0 520 190",role:"img","aria-label":"Yanmar connecting rod measurement positions A to G",style:{display:"block",width:"100%",maxHeight:compact?125:210,background:"#fff"}},
+    React.createElement("circle",{cx:72,cy:95,r:35,...common}),
+    React.createElement("circle",{cx:72,cy:95,r:22,...common}),
+    React.createElement("path",{d:"M103 78 C165 74 220 75 286 78",...common}),
+    React.createElement("path",{d:"M103 112 C165 116 220 115 286 112",...common}),
+    React.createElement("path",{d:"M117 89 C165 90 210 90 260 88 C276 87 282 81 291 74",...common}),
+    React.createElement("path",{d:"M117 101 C165 100 210 100 260 102 C276 103 282 109 291 116",...common}),
+    React.createElement("path",{d:"M286 78 Q322 36 367 30 Q420 28 455 60 L474 95 L455 130 Q420 162 367 160 Q322 154 286 112",...common}),
+    React.createElement("circle",{cx:382,cy:95,r:56,...common}),
+    React.createElement("circle",{cx:382,cy:95,r:42,...common}),
+    React.createElement("line",{x1:326,y1:95,x2:438,y2:95,...common}),
+    React.createElement("line",{x1:382,y1:39,x2:382,y2:151,...common}),
+    React.createElement("line",{x1:336,y1:62,x2:428,y2:128,...common}),
+    React.createElement("line",{x1:336,y1:128,x2:428,y2:62,...common}),
+    React.createElement("line",{x1:343,y1:48,x2:421,y2:142,...common}),
+    React.createElement("line",{x1:343,y1:142,x2:421,y2:48,...common}),
+    React.createElement("text",{x:291,y:98,fontSize:18,fontWeight:700,fill:"#111"},"A"),
+    React.createElement("text",{x:319,y:138,fontSize:18,fontWeight:700,fill:"#111"},"B"),
+    React.createElement("text",{x:376,y:176,fontSize:18,fontWeight:700,fill:"#111"},"C"),
+    React.createElement("text",{x:431,y:144,fontSize:18,fontWeight:700,fill:"#111"},"D"),
+    React.createElement("text",{x:468,y:112,fontSize:18,fontWeight:700,fill:"#111"},"E"),
+    React.createElement("text",{x:62,y:150,fontSize:18,fontWeight:700,fill:"#111"},"F"),
+    React.createElement("text",{x:18,y:100,fontSize:18,fontWeight:700,fill:"#111"},"G")
+  );
+}
+
 function CustomerConnectingRodReport({ werkorder, rapporten, template }) {
   const cell={border:"1px solid #c8cbc3",padding:"4px 5px",fontSize:8.2,textAlign:"center"};
   const head={...cell,fontWeight:700,background:"#eef1f3"};
@@ -973,6 +1038,10 @@ function CustomerConnectingRodReport({ werkorder, rapporten, template }) {
       reference.length?React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1.5mm 7mm",border:"1px solid #cbd2da",borderTop:"none",padding:"2.5mm",fontSize:8.3,background:"#fafbfd"}},
         ...reference.map(([label,val])=>React.createElement("div",{key:label},React.createElement("b",null,label+": "),String(val)))
       ):null,
+      React.createElement("div",{style:{border:"1px solid #cbd2da",borderTop:"none",padding:"2mm",pageBreakInside:"avoid"}},
+        React.createElement("div",{style:{fontSize:8,fontWeight:700,textAlign:"center",marginBottom:"1mm"}},"MEASUREMENT POSITIONS"),
+        React.createElement(ConnectingRodMeasurementDiagram,{template,werkorder,compact:true})
+      ),
       ...sections,
       React.createElement("div",{style:{borderTop:"2px solid #1664a8",paddingTop:"2mm",marginTop:"6mm",display:"flex",justifyContent:"space-between",fontSize:7.5,color:"#304564"}},
         React.createElement("span",null,"Nicoverken Engine Repair | Connecting Rod Measurement Report"),
@@ -1772,6 +1841,10 @@ function App() {
             ),
             React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:6,background:"#fafaf7",border:`1px solid ${palette.line}`,padding:10,borderRadius:6,marginBottom:14}},
               ...refBits.map(([label,val])=>React.createElement("div",{key:label,style:{fontSize:12}},React.createElement("b",null,label+": "),String(val)))
+            ),
+            React.createElement("div",{style:{marginBottom:14,padding:10,border:`1px solid ${palette.line}`,borderRadius:6,background:"#fff"}},
+              React.createElement("div",{style:{fontSize:11,fontWeight:800,textAlign:"center",marginBottom:6}},"MEETPUNTEN / MEASUREMENT POSITIONS"),
+              React.createElement(ConnectingRodMeasurementDiagram,{template,werkorder:activeWerkorder})
             ),
             React.createElement("div",{style:{overflowX:"auto"}},React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",minWidth:620}},
               React.createElement("thead",null,React.createElement("tr",null,React.createElement("th",{style:th},"Position"),React.createElement("th",{style:th},"Big End (mm)"),React.createElement("th",{style:th},"Small End (mm)"))),
