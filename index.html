@@ -1020,6 +1020,7 @@ function App() {
   const [krukasRapport, setKrukasRapport] = useState(null);
   const [componentRapport, setComponentRapport] = useState(null);
   const [partsTemplates, setPartsTemplates] = useState([]);
+  const [illustrationZoom, setIllustrationZoom] = useState(false);
   const [activeZuiger, setActiveZuiger] = useState(0);
   const [showZuigerKlantRapport, setShowZuigerKlantRapport] = useState(false);
   const [showGenericKlantRapport, setShowGenericKlantRapport] = useState(false);
@@ -1051,6 +1052,92 @@ function App() {
       return names.some(x=>normaliseEngineName(x)===n);
     }):null;
     return exact||partsTemplates.find(t=>t.engine_type==="__GENERIC__"&&Array.isArray(t.report_codes)&&t.report_codes.includes(reportCode))||null;
+  }
+
+  function ComponentSchematic({code,title,large=false}){
+    const kind = ({
+      cilinderkop:"cylinder_head",cilinderkop_overhaul_niet_yanmar:"cylinder_head",
+      connecting_rod_before:"connecting_rod",connecting_rod_after:"connecting_rod",
+      krukas_inspectie:"crankshaft",krukas_voor:"crankshaft",krukas_na:"crankshaft",
+      zuiger:"piston",zuiger_voor:"piston",zuiger_na:"piston",zuiger_met_losse_kroon:"piston",
+      voeringen_voor:"liner",voeringen_na:"liner",
+      koel_water_pomp_inspectie:"pump",smeer_olie_pomp:"pump",
+      brandstof_pompen_voor:"fuel_pump",brandstof_pompen_na:"fuel_pump",
+      verstuivers_voor:"injector",verstuivers_na:"injector",
+      governor:"governor",governor_voor:"governor",governor_na:"governor",
+      nokkenas_voor:"camshaft",nokkenas_na:"camshaft",
+      rockerarms:"rockerarms",turbo_na:"turbo"
+    })[code]||"component";
+    const stroke="#283039", fill="#f7f7f3", accent="#c25a2c";
+    const common={fill:"none",stroke,strokeWidth:4,strokeLinecap:"round",strokeLinejoin:"round"};
+    const el=[];
+    if(kind==="piston"){
+      el.push(React.createElement("path",{key:"a",d:"M80 45 L80 145 Q80 165 100 170 L220 170 Q240 165 240 145 L240 45 Z",...common}));
+      el.push(React.createElement("path",{key:"b",d:"M88 70 H232 M88 88 H232 M92 108 H228",...common}));
+      el.push(React.createElement("circle",{key:"c",cx:160,cy:132,r:27,...common}));
+      el.push(React.createElement("line",{key:"d",x1:115,y1:132,x2:205,y2:132,...common}));
+    } else if(kind==="connecting_rod"){
+      el.push(React.createElement("circle",{key:"a",cx:160,cy:55,r:34,...common}));
+      el.push(React.createElement("circle",{key:"b",cx:160,cy:180,r:62,...common}));
+      el.push(React.createElement("path",{key:"c",d:"M140 84 L118 137 M180 84 L202 137",...common}));
+      el.push(React.createElement("circle",{key:"d",cx:160,cy:180,r:37,...common}));
+    } else if(kind==="crankshaft"){
+      el.push(React.createElement("path",{key:"a",d:"M35 120 H85 L105 80 H150 L170 160 H215 L235 105 H285",...common}));
+      [55,105,150,170,215,265].forEach((x,i)=>el.push(React.createElement("circle",{key:"c"+i,cx:x,cy:i===1?80:i===3?160:i===4?160:120,r:17,...common})));
+    } else if(kind==="cylinder_head"){
+      el.push(React.createElement("rect",{key:"a",x:55,y:45,width:210,height:145,rx:18,...common}));
+      el.push(React.createElement("circle",{key:"b",cx:160,cy:118,r:32,...common}));
+      [100,130,190,220].forEach((x,i)=>el.push(React.createElement("line",{key:"v"+i,x1:x,y1:70,x2:x,y2:160,...common})));
+      el.push(React.createElement("path",{key:"d",d:"M85 190 V212 H235 V190",...common}));
+    } else if(kind==="liner"){
+      el.push(React.createElement("ellipse",{key:"a",cx:160,cy:45,rx:70,ry:22,...common}));
+      el.push(React.createElement("path",{key:"b",d:"M90 45 V190 M230 45 V190",...common}));
+      el.push(React.createElement("ellipse",{key:"c",cx:160,cy:190,rx:70,ry:22,...common}));
+      el.push(React.createElement("ellipse",{key:"d",cx:160,cy:62,rx:58,ry:16,...common}));
+    } else if(kind==="pump"){
+      el.push(React.createElement("circle",{key:"a",cx:145,cy:122,r:72,...common}));
+      el.push(React.createElement("circle",{key:"b",cx:145,cy:122,r:19,...common}));
+      [0,60,120,180,240,300].forEach((deg,i)=>{const r=45,rad=deg*Math.PI/180;el.push(React.createElement("line",{key:"i"+i,x1:145,y1:122,x2:145+Math.cos(rad)*r,y2:122+Math.sin(rad)*r,...common}));});
+      el.push(React.createElement("path",{key:"c",d:"M217 122 H282 M92 177 L55 212",...common}));
+    } else if(kind==="fuel_pump"){
+      el.push(React.createElement("rect",{key:"a",x:105,y:42,width:110,height:170,rx:12,...common}));
+      el.push(React.createElement("line",{key:"b",x1:160,y1:58,x2:160,y2:180,...common}));
+      el.push(React.createElement("rect",{key:"c",x:135,y:75,width:50,height:60,...common}));
+      el.push(React.createElement("path",{key:"d",d:"M105 105 H65 M215 105 H255",...common}));
+    } else if(kind==="injector"){
+      el.push(React.createElement("path",{key:"a",d:"M132 35 H188 L198 75 L183 165 L170 215 H150 L137 165 L122 75 Z",...common}));
+      el.push(React.createElement("line",{key:"b",x1:160,y1:52,x2:160,y2:190,...common}));
+      el.push(React.createElement("path",{key:"c",d:"M145 95 H175 M142 120 H178",...common}));
+    } else if(kind==="camshaft"){
+      el.push(React.createElement("line",{key:"a",x1:35,y1:125,x2:285,y2:125,...common}));
+      [70,120,170,220,265].forEach((x,i)=>el.push(React.createElement("ellipse",{key:"l"+i,cx:x,cy:125,rx:20,ry:i%2?42:30,transform:`rotate(${i%2?28:-24} ${x} 125)`,...common})));
+    } else if(kind==="rockerarms"){
+      el.push(React.createElement("circle",{key:"a",cx:160,cy:125,r:22,...common}));
+      el.push(React.createElement("path",{key:"b",d:"M48 102 Q105 74 145 115 M175 115 Q220 82 275 98",...common}));
+      el.push(React.createElement("line",{key:"c",x1:70,y1:102,x2:70,y2:185,...common}));
+      el.push(React.createElement("line",{key:"d",x1:250,y1:98,x2:250,y2:185,...common}));
+    } else if(kind==="turbo"){
+      el.push(React.createElement("circle",{key:"a",cx:120,cy:125,r:70,...common}));
+      el.push(React.createElement("circle",{key:"b",cx:120,cy:125,r:20,...common}));
+      el.push(React.createElement("path",{key:"c",d:"M185 90 H245 Q280 90 280 125 Q280 160 245 160 H205",...common}));
+      [0,60,120,180,240,300].forEach((deg,i)=>{const r=43,rad=deg*Math.PI/180;el.push(React.createElement("line",{key:"t"+i,x1:120,y1:125,x2:120+Math.cos(rad)*r,y2:125+Math.sin(rad)*r,...common}));});
+    } else if(kind==="governor"){
+      el.push(React.createElement("rect",{key:"a",x:95,y:70,width:130,height:130,rx:18,...common}));
+      el.push(React.createElement("circle",{key:"b",cx:160,cy:122,r:32,...common}));
+      el.push(React.createElement("line",{key:"c",x1:160,y1:122,x2:205,y2:85,...common}));
+      el.push(React.createElement("line",{key:"d",x1:160,y1:200,x2:160,y2:230,...common}));
+    } else {
+      el.push(React.createElement("circle",{key:"a",cx:160,cy:125,r:75,...common}));
+      el.push(React.createElement("path",{key:"b",d:"M90 125 H230 M160 55 V195",...common}));
+    }
+    return React.createElement("div",{style:{background:"#fff",border:"1px solid #d7dad0",borderRadius:8,padding:large?22:10,textAlign:"center"}},
+      React.createElement("svg",{viewBox:"0 0 320 250",style:{width:"100%",height:large?"65vh":"230px",maxHeight:large?"720px":"230px"}},...el,
+        React.createElement("circle",{key:"mark",cx:285,cy:28,r:12,fill:accent,stroke:"none"}),
+        React.createElement("text",{key:"m2",x:285,y:32,textAnchor:"middle",fontSize:10,fontWeight:"800",fill:"#fff"},"N")
+      ),
+      React.createElement("div",{style:{fontWeight:800,fontSize:large?18:12,marginTop:4}},title||getKlustypeNaam(code)),
+      React.createElement("div",{style:{fontSize:10,color:"#6a7068",marginTop:3}},"Schematische Nicoverken-illustratie · niet op schaal")
+    );
   }
 
   useEffect(()=>lsSet("wo_mode", mode),[mode]);
@@ -1397,8 +1484,8 @@ function App() {
   if(mode==="monteur"&&view==="overzicht") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,React.createElement("div",{style:{padding:24,maxWidth:650,margin:"0 auto"}},React.createElement("h1",{style:{fontSize:20}},"Mijn werkorders"),!monteurNaam&&React.createElement("div",{style:{background:"#fff6ef",border:"1px solid #c25a2c",borderRadius:6,padding:10,marginBottom:12,fontSize:13}},"Kies eerst jouw naam rechtsboven."),ErrorBanner,React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:10}},monteurWerkorders.map(wor=>React.createElement("button",{key:wor.id,onClick:()=>openWerkorder(wor,wor.werkopdrachten),style:{textAlign:"left",padding:14,borderRadius:8,border:`1px solid ${palette.line}`,background:"#fff",cursor:"pointer"}},React.createElement("b",null,wor.werkopdrachten?.order_nummer," — ",wor.werkopdrachten?.schip_klant),React.createElement("div",{style:{fontSize:13,color:"#666",margin:"4px 0"}},getKlustypeNaam(wor.klustype)," · ",wor.motortype==="-"?"":wor.motortype),React.createElement(StatusBadge,{status:wor.status}))))));
 
   if(view==="werkorder"&&activeWerkorder){
-    const header=React.createElement("div",{style:{background:"#fff",borderBottom:`1px solid ${palette.line}`,padding:"14px 20px"}},React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:16,alignItems:"center",fontSize:13}},React.createElement("span",null,React.createElement("b",null,"Order "),activeWerkorder.werkopdracht?.order_nummer),React.createElement("span",null,React.createElement("b",null,"Schip "),activeWerkorder.werkopdracht?.schip_klant),React.createElement("span",null,React.createElement("b",null,"Klustype "),getKlustypeNaam(activeWerkorder.klustype)),React.createElement("span",null,React.createElement("b",null,"Motortype "),activeWerkorder.motortype==="-"?"":activeWerkorder.motortype),React.createElement(StatusBadge,{status:activeWerkorder.status}),React.createElement("span",{style:{color:"#999"}},saving?"opslaan…":"opgeslagen"),mode==="monteur"&&btn(activeWerkorder.status==="teruggestuurd"?"Opnieuw indienen ter controle":"Indienen ter controle",indienenTerControle,{marginLeft:"auto",background:palette.accent,color:"#fff",border:"none"}),mode==="kantoor"&&activeWerkorder.status==="ter_controle"&&React.createElement(React.Fragment,null,React.createElement("input",{value:terugOpmerking,onChange:e=>setTerugOpmerking(e.target.value),placeholder:"Opmerking bij terugsturen",style:{...inputStyle,marginLeft:"auto",width:220}}),btn("Terugsturen",terugsturen,{color:"#d9483a"}),heeftVolledigeRechten(monteurNaam)&&btn("Goedkeuren",goedkeuren,{background:"#3f7a4f",color:"#fff",border:"none"})),btn("← Terug",()=>{setView("overzicht");setActiveWerkorder(null)})),React.createElement("div",{style:{marginTop:10,maxWidth:900}},magToewijzen(monteurNaam)&&React.createElement("div",{style:{marginBottom:12,padding:10,border:`1px solid ${palette.line}`,borderRadius:6,background:"#fafaf7"}},React.createElement("div",{style:{fontSize:12,fontWeight:800,marginBottom:7}},"MONTEURS TOEWIJZEN"),React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6}},...MONTEURS.map(n=>{const selected=(activeWerkorder.assigned_monteurs||[]).includes(n);return React.createElement("button",{type:"button",key:n,onClick:()=>toggleAssignedMonteur(n),style:{padding:"6px 9px",borderRadius:16,border:`1px solid ${selected?palette.accent:palette.line}`,background:selected?"#fbeee6":"#fff",cursor:"pointer",fontWeight:selected?700:500}},selected?"✓ "+n:n)})),React.createElement("div",{style:{fontSize:11,color:"#666",marginTop:7}},"Rapporthistorie: ",werkorderMonteursTekst(activeWerkorder)||"nog niemand")),React.createElement("div",{style:{fontSize:12,fontWeight:700,marginBottom:4}},"WERKBESCHRIJVING"),mode==="kantoor"?React.createElement("textarea",{value:activeWerkorder.werkbeschrijving||"",onChange:e=>updateWerkbeschrijving(e.target.value),rows:3,style:{...inputStyle,width:"100%",boxSizing:"border-box"}}):React.createElement("div",{style:{padding:10,border:`1px solid ${palette.line}`,borderRadius:6,background:"#fbeee6",whiteSpace:"pre-wrap"}},activeWerkorder.werkbeschrijving||"Geen werkbeschrijving")),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"150px 1fr",gap:12,marginTop:12,maxWidth:760}},React.createElement(Field,{label:"Uitgevoerd"},React.createElement("label",{style:{display:"flex",gap:8,alignItems:"center",padding:"10px 0"}},React.createElement("input",{type:"checkbox",checked:!!activeWerkorder.uitgevoerd,onChange:e=>updateWerkorderMeta({uitgevoerd:e.target.checked})}),"Werk is uitgevoerd")),React.createElement(Field,{label:"Opmerking monteur"},React.createElement("textarea",{rows:2,value:activeWerkorder.monteur_opmerking||"",onChange:e=>updateWerkorderMeta({monteur_opmerking:e.target.value}),style:{...inputStyle,resize:"vertical"}}))),
-      mode==="monteur"&&React.createElement("button",{type:"button",onClick:indienenTerControle,style:{position:"fixed",right:20,bottom:20,zIndex:9999,padding:"13px 18px",border:0,borderRadius:7,background:palette.accent,color:"#fff",fontWeight:800,fontSize:14,boxShadow:"0 4px 16px rgba(0,0,0,.22)",cursor:"pointer"}},activeWerkorder.status==="teruggestuurd"?"Opnieuw indienen ter controle":"Indienen ter controle")
+    const header=React.createElement("div",{style:{background:"#fff",borderBottom:`1px solid ${palette.line}`,padding:"14px 20px"}},React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:16,alignItems:"center",fontSize:13}},React.createElement("span",null,React.createElement("b",null,"Order "),activeWerkorder.werkopdracht?.order_nummer),React.createElement("span",null,React.createElement("b",null,"Schip "),activeWerkorder.werkopdracht?.schip_klant),React.createElement("span",null,React.createElement("b",null,"Klustype "),getKlustypeNaam(activeWerkorder.klustype)),React.createElement("span",null,React.createElement("b",null,"Motortype "),activeWerkorder.motortype==="-"?"":activeWerkorder.motortype),React.createElement(StatusBadge,{status:activeWerkorder.status}),React.createElement("span",{style:{color:"#999"}},saving?"opslaan…":"opgeslagen"),(mode==="monteur"||mode==="kantoor")&&["open","teruggestuurd"].includes(activeWerkorder.status)&&btn(activeWerkorder.status==="teruggestuurd"?"Opnieuw rapport indienen":"Rapport indienen",indienenTerControle,{marginLeft:"auto",background:palette.accent,color:"#fff",border:"none",fontWeight:800}),mode==="kantoor"&&activeWerkorder.status==="ter_controle"&&React.createElement(React.Fragment,null,React.createElement("input",{value:terugOpmerking,onChange:e=>setTerugOpmerking(e.target.value),placeholder:"Opmerking bij terugsturen",style:{...inputStyle,marginLeft:"auto",width:220}}),btn("Terugsturen",terugsturen,{color:"#d9483a"}),heeftVolledigeRechten(monteurNaam)&&btn("Goedkeuren",goedkeuren,{background:"#3f7a4f",color:"#fff",border:"none"})),btn("← Terug",()=>{setView("overzicht");setActiveWerkorder(null)})),React.createElement("div",{style:{marginTop:10,maxWidth:900}},magToewijzen(monteurNaam)&&React.createElement("div",{style:{marginBottom:12,padding:10,border:`1px solid ${palette.line}`,borderRadius:6,background:"#fafaf7"}},React.createElement("div",{style:{fontSize:12,fontWeight:800,marginBottom:7}},"MONTEURS TOEWIJZEN"),React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6}},...MONTEURS.map(n=>{const selected=(activeWerkorder.assigned_monteurs||[]).includes(n);return React.createElement("button",{type:"button",key:n,onClick:()=>toggleAssignedMonteur(n),style:{padding:"6px 9px",borderRadius:16,border:`1px solid ${selected?palette.accent:palette.line}`,background:selected?"#fbeee6":"#fff",cursor:"pointer",fontWeight:selected?700:500}},selected?"✓ "+n:n)})),React.createElement("div",{style:{fontSize:11,color:"#666",marginTop:7}},"Rapporthistorie: ",werkorderMonteursTekst(activeWerkorder)||"nog niemand")),React.createElement("div",{style:{fontSize:12,fontWeight:700,marginBottom:4}},"WERKBESCHRIJVING"),mode==="kantoor"?React.createElement("textarea",{value:activeWerkorder.werkbeschrijving||"",onChange:e=>updateWerkbeschrijving(e.target.value),rows:3,style:{...inputStyle,width:"100%",boxSizing:"border-box"}}):React.createElement("div",{style:{padding:10,border:`1px solid ${palette.line}`,borderRadius:6,background:"#fbeee6",whiteSpace:"pre-wrap"}},activeWerkorder.werkbeschrijving||"Geen werkbeschrijving")),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"150px 1fr",gap:12,marginTop:12,maxWidth:760}},React.createElement(Field,{label:"Uitgevoerd"},React.createElement("label",{style:{display:"flex",gap:8,alignItems:"center",padding:"10px 0"}},React.createElement("input",{type:"checkbox",checked:!!activeWerkorder.uitgevoerd,onChange:e=>updateWerkorderMeta({uitgevoerd:e.target.checked})}),"Werk is uitgevoerd")),React.createElement(Field,{label:"Opmerking monteur"},React.createElement("textarea",{rows:2,value:activeWerkorder.monteur_opmerking||"",onChange:e=>updateWerkorderMeta({monteur_opmerking:e.target.value}),style:{...inputStyle,resize:"vertical"}}))),
+      (mode==="monteur"||mode==="kantoor")&&["open","teruggestuurd"].includes(activeWerkorder.status)&&React.createElement("button",{type:"button",onClick:indienenTerControle,style:{position:"fixed",right:20,bottom:20,zIndex:9999,padding:"14px 20px",border:0,borderRadius:7,background:palette.accent,color:"#fff",fontWeight:900,fontSize:15,boxShadow:"0 5px 18px rgba(0,0,0,.25)",cursor:"pointer"}},activeWerkorder.status==="teruggestuurd"?"Opnieuw rapport indienen":"Rapport indienen")
     );
     const controleFeedback=activeWerkorder.opmerking_controle?React.createElement("div",{style:{maxWidth:1050,margin:"10px auto 0",padding:"11px 14px",borderRadius:7,border:`1px solid ${activeWerkorder.status==="teruggestuurd"?"#d9483a":palette.line}`,background:activeWerkorder.status==="teruggestuurd"?"#fff2ee":"#fafaf7",fontSize:13,lineHeight:1.45,color:palette.ink}},
       React.createElement("div",{style:{fontSize:11,fontWeight:800,letterSpacing:".04em",color:activeWerkorder.status==="teruggestuurd"?"#b5362a":"#5b5f52",marginBottom:4}},activeWerkorder.status==="teruggestuurd"?"TERUGGESTUURD DOOR CONTROLE":"LAATSTE CONTROLEOPMERKING"),
@@ -1425,19 +1512,10 @@ function App() {
         React.createElement("div",{style:{border:`1px solid ${palette.line}`,borderRadius:7,padding:10,background:"#fafaf7"}},
           React.createElement("div",{style:{fontWeight:800,fontSize:12,marginBottom:7}},"ILLUSTRATIE / EXPLODED VIEW"),
           componentRapport.data?.illustration_image
-            ?React.createElement("img",{src:componentRapport.data.illustration_image,style:{display:"block",width:"100%",maxHeight:320,objectFit:"contain",background:"#fff"}})
+            ?React.createElement("img",{src:componentRapport.data.illustration_image,onClick:()=>setIllustrationZoom(true),title:"Klik om te vergroten",style:{display:"block",width:"100%",maxHeight:320,objectFit:"contain",background:"#fff",cursor:"zoom-in"}})
             :oemPartsTemplate
-              ?React.createElement("div",{style:{minHeight:250,padding:12,background:"#fff",border:"1px solid #cfd3c8",boxSizing:"border-box"}},
-                React.createElement("div",{style:{textAlign:"center",fontWeight:900,fontSize:14,margin:"6px 0 12px"}},oemPartsTemplate.title),
-                React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:7}},
-                  ...oemParts.slice(0,10).map((p,i)=>React.createElement("div",{key:(p.partNo||p.ref||i),style:{border:"1px solid #d7dad0",borderRadius:6,padding:"7px 8px",background:i%2?"#fafaf7":"#fff"}},
-                    React.createElement("div",{style:{display:"flex",gap:7,alignItems:"center"}},
-                      React.createElement("span",{style:{minWidth:25,height:25,borderRadius:13,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"#1f231c",color:"#fff",fontSize:10,fontWeight:800}},p.ref||String(i+1)),
-                      React.createElement("div",{style:{fontSize:10,lineHeight:1.25}},React.createElement("b",null,p.description||"Part"),p.partNo&&React.createElement("div",{style:{color:"#56606a",marginTop:2}},p.partNo))
-                    )
-                  ))
-                ),
-                React.createElement("div",{style:{fontSize:9.5,color:"#68706a",marginTop:10,textAlign:"center"}},oemPartsTemplate.exact_parts?"Schematische onderdelenkaart op basis van de OEM-catalogus; niet op schaal.":"Schematische Nicoverken-basiskaart; exacte uitvoering is motortype-afhankelijk.")
+              ?React.createElement("button",{type:"button",onClick:()=>setIllustrationZoom(true),title:"Klik om illustratie te vergroten",style:{display:"block",width:"100%",padding:0,border:0,background:"transparent",cursor:"zoom-in"}},
+                React.createElement(ComponentSchematic,{code:activeWerkorder.klustype,title:oemPartsTemplate.title})
               )
               :React.createElement("div",{style:{height:180,display:"flex",alignItems:"center",justifyContent:"center",textAlign:"center",padding:18,color:"#777",background:"#fff",border:"1px dashed #bfc3b8"}},"Nog geen OEM-illustratie voor deze combinatie. Handmatig toevoegen blijft mogelijk."),
           oemPartsTemplate&&React.createElement("div",{style:{marginTop:8,padding:"8px 9px",background:oemPartsTemplate.exact_parts?"#eef3f6":"#fff8e9",borderRadius:5,fontSize:10.5,lineHeight:1.4,border:oemPartsTemplate.exact_parts?"none":"1px solid #e3bd72"}},
@@ -1485,7 +1563,15 @@ function App() {
         )
       )
     ):null;
-    const pageHeader=React.createElement(React.Fragment,null,header,controleFeedback,controleCheck,partsPanel);
+    const illustrationModal=illustrationZoom?React.createElement("div",{onClick:()=>setIllustrationZoom(false),style:{position:"fixed",inset:0,zIndex:12000,background:"rgba(20,24,22,.88)",display:"flex",alignItems:"center",justifyContent:"center",padding:24,cursor:"zoom-out"}},
+      React.createElement("div",{onClick:e=>e.stopPropagation(),style:{position:"relative",width:"min(1000px,94vw)",maxHeight:"92vh",overflow:"auto",background:"#fff",borderRadius:10,padding:18,boxShadow:"0 12px 42px rgba(0,0,0,.45)"}},
+        React.createElement("button",{type:"button",onClick:()=>setIllustrationZoom(false),style:{position:"sticky",float:"right",top:0,zIndex:2,width:38,height:38,borderRadius:19,border:"1px solid #ccd0c7",background:"#fff",fontSize:24,cursor:"pointer",lineHeight:1}},"×"),
+        componentRapport?.data?.illustration_image
+          ?React.createElement("img",{src:componentRapport.data.illustration_image,style:{display:"block",maxWidth:"100%",maxHeight:"78vh",margin:"10px auto",objectFit:"contain"}})
+          :React.createElement(ComponentSchematic,{code:activeWerkorder.klustype,title:oemPartsTemplate?.title||getKlustypeNaam(activeWerkorder.klustype),large:true})
+      )
+    ):null;
+    const pageHeader=React.createElement(React.Fragment,null,header,controleFeedback,controleCheck,partsPanel,illustrationModal);
 
     if(isZuigerKlustype(activeWerkorder.klustype)&&zuigerRapporten.length){
       const z=zuigerRapporten[activeZuiger] || zuigerRapporten[0];
@@ -1528,7 +1614,10 @@ function App() {
         React.createElement("div",{style:{marginTop:16}},React.createElement(Field,{label:"REMARKS"},React.createElement("textarea",{rows:5,value:z.remarks||"",onChange:e=>updateZuiger({remarks:e.target.value}),style:{...inputStyle,resize:"vertical",width:"100%",boxSizing:"border-box"}})))
       );
       const customer=React.createElement(CustomerPistonReport,{werkorder:activeWerkorder,rapporten:zuigerRapporten,template});
-      return React.createElement("div",{style:{minHeight:"100%",background:palette.bg,color:palette.ink}},ModeSwitch,pageHeader,ErrorBanner&&React.createElement("div",{style:{padding:20}},ErrorBanner),React.createElement("div",{style:{padding:20,maxWidth:1000,margin:"0 auto"}},showZuigerKlantRapport?React.createElement("div",{style:{background:"#ddd",padding:16,overflowX:"auto"}},customer):monteurRapport),!showZuigerKlantRapport&&React.createElement("div",{style:{position:"fixed",left:"-10000px",top:0,width:"794px",zIndex:-1}},customer));
+      return React.createElement("div",{style:{minHeight:"100%",background:palette.bg,color:palette.ink}},ModeSwitch,pageHeader,ErrorBanner&&React.createElement("div",{style:{padding:20}},ErrorBanner),React.createElement("div",{style:{padding:20,maxWidth:1000,margin:"0 auto"}},showZuigerKlantRapport?React.createElement("div",null,
+        React.createElement("div",{style:{position:"sticky",top:8,zIndex:20,display:"flex",justifyContent:"flex-end",marginBottom:8}},btn("× Sluiten / terug naar invoer",()=>setShowZuigerKlantRapport(false),{background:"#1f231c",color:"#fff",border:"none",fontWeight:800,padding:"10px 14px"})),
+        React.createElement("div",{style:{background:"#ddd",padding:16,overflowX:"auto"}},customer)
+      ):monteurRapport),!showZuigerKlantRapport&&React.createElement("div",{style:{position:"fixed",left:"-10000px",top:0,width:"794px",zIndex:-1}},customer));
     }
 
 
@@ -1674,7 +1763,10 @@ function App() {
       );
       return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,pageHeader,
         React.createElement("div",{style:{padding:20,maxWidth:1000,margin:"0 auto"}},
-          showGenericKlantRapport?React.createElement("div",{style:{background:"#ddd",padding:16,overflowX:"auto"}},genericCustomer):genericEditor
+          showGenericKlantRapport?React.createElement("div",null,
+            React.createElement("div",{style:{position:"sticky",top:8,zIndex:20,display:"flex",justifyContent:"flex-end",marginBottom:8}},btn("× Sluiten / terug naar invoer",()=>setShowGenericKlantRapport(false),{background:"#1f231c",color:"#fff",border:"none",fontWeight:800,padding:"10px 14px"})),
+            React.createElement("div",{style:{background:"#ddd",padding:16,overflowX:"auto"}},genericCustomer)
+          ):genericEditor
         ),
         !showGenericKlantRapport&&React.createElement("div",{style:{position:"fixed",left:"-10000px",top:0,width:"794px",zIndex:-1}},genericCustomer)
       );
