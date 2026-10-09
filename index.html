@@ -1157,6 +1157,7 @@ function App() {
   const [loginCode, setLoginCode] = useState("");
   const [loginError, setLoginError] = useState("");
   const [view, setView] = useState("overzicht");
+  const [rapportPreviewCode,setRapportPreviewCode]=useState("");
   const [werkopdrachten, setWerkopdrachten] = useState([]);
   const [monteurWerkorders, setMonteurWerkorders] = useState([]);
   const [klustypenDb, setKlustypenDb] = useState([]);
@@ -1596,7 +1597,7 @@ function App() {
     try{ localStorage.removeItem("wo_monteur_naam"); }catch(e){}
   }
   const beschikbareModi=toegestaneModi(monteurNaam);
-  const ModeSwitch=React.createElement("div",{style:{display:"flex",gap:6,padding:"10px 20px",background:"#1f231c",alignItems:"center",flexWrap:"wrap"}},beschikbareModi.map(m=>React.createElement("button",{key:m,onClick:()=>{setMode(m);setView("overzicht");setActiveWerkorder(null)},style:{padding:"6px 14px",borderRadius:5,border:"none",background:mode===m?palette.accent:"transparent",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",textTransform:"uppercase"}},m)),React.createElement("span",{style:{marginLeft:"auto",color:"#fff",fontWeight:700,fontSize:12}},monteurNaam),React.createElement("button",{onClick:logout,style:{border:"1px solid #777",background:"transparent",color:"#fff",borderRadius:5,padding:"6px 10px",cursor:"pointer",fontSize:12}},"Uitloggen"));
+  const ModeSwitch=React.createElement("div",{style:{display:"flex",gap:6,padding:"10px 20px",background:"#1f231c",alignItems:"center",flexWrap:"wrap"}},beschikbareModi.map(m=>React.createElement("button",{key:m,onClick:()=>{setMode(m);setView("overzicht");setActiveWerkorder(null)},style:{padding:"6px 14px",borderRadius:5,border:"none",background:mode===m?palette.accent:"transparent",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",textTransform:"uppercase"}},m)),React.createElement("span",{style:{marginLeft:"auto",color:"#fff",fontWeight:700,fontSize:12}},monteurNaam),React.createElement("button",{onClick:()=>{setView("rapporten");setActiveWerkorder(null)},style:{border:"1px solid #777",background:view==="rapporten"?palette.accent:"transparent",color:"#fff",borderRadius:5,padding:"6px 13px",cursor:"pointer",fontSize:12,fontWeight:800}},"Rapporten"),React.createElement("button",{onClick:logout,style:{border:"1px solid #777",background:"transparent",color:"#fff",borderRadius:5,padding:"6px 10px",cursor:"pointer",fontSize:12}},"Uitloggen"));
   const ErrorBanner=loadError?React.createElement("div",{style:{background:"#fbeae7",border:"1px solid #d9483a",color:"#8a2e22",borderRadius:6,padding:10,fontSize:12,marginBottom:14}},loadError):null;
 
   if(!isLoggedIn) return React.createElement("div",{style:{minHeight:"100vh",background:palette.bg,display:"grid",placeItems:"center",padding:20}},
@@ -1611,6 +1612,39 @@ function App() {
     )
   );
   const btn=(label,onClick,extra={})=>React.createElement("button",{onClick,style:{padding:"9px 13px",borderRadius:6,border:`1px solid ${palette.line}`,background:"#fff",fontWeight:700,cursor:"pointer",...extra}},label);
+
+  if(view==="rapporten"){
+    const items=[...(klustypenDb||[])].filter(k=>k.actief!==false).sort((a,b)=>String(a.label||a.naam).localeCompare(String(b.label||b.naam),"nl"));
+    const selected=items.find(k=>(k.code||k.naam)===rapportPreviewCode)||items[0];
+    const code=selected?.code||selected?.naam||"";
+    const demo={klustype:code,motortype:"",status:"open",werkbeschrijving:"",monteur_opmerking:"",werkopdracht:{schip_klant:"",order_nummer:"",datum:""},assigned_monteurs:[],rapport_monteurs:[]};
+    return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,
+      React.createElement("div",{style:{padding:20,maxWidth:1250,margin:"0 auto"}},
+        React.createElement("div",{style:{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}},
+          React.createElement("h1",{style:{fontSize:22,margin:"0 0 8px"}},"Rapportenbibliotheek"),
+          React.createElement("button",{onClick:()=>setView("overzicht"),style:{...inputStyle,cursor:"pointer"}},"Terug naar werkopdrachten")
+        ),
+        React.createElement("p",{style:{fontSize:12,color:"#59615a"}},"Alle beschikbare rapporttypen. Alleen bekijken: er wordt geen werkorder aangemaakt en er worden geen testgegevens opgeslagen."),
+        ErrorBanner,
+        React.createElement("div",{style:{display:"grid",gridTemplateColumns:"minmax(210px,300px) minmax(0,1fr)",gap:16,alignItems:"start"}},
+          React.createElement("div",{style:{background:"#fff",border:"1px solid #d5d8ce",borderRadius:8,padding:12,maxHeight:"78vh",overflowY:"auto"}},
+            React.createElement("div",{style:{fontWeight:800,marginBottom:10}},items.length+" rapporttypen"),
+            ...items.map(k=>React.createElement("button",{key:k.id||k.code,onClick:()=>setRapportPreviewCode(k.code||k.naam),style:{display:"block",width:"100%",textAlign:"left",border:"1px solid #d5d8ce",borderRadius:5,padding:"10px 9px",marginBottom:6,cursor:"pointer",fontWeight:code===(k.code||k.naam)?800:500,background:code===(k.code||k.naam)?"#eaf1f7":"#fff"}},k.label||k.naam))
+          ),
+          React.createElement("div",{style:{minWidth:0,background:"#fff",border:"1px solid #d5d8ce",borderRadius:8,padding:16}},
+            selected?React.createElement(React.Fragment,null,
+              React.createElement("h2",{style:{fontSize:17,margin:"0 0 6px"}},selected.label||selected.naam),
+              React.createElement("div",{style:{fontSize:12,color:"#606660",marginBottom:12}},"Rapportcode: ",code),
+              React.createElement("div",{style:{overflowX:"auto",padding:12,background:"#e5e5e5"}},
+                React.createElement(CustomerGenericReport,{werkorder:demo,label:selected.label})
+              ),
+              React.createElement("p",{style:{fontSize:12,color:"#777"}},"Dit is de algemene klantweergave. Speciale meetformulieren worden verder geïntegreerd.")
+            ):React.createElement("p",null,"Er zijn nog geen rapporttypen geladen.")
+          )
+        )
+      )
+    );
+  }
 
   if(mode==="kantoor"&&view==="overzicht") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg,color:palette.ink}},ModeSwitch,React.createElement("div",{style:{padding:24,maxWidth:900,margin:"0 auto"}},React.createElement("div",{style:{display:"flex",gap:10,alignItems:"center",marginBottom:18}},React.createElement("h1",{style:{fontSize:21,margin:0}},"Werkopdrachten"),React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:8}},btn("Werkopdrachten beheren",()=>setView("klustypen")),React.createElement("button",{onClick:()=>setView("nieuwe_werkopdracht"),style:{padding:"10px 14px",border:0,borderRadius:6,background:palette.accent,color:"white",fontWeight:700,cursor:"pointer"}},"+ Nieuwe werkopdracht"))),ErrorBanner,React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:12}},werkopdrachten.map(wop=>React.createElement("div",{key:wop.id,style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:16}},React.createElement("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10}},React.createElement("b",null,wop.order_nummer),React.createElement("span",null,wop.schip_klant),React.createElement("span",{style:{color:"#777"}},wop.datum),heeftVolledigeRechten(monteurNaam)&&React.createElement("button",{onClick:()=>verwijderWerkopdracht(wop),style:{marginLeft:"auto",border:"1px solid #d9483a",color:"#d9483a",background:"#fff",borderRadius:5,padding:"6px 9px",cursor:"pointer"}},"Verwijderen")),React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:6}},(wop.werkorders||[]).map(wor=>React.createElement("button",{key:wor.id,onClick:()=>openWerkorder(wor,wop),style:{display:"flex",gap:10,alignItems:"center",padding:"9px 10px",borderRadius:5,border:`1px solid ${palette.line}`,background:"#fafaf7",cursor:"pointer"}},React.createElement("b",null,getKlustypeNaam(wor.klustype)),React.createElement("span",null,wor.motortype==="-"?"":wor.motortype),React.createElement("span",null,(Array.isArray(wor.assigned_monteurs)&&wor.assigned_monteurs.length?wor.assigned_monteurs.join(", "):(wor.monteur||"nog niet toegewezen"))),wor.uitgevoerd&&React.createElement("span",{style:{color:"#3f7a4f",fontWeight:700}},"✓ uitgevoerd"),React.createElement("span",{style:{marginLeft:"auto"}},React.createElement(StatusBadge,{status:wor.status}))))))))));
 
