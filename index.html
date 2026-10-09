@@ -401,7 +401,7 @@ function CustomerPistonReport({ werkorder, rapporten, template }) {
         .concat(cols.map(c=>React.createElement("td",{key:c.key,style:cell},r[c.key]||"")));
       return React.createElement("tr",{key:ri},...values);
     });
-    return React.createElement("div",{key:z.id||zi,style:{pageBreakInside:"avoid",marginBottom:"4mm"}},
+    return React.createElement("div",{key:z.id||zi,style:{pageBreakInside:"auto",breakInside:"auto",marginBottom:"4mm"}},
       React.createElement("div",{style:{display:"flex",justifyContent:"space-between",fontSize:9,fontWeight:700,margin:"1mm 0"}},
         React.createElement("span",null,"Piston ",z.nummer,z.markering?` - Marking: ${z.markering}`:""),
         React.createElement("span",null,"Type: ",z.type_variant?`${z.type_variant}-type`:"—")
@@ -1495,7 +1495,7 @@ function App() {
     if(!el || !window.html2pdf){ setLoadError("PDF-module kon niet worden geladen. Probeer de pagina opnieuw te openen."); return; }
     const order=(activeWerkorder?.werkopdracht?.order_nummer||"werkorder").replace(/[^a-zA-Z0-9_-]/g,"_");
     const soort=activeWerkorder?.klustype==="zuiger_na"?"na":"voor";
-    await window.html2pdf().set({margin:[5,5,5,5],filename:`${order}_zuiger_${soort}.pdf`,image:{type:"jpeg",quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},pagebreak:{mode:["css","legacy"]}}).from(el).save();
+    await window.html2pdf().set({margin:[5,5,5,5],filename:`${order}_zuiger_${soort}.pdf`,image:{type:"jpeg",quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},pagebreak:{mode:["legacy"]}}).from(el).save();
   }
 
 
