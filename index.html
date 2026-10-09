@@ -1046,6 +1046,7 @@ function App() {
     const n=normaliseEngineName(engineType);
     const exact=n?partsTemplates.find(t=>{
       if(t.engine_type==="__GENERIC__"||!Array.isArray(t.report_codes)||!t.report_codes.includes(reportCode)) return false;
+      if(!Array.isArray(t.parts)||!t.parts.length) return false;
       const names=[t.engine_type,...(Array.isArray(t.engine_aliases)?t.engine_aliases:[])];
       return names.some(x=>normaliseEngineName(x)===n);
     }):null;
