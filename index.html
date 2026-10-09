@@ -1677,10 +1677,26 @@ function App() {
               )))
             )),
             React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10,marginTop:14}},
-              React.createElement(Field,{label:"Serration condition"},React.createElement(TextInput,{value:d.serration_condition||"",onChange:e=>updateDrijfstang({serration_condition:e.target.value})})),
-              React.createElement(Field,{label:"Cracks"},React.createElement(TextInput,{value:d.cracks||"",onChange:e=>updateDrijfstang({cracks:e.target.value})})),
-              React.createElement(Field,{label:"New bolts"},React.createElement(TextInput,{value:d.new_bolts||"",onChange:e=>updateDrijfstang({new_bolts:e.target.value})})),
-              React.createElement(Field,{label:"Straightness"},React.createElement(TextInput,{value:d.straightness||"",onChange:e=>updateDrijfstang({straightness:e.target.value})}))
+              React.createElement(Field,{label:"Serration condition"},React.createElement("select",{value:d.serration_condition||"",onChange:e=>updateDrijfstang({serration_condition:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box"}},
+                React.createElement("option",{value:""},"— Kies —"),
+                React.createElement("option",{value:"OK"},"OK"),
+                React.createElement("option",{value:"NOT OK"},"NOT OK")
+              )),
+              React.createElement(Field,{label:"Cracks"},React.createElement("select",{value:d.cracks||"",onChange:e=>updateDrijfstang({cracks:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box"}},
+                React.createElement("option",{value:""},"— Kies —"),
+                React.createElement("option",{value:"OK"},"OK"),
+                React.createElement("option",{value:"NOT OK"},"NOT OK")
+              )),
+              React.createElement(Field,{label:"New bolts"},React.createElement("select",{value:d.new_bolts||"",onChange:e=>updateDrijfstang({new_bolts:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box"}},
+                React.createElement("option",{value:""},"— Kies —"),
+                React.createElement("option",{value:"YES"},"YES"),
+                React.createElement("option",{value:"NO"},"NO")
+              )),
+              React.createElement(Field,{label:"Straightness"},React.createElement("select",{value:d.straightness||"",onChange:e=>updateDrijfstang({straightness:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box"}},
+                React.createElement("option",{value:""},"— Kies —"),
+                React.createElement("option",{value:"OK"},"OK"),
+                React.createElement("option",{value:"NOT OK"},"NOT OK")
+              ))
             ),
             React.createElement("div",{style:{marginTop:12}},React.createElement(Field,{label:"Remarks"},React.createElement("textarea",{rows:4,value:d.remarks||"",onChange:e=>updateDrijfstang({remarks:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box",resize:"vertical"}})))
           )
