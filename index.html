@@ -1561,11 +1561,6 @@ function App() {
   async function terugsturen(){ try{await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({status:"teruggestuurd",opmerking_controle:terugOpmerking}),prefer:"return=minimal"});setView("overzicht");setActiveWerkorder(null);}catch(e){setLoadError(e.message)} }
   async function verwijderWerkopdracht(wop){
     if(!heeftVolledigeRechten(monteurNaam)){setLoadError("Alleen Leroy, Daan, Brito of Frank Verschaick kan werkopdrachten verwijderen.");return;}
-    const orderNummer=String(wop.order_nummer||"").trim();
-    const invoer=prompt(`Typ het ordernummer ${orderNummer} om verwijderen te bevestigen:`,"");
-    if(invoer===null) return;
-    if(String(invoer).trim()!==orderNummer){setLoadError("Verwijderen geannuleerd: het ingevoerde ordernummer komt niet overeen.");return;}
-    if(!confirm(`Werkopdracht ${orderNummer} definitief verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
     try{
       const ids=(await sb(`werkorders?werkopdracht_id=eq.${wop.id}&select=id`))||[];
       for(const x of ids){
