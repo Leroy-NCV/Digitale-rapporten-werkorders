@@ -1021,6 +1021,7 @@ function App() {
   const [componentRapport, setComponentRapport] = useState(null);
   const [partsTemplates, setPartsTemplates] = useState([]);
   const [illustrationZoom, setIllustrationZoom] = useState(false);
+  const [werkorderTab, setWerkorderTab] = useState("rapport");
   const [activeZuiger, setActiveZuiger] = useState(0);
   const [showZuigerKlantRapport, setShowZuigerKlantRapport] = useState(false);
   const [showGenericKlantRapport, setShowGenericKlantRapport] = useState(false);
@@ -1042,6 +1043,9 @@ function App() {
     ...krukasTemplates.map(t=>t?.naam),
     ...partsTemplates.filter(t=>t?.engine_type!=="__GENERIC__").flatMap(t=>[t?.engine_type,...(Array.isArray(t?.engine_aliases)?t.engine_aliases:[])])
   ].map(x=>String(x||"").trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:"base"}));
+  function heeftBestellijst(code){
+    return !(isZuigerKlustype(code)||isKrukasKlustype(code)||["voeringen_voor","voeringen_na"].includes(code));
+  }
   function findPartsTemplate(engineType,reportCode){
     if(!reportCode) return null;
     const n=normaliseEngineName(engineType);
@@ -1217,7 +1221,7 @@ function App() {
   }
 
   async function openWerkorder(wo,werkopdrachtInfo){
-    setLoadError(""); setKoppen([]); setZuigerRapporten([]); setDrijfstangRapporten([]); setActiveDrijfstang(0); setKrukasRapport(null); setComponentRapport(null); setActiveZuiger(0); setShowZuigerKlantRapport(false); setShowGenericKlantRapport(false); setKopView("intern");
+    setLoadError(""); setKoppen([]); setZuigerRapporten([]); setDrijfstangRapporten([]); setActiveDrijfstang(0); setKrukasRapport(null); setComponentRapport(null); setWerkorderTab("rapport"); setIllustrationZoom(false); setActiveZuiger(0); setShowZuigerKlantRapport(false); setShowGenericKlantRapport(false); setKopView("intern");
     try{
       let opened=wo;
       if(mode==="monteur"&&monteurNaam){
@@ -1571,7 +1575,16 @@ function App() {
           :React.createElement(ComponentSchematic,{code:activeWerkorder.klustype,title:oemPartsTemplate?.title||getKlustypeNaam(activeWerkorder.klustype),large:true})
       )
     ):null;
-    const pageHeader=React.createElement(React.Fragment,null,header,controleFeedback,controleCheck,partsPanel,illustrationModal);
+    const showPartsTab=heeftBestellijst(activeWerkorder.klustype);
+    const werkorderTabs=showPartsTab?React.createElement("div",{style:{maxWidth:1050,margin:"12px auto 0",display:"flex",gap:6,padding:"0 12px"}},
+      React.createElement("button",{type:"button",onClick:()=>setWerkorderTab("rapport"),style:{padding:"10px 16px",borderRadius:"7px 7px 0 0",border:`1px solid ${werkorderTab==="rapport"?palette.accent:palette.line}`,background:werkorderTab==="rapport"?"#fff":"#f3f3ee",color:palette.ink,fontWeight:werkorderTab==="rapport"?900:700,cursor:"pointer"}},"Rapport"),
+      React.createElement("button",{type:"button",onClick:()=>setWerkorderTab("parts"),style:{padding:"10px 16px",borderRadius:"7px 7px 0 0",border:`1px solid ${werkorderTab==="parts"?palette.accent:palette.line}`,background:werkorderTab==="parts"?"#fff":"#f3f3ee",color:palette.ink,fontWeight:werkorderTab==="parts"?900:700,cursor:"pointer"}},"Illustratie & bestellijst")
+    ):null;
+    const pageHeader=React.createElement(React.Fragment,null,header,controleFeedback,controleCheck,werkorderTabs,showPartsTab&&werkorderTab==="parts"?partsPanel:null,illustrationModal);
+
+    if(showPartsTab&&werkorderTab==="parts"){
+      return React.createElement("div",{style:{minHeight:"100%",background:palette.bg,color:palette.ink}},ModeSwitch,pageHeader);
+    }
 
     if(isZuigerKlustype(activeWerkorder.klustype)&&zuigerRapporten.length){
       const z=zuigerRapporten[activeZuiger] || zuigerRapporten[0];
