@@ -1039,16 +1039,17 @@ function App() {
     ...zuigerTemplates.map(t=>t?.naam),
     ...drijfstangTemplates.map(t=>t?.naam),
     ...krukasTemplates.map(t=>t?.naam),
-    ...partsTemplates.flatMap(t=>[t?.engine_type,...(Array.isArray(t?.engine_aliases)?t.engine_aliases:[])])
+    ...partsTemplates.filter(t=>t?.engine_type!=="__GENERIC__").flatMap(t=>[t?.engine_type,...(Array.isArray(t?.engine_aliases)?t.engine_aliases:[])])
   ].map(x=>String(x||"").trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:"base"}));
   function findPartsTemplate(engineType,reportCode){
+    if(!reportCode) return null;
     const n=normaliseEngineName(engineType);
-    if(!n||!reportCode) return null;
-    return partsTemplates.find(t=>{
-      if(!Array.isArray(t.report_codes)||!t.report_codes.includes(reportCode)) return false;
+    const exact=n?partsTemplates.find(t=>{
+      if(t.engine_type==="__GENERIC__"||!Array.isArray(t.report_codes)||!t.report_codes.includes(reportCode)) return false;
       const names=[t.engine_type,...(Array.isArray(t.engine_aliases)?t.engine_aliases:[])];
       return names.some(x=>normaliseEngineName(x)===n);
-    })||null;
+    }):null;
+    return exact||partsTemplates.find(t=>t.engine_type==="__GENERIC__"&&Array.isArray(t.report_codes)&&t.report_codes.includes(reportCode))||null;
   }
 
   useEffect(()=>lsSet("wo_mode", mode),[mode]);
@@ -1435,13 +1436,14 @@ function App() {
                     )
                   ))
                 ),
-                React.createElement("div",{style:{fontSize:9.5,color:"#68706a",marginTop:10,textAlign:"center"}},"Schematische onderdelenkaart op basis van de OEM-catalogus; niet op schaal.")
+                React.createElement("div",{style:{fontSize:9.5,color:"#68706a",marginTop:10,textAlign:"center"}},oemPartsTemplate.exact_parts?"Schematische onderdelenkaart op basis van de OEM-catalogus; niet op schaal.":"Schematische Nicoverken-basiskaart; exacte uitvoering is motortype-afhankelijk.")
               )
               :React.createElement("div",{style:{height:180,display:"flex",alignItems:"center",justifyContent:"center",textAlign:"center",padding:18,color:"#777",background:"#fff",border:"1px dashed #bfc3b8"}},"Nog geen OEM-illustratie voor deze combinatie. Handmatig toevoegen blijft mogelijk."),
-          oemPartsTemplate&&React.createElement("div",{style:{marginTop:8,padding:"8px 9px",background:"#eef3f6",borderRadius:5,fontSize:10.5,lineHeight:1.4}},
-            React.createElement("b",null,oemPartsTemplate.manufacturer," · ",oemPartsTemplate.engine_type),
+          oemPartsTemplate&&React.createElement("div",{style:{marginTop:8,padding:"8px 9px",background:oemPartsTemplate.exact_parts?"#eef3f6":"#fff8e9",borderRadius:5,fontSize:10.5,lineHeight:1.4,border:oemPartsTemplate.exact_parts?"none":"1px solid #e3bd72"}},
+            React.createElement("b",null,oemPartsTemplate.exact_parts?"OEM CATALOGUS":"Nicoverken basislijst",oemPartsTemplate.exact_parts?" · "+oemPartsTemplate.manufacturer:""),
+            oemPartsTemplate.exact_parts&&React.createElement("div",null,oemPartsTemplate.engine_type),
             React.createElement("div",null,oemPartsTemplate.source_ref||"",oemPartsTemplate.source_page?" · p. "+oemPartsTemplate.source_page:""),
-            React.createElement("div",{style:{color:"#60666c"}},oemPartsTemplate.source_file||""),
+            oemPartsTemplate.source_file&&React.createElement("div",{style:{color:"#60666c"}},oemPartsTemplate.source_file),
             oemPartsTemplate.notes&&React.createElement("div",{style:{marginTop:4,color:"#7a5224"}},oemPartsTemplate.notes)
           ),
           React.createElement("input",{type:"file",accept:"image/*",style:{marginTop:9,width:"100%"},onChange:e=>{const file=e.target.files?.[0];setComponentIllustration(file);e.target.value="";}}),
@@ -1449,7 +1451,7 @@ function App() {
         ),
         React.createElement("div",{style:{overflowX:"auto"}},
           oemPartsTemplate?React.createElement("div",{style:{marginBottom:14,border:"1px solid #d7dad0",borderRadius:7,overflow:"hidden"}},
-            React.createElement("div",{style:{padding:"8px 10px",background:"#eef1ec",fontSize:12,fontWeight:900}},"OEM ONDERDELEN UIT CATALOGUS"),
+            React.createElement("div",{style:{padding:"8px 10px",background:oemPartsTemplate.exact_parts?"#eef1ec":"#fff8e9",fontSize:12,fontWeight:900}},oemPartsTemplate.exact_parts?"OEM ONDERDELEN UIT CATALOGUS":"BASIS ONDERDELENLIJST — PARTNUMMERS NOG CONTROLEREN"),
             React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",minWidth:600,fontSize:10.5}},
               React.createElement("thead",null,React.createElement("tr",null,...["Ref.","Part no.","Description",""].map(h=>React.createElement("th",{key:h,style:{padding:6,textAlign:"left",borderBottom:"1px solid #d7dad0"}},h)))),
               React.createElement("tbody",null,...oemParts.map((p,i)=>React.createElement("tr",{key:(p.partNo||p.ref||i)},
