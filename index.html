@@ -376,17 +376,13 @@ function PistonToleranceAndImages({template,z,compact=false}) {
   const profile=getToleranceProfile(template,z);
   const rows=(template?.grooves||[]).slice(0,4);
   const c={border:"1px solid #c8cbc3",padding:compact?"4px 6px":"7px 9px",fontSize:compact?9:12};
-  return React.createElement("div",{style:{display:"grid",gridTemplateColumns:compact?"1.05fr 1.35fr .55fr":"1fr 1.35fr .55fr",gap:10,alignItems:"stretch",margin:"10px 0 14px"}},
-    React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",background:"#fff"}},
+  return React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",background:"#fff"}},
       React.createElement("thead",null,
         React.createElement("tr",null,React.createElement("th",{rowSpan:2,style:{...c,fontWeight:800,textAlign:"left",background:"#f0f1ed"}},"Measurement"),React.createElement("th",{colSpan:2,style:{...c,fontWeight:800,background:"#f0f1ed"}},"Tolerance (mm)")),
         React.createElement("tr",null,React.createElement("th",{style:{...c,fontWeight:800,background:"#f0f1ed"}},"V-type"),React.createElement("th",{style:{...c,fontWeight:800,background:"#f0f1ed"}},"N-type"))
       ),
       React.createElement("tbody",null,...rows.map(g=>{const t=getToleranceFor(profile,g.key);return React.createElement("tr",{key:g.key},React.createElement("td",{style:{...c,textAlign:"left"}},g.label),React.createElement("td",{style:{...c,textAlign:"center"}},t?`${Number(t.v)>=0?"+":""}${fmtNum(t.v,3)}`:"—"),React.createElement("td",{style:{...c,textAlign:"center"}},t?`${Number(t.n)>=0?"+":""}${fmtNum(t.n,3)}`:"—"))}))
-    ),
-    React.createElement("div",{style:{border:"1px solid #d6d8ce",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",padding:6}},React.createElement("img",{src:PISTON_TECH_IMAGE,alt:"Piston meetpunten",style:{maxWidth:"100%",maxHeight:compact?115:165,objectFit:"contain"}})),
-    React.createElement("div",{style:{border:"1px solid #d6d8ce",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",padding:6}},React.createElement("img",{src:PISTON_NV_IMAGE,alt:"N-type en V-type",style:{maxWidth:"100%",maxHeight:compact?105:145,objectFit:"contain"}}))
-  );
+    );
 }
 function CustomerPistonReport({ werkorder, rapporten, template }) {
   const cell={border:"1px solid #c8cbc3",padding:"4px 5px",fontSize:8.5,textAlign:"center"};
@@ -1774,16 +1770,7 @@ function App() {
           :React.createElement(ComponentSchematic,{code:activeWerkorder.klustype,title:oemPartsTemplate?.title||getKlustypeNaam(activeWerkorder.klustype),large:true})
       )
     ):null;
-    const showPartsTab=heeftBestellijst(activeWerkorder.klustype);
-    const werkorderTabs=showPartsTab?React.createElement("div",{style:{maxWidth:1050,margin:"12px auto 0",display:"flex",gap:6,padding:"0 12px"}},
-      React.createElement("button",{type:"button",onClick:()=>setWerkorderTab("rapport"),style:{padding:"10px 16px",borderRadius:"7px 7px 0 0",border:`1px solid ${werkorderTab==="rapport"?palette.accent:palette.line}`,background:werkorderTab==="rapport"?"#fff":"#f3f3ee",color:palette.ink,fontWeight:werkorderTab==="rapport"?900:700,cursor:"pointer"}},"Rapport"),
-      React.createElement("button",{type:"button",onClick:()=>setWerkorderTab("parts"),style:{padding:"10px 16px",borderRadius:"7px 7px 0 0",border:`1px solid ${werkorderTab==="parts"?palette.accent:palette.line}`,background:werkorderTab==="parts"?"#fff":"#f3f3ee",color:palette.ink,fontWeight:werkorderTab==="parts"?900:700,cursor:"pointer"}},"Illustratie & bestellijst")
-    ):null;
-    const pageHeader=React.createElement(React.Fragment,null,header,controleFeedback,controleCheck,werkorderTabs,showPartsTab&&werkorderTab==="parts"?partsPanel:null,illustrationModal);
-
-    if(showPartsTab&&werkorderTab==="parts"){
-      return React.createElement("div",{style:{minHeight:"100%",background:palette.bg,color:palette.ink}},ModeSwitch,pageHeader);
-    }
+    const pageHeader=React.createElement(React.Fragment,null,header,controleFeedback,controleCheck);
 
     if(isZuigerKlustype(activeWerkorder.klustype)&&zuigerRapporten.length){
       const z=zuigerRapporten[activeZuiger] || zuigerRapporten[0];
