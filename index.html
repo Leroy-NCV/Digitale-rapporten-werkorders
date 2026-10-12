@@ -891,7 +891,7 @@ function CylinderCustomerEditor(props){
 function ConnectingRodMeasurementDiagram({template,werkorder,compact=false}) {
   const code=String(template?.code||werkorder?.rapport_template_code||"").toLowerCase();
   const name=String(template?.naam||werkorder?.motortype||"").toLowerCase();
-  const isEy26=code==="yanmar_ey26"||/\\b(6?ey26)(l|alw)?\\b/i.test(name);
+  const isEy26=code==="yanmar_ey26"||name.includes("ey26");
   const isAfter=String(werkorder?.klustype||"").endsWith("_after")||String(werkorder?.klustype||"").endsWith("_na");
   if(isEy26&&isAfter)return null;
   return React.createElement("img",{src:"./assets/drijfstang-meetposities.svg",alt:"Drijfstang meetposities A tot G",style:{display:"block",width:"100%",maxWidth:compact?"145mm":"650px",height:"auto",margin:"0 auto"}});
@@ -981,7 +981,7 @@ function CustomerConnectingRodReport({ werkorder, rapporten, template }) {
       reference.length?React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1.5mm 7mm",border:"1px solid #cbd2da",borderTop:"none",padding:"2.5mm",fontSize:8.3,background:"#fafbfd"}},
         ...reference.map(([label,val])=>React.createElement("div",{key:label},React.createElement("b",null,label+": "),String(val)))
       ):null,
-      !(String(template?.code||"").toLowerCase()==="yanmar_ey26"&&phase==="AFTER")?React.createElement("div",{style:{border:"1px solid #cbd2da",borderTop:"none",padding:"2mm",pageBreakInside:"avoid"}},
+      !(String(template?.code||"").toLowerCase()==="yanmar_ey26"||String(template?.naam||werkorder.motortype||"").toLowerCase().includes("ey26"))||phase!=="AFTER"?React.createElement("div",{style:{border:"1px solid #cbd2da",borderTop:"none",padding:"2mm",pageBreakInside:"avoid"}},
         React.createElement("div",{style:{fontSize:8,fontWeight:700,textAlign:"center",marginBottom:"1mm"}},"MEASUREMENT POSITIONS"),
         React.createElement(ConnectingRodMeasurementDiagram,{template,werkorder,compact:true})
       ):null,
@@ -1875,7 +1875,7 @@ function App() {
             React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:6,background:"#fafaf7",border:`1px solid ${palette.line}`,padding:10,borderRadius:6,marginBottom:14}},
               ...refBits.map(([label,val])=>React.createElement("div",{key:label,style:{fontSize:12}},React.createElement("b",null,label+": "),String(val)))
             ),
-            !(String(template?.code||"").toLowerCase()==="yanmar_ey26"&&String(activeWerkorder.klustype||"")==="connecting_rod_after")&&React.createElement("div",{style:{marginBottom:14,padding:10,border:`1px solid ${palette.line}`,borderRadius:6,background:"#fff"}},
+            !((String(template?.code||"").toLowerCase()==="yanmar_ey26"||String(template?.naam||activeWerkorder.motortype||"").toLowerCase().includes("ey26"))&&String(activeWerkorder.klustype||"")==="connecting_rod_after")&&React.createElement("div",{style:{marginBottom:14,padding:10,border:`1px solid ${palette.line}`,borderRadius:6,background:"#fff"}},
               React.createElement("div",{style:{fontSize:11,fontWeight:800,textAlign:"center",marginBottom:6}},"MEETPUNTEN / MEASUREMENT POSITIONS"),
               React.createElement(ConnectingRodMeasurementDiagram,{template,werkorder:activeWerkorder})
             ),
