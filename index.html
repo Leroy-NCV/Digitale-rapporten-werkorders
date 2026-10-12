@@ -1197,6 +1197,53 @@ function RockerArmProtocol({report,onChange,readonly=false}) {
   );
 }
 
+function LOPumpProtocol({report,onChange,readonly=false}) {
+  const code=String(report?.rapport_type||"").toLowerCase();
+  if(!["smeer_olie_pomp","lo_pomp","lo_pomp_voor","lo_pomp_na"].includes(code)&&!code.includes("lube_oil_pump"))return null;
+  const data=report?.data?.loPump||{};
+  const update=patch=>{if(!readonly&&onChange)onChange({loPump:{...data,...patch}})};
+  const cell={border:"1px solid #aeb7b9",padding:readonly?"3px":"6px",fontSize:readonly?9:12};
+  const entry=(value,action)=>readonly?React.createElement("span",null,value||"—"):
+    React.createElement("input",{value:value||"",onChange:e=>action(e.target.value),style:{width:"100%",boxSizing:"border-box",minWidth:0,padding:5,border:"1px solid #c4c9c7",borderRadius:3}});
+  const measurement=(title,key,nominal,limit)=>{
+    const values=data[key]||{};
+    return React.createElement("section",{style:{marginTop:14,pageBreakInside:"avoid"}},
+      React.createElement("h3",{style:{fontSize:readonly?11:14,margin:"0 0 5px"}},title),
+      React.createElement("p",{style:{fontSize:readonly?9:11,margin:"2px 0 7px"}},"Nominal: "+nominal+" mm · Usage limit of parts: "+limit+" mm"),
+      React.createElement("div",{style:{overflowX:"auto"}},React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"}},
+        React.createElement("thead",null,React.createElement("tr",null,...[1,2,3,4].map(i=>React.createElement("th",{key:i,colSpan:2,style:{...cell,background:"#f0f2ef"}} ,(key==="shaft"?"Pin Ø d":"Bush Ø d")+i))),
+          React.createElement("tr",null,...[1,2,3,4].flatMap(i=>["T/B","P/S"].map(axis=>React.createElement("th",{key:i+axis,style:{...cell,background:"#f6f7f4"}},axis))))),
+        React.createElement("tbody",null,React.createElement("tr",null,...[1,2,3,4].flatMap(i=>["TB","PS"].map(axis=>{
+          const k="d"+i+"_"+axis;
+          return React.createElement("td",{key:k,style:cell},entry(values[k],v=>update({[key]:{...values,[k]:v}})));
+        }))))
+      )),
+      React.createElement("label",{style:{display:"block",fontSize:11,fontWeight:700,marginTop:6}},"Remark",
+        entry(data[key+"Remark"],v=>update({[key+"Remark"]:v}))
+      )
+    );
+  };
+  const clearances=[
+    ["b","Shaft & bush","0.15"],
+    ["c","Pump case & gear","0.50"],
+    ["d","Pump case width & pump gear","0.18"]
+  ];
+  return React.createElement("section",{style:{marginTop:18,color:"#111",fontFamily:"Arial,sans-serif"}},
+    React.createElement("h2",{style:{fontSize:readonly?14:18,textAlign:"center",marginBottom:12}},"LUBE OIL PUMP INSPECTION REPORT"),
+    React.createElement("div",{style:{fontSize:11,marginBottom:8}},"Reference: Yanmar 6N21AL-DV · Lube oil pump Assy #1. Limits from the original Nicoverken report."),
+    measurement("Measurement of shaft pins","shaft","40.00 ± 0.008","-0.12"),
+    measurement("Measurement of bushes","bush","40.00 +0.076/+0.060","+0.10"),
+    React.createElement("h3",{style:{fontSize:readonly?11:14,margin:"16px 0 7px"}},"MAXIMUM CLEARANCES"),
+    ...clearances.map(([key,name,limit])=>React.createElement("div",{key,style:{display:"grid",gridTemplateColumns:"1fr 100px 1fr",gap:8,alignItems:"center",marginBottom:7,fontSize:11}},
+      React.createElement("strong",null,name),React.createElement("span",null,key+" = "+limit+" mm"),entry(data["clearance_"+key],v=>update({["clearance_"+key]:v}))
+    )),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:12}},
+      ...[["MPI of gears","mpi"],["Bushing, housing & cover","condition"],["Reassembly / packaging","assembly"]].map(([label,key])=>
+        React.createElement("label",{key,style:{display:"flex",flexDirection:"column",fontSize:11,fontWeight:700,gap:4}},label,entry(data[key],v=>update({[key]:v}))))
+    )
+  );
+}
+
 function CustomerGenericReport({ werkorder, label, componentRapport }) {
   const title=getGenericReportTitle(werkorder.klustype,label);
   const statusLabel=STATUS_LABELS[werkorder.status]||werkorder.status||"";
@@ -1246,6 +1293,7 @@ function CustomerGenericReport({ werkorder, label, componentRapport }) {
       React.createElement(SpecialComponentReport,{report:componentRapport,readonly:true}),
       React.createElement(CamshaftSizeProtocol,{report:componentRapport,readonly:true}),
       React.createElement(RockerArmProtocol,{report:componentRapport,readonly:true}),
+      React.createElement(LOPumpProtocol,{report:componentRapport,readonly:true}),
       String(werkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:werkorder.motortype},readonly:true}):null,
       React.createElement("div",{style:{borderTop:"2px solid #1664a8",paddingTop:"2mm",marginTop:"8mm",display:"flex",justifyContent:"space-between",fontSize:7.5,color:"#304564"}},
         React.createElement("span",null,"Nicoverken Engine Repair | ",title),
@@ -2117,6 +2165,7 @@ function App() {
         React.createElement(SpecialComponentReport,{report:componentRapport,onChange:updateComponentData}),
         React.createElement(CamshaftSizeProtocol,{report:componentRapport,onChange:updateComponentData}),
         React.createElement(RockerArmProtocol,{report:componentRapport,onChange:updateComponentData}),
+        React.createElement(LOPumpProtocol,{report:componentRapport,onChange:updateComponentData}),
         String(activeWerkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:activeWerkorder.motortype},onChange:updateComponentData}):null
       );
       return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,pageHeader,
