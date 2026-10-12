@@ -1098,6 +1098,50 @@ function GovernorTypeField({report,onChange,readonly=false}) {
   );
 }
 
+function CamshaftSizeProtocol({report,onChange,readonly=false}) {
+  const typ=String(report?.rapport_type||"");
+  if(typ!=="nokkenas_voor"&&typ!=="nokkenas_na")return null;
+  const d=report?.data?.camshaft||{};
+  const change=(key,value)=>{if(onChange&&!readonly)onChange({camshaft:{...d,[key]:value}})};
+  const phase=typ==="nokkenas_na"?"AFTER":"BEFORE";
+  const boxStyle={border:"1px solid #bfc6cb",padding:6,fontSize:readonly?9:12,boxSizing:"border-box",width:"100%"};
+  const cell={border:"1px solid #bfc6cb",padding:readonly?3:5,fontSize:readonly?9:11,textAlign:"center"};
+  const field=(label,key)=>React.createElement("label",{style:{display:"flex",flexDirection:"column",gap:3,fontSize:11,fontWeight:700}},label,
+    readonly?React.createElement("div",{style:boxStyle},d[key]||""):
+    React.createElement("input",{style:boxStyle,value:d[key]||"",onChange:e=>change(key,e.target.value)})
+  );
+  const cols=["A1","A2","B1","B2","HS","ECCENTRICITY","SUPPORTED","BETWEEN CENTERS"];
+  const rows=Array.from({length:10},(_,i)=>{const n=i+1;const obj=(d.journals||{})[n]||{};
+    return React.createElement("tr",{key:n},
+      React.createElement("td",{style:cell},n),
+      ...cols.map(k=>React.createElement("td",{key:k,style:cell},
+        readonly?(obj[k]||""):React.createElement("input",{value:obj[k]||"",onChange:e=>change("journals",{...(d.journals||{}),[n]:{...obj,[k]:e.target.value}}),style:{...boxStyle,padding:3,minWidth:40,textAlign:"center"}})
+      ))
+    );
+  });
+  return React.createElement("section",{style:{marginTop:15,color:"#111",fontFamily:"Arial,sans-serif"}},
+    React.createElement("h2",{style:{fontSize:readonly?13:17,textAlign:"center",margin:"6px 0 14px"}},"SIZE PROTOCOL CAMSHAFT ("+phase+")"),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8,marginBottom:12}},
+      field("STROKE","stroke"),field("STANDARD SIZE","standardSize"),field("JOURNALS Ø (mm)","journalsDiameter"),field("LIMIT (mm)","limit")
+    ),
+    React.createElement("div",{style:{overflowX:"auto"}},
+      React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:readonly?"fixed":"auto"}},
+        React.createElement("thead",null,React.createElement("tr",null,
+          ...["MAINJOURNALS",...cols].map(x=>React.createElement("th",{key:x,style:{...cell,fontWeight:800,background:"#f0f1ee"}},x))
+        )),React.createElement("tbody",null,...rows)
+      )
+    ),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,margin:"13px 0"}},
+      React.createElement("div",{style:{...boxStyle,fontWeight:800}},"A-B MEASURE DEVIATION 1/100 MM."),
+      React.createElement("div",{style:{...boxStyle,fontWeight:800}},"ECCENTRICITY")
+    ),
+    React.createElement("div",{style:{fontWeight:800,margin:"10px 0 5px"}},"ANTI FLYWHEEL / FLY WHEEL"),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:7}},...["C","D","E","F"].map(k=>field(k,"flywheel_"+k))),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:12}},field("Hardness","hardness"),field("Cracks","cracks")),
+    React.createElement("div",{style:{marginTop:12}},field("REMARKS","remarks"))
+  );
+}
+
 function CustomerGenericReport({ werkorder, label, componentRapport }) {
   const title=getGenericReportTitle(werkorder.klustype,label);
   const statusLabel=STATUS_LABELS[werkorder.status]||werkorder.status||"";
@@ -1145,6 +1189,7 @@ function CustomerGenericReport({ werkorder, label, componentRapport }) {
         )
       ),
       React.createElement(SpecialComponentReport,{report:componentRapport,readonly:true}),
+      React.createElement(CamshaftSizeProtocol,{report:componentRapport,readonly:true}),
       String(werkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:werkorder.motortype},readonly:true}):null,
       React.createElement("div",{style:{borderTop:"2px solid #1664a8",paddingTop:"2mm",marginTop:"8mm",display:"flex",justifyContent:"space-between",fontSize:7.5,color:"#304564"}},
         React.createElement("span",null,"Nicoverken Engine Repair | ",title),
@@ -2014,6 +2059,7 @@ function App() {
           "Header, rapportgegevens, werkbeschrijving, opmerkingen, status en footer worden in de vaste Nicoverken-opmaak weergegeven."
         ),
         React.createElement(SpecialComponentReport,{report:componentRapport,onChange:updateComponentData}),
+        React.createElement(CamshaftSizeProtocol,{report:componentRapport,onChange:updateComponentData}),
         String(activeWerkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:activeWerkorder.motortype},onChange:updateComponentData}):null
       );
       return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,pageHeader,
