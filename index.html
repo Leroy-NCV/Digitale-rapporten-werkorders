@@ -1087,6 +1087,17 @@ function SpecialComponentReport({report,onChange,readonly=false}) {
   return null;
 }
 
+function GovernorTypeField({report,onChange,readonly=false}) {
+  const value=report?.data?.governor_type||"";
+  return React.createElement("div",{style:{padding:"10px 0",marginTop:10}},
+    React.createElement("label",{style:{display:"block",fontWeight:700,fontSize:12,marginBottom:5}},"Governor type"),
+    readonly?React.createElement("div",{style:{border:"1px solid #c8cbc3",padding:7,fontSize:11}},value||"—"):
+    React.createElement("select",{value,onChange:e=>onChange&&onChange({governor_type:e.target.value}),style:{...inputStyle,minWidth:190,maxWidth:"100%"}},
+      ...["","RHD 6","RHD 10","NZ61"].map(t=>React.createElement("option",{key:t,value:t},t||"— Kies type —"))
+    )
+  );
+}
+
 function CustomerGenericReport({ werkorder, label, componentRapport }) {
   const title=getGenericReportTitle(werkorder.klustype,label);
   const statusLabel=STATUS_LABELS[werkorder.status]||werkorder.status||"";
@@ -1134,6 +1145,7 @@ function CustomerGenericReport({ werkorder, label, componentRapport }) {
         )
       ),
       React.createElement(SpecialComponentReport,{report:componentRapport,readonly:true}),
+      String(werkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:componentRapport,readonly:true}):null,
       React.createElement("div",{style:{borderTop:"2px solid #1664a8",paddingTop:"2mm",marginTop:"8mm",display:"flex",justifyContent:"space-between",fontSize:7.5,color:"#304564"}},
         React.createElement("span",null,"Nicoverken Engine Repair | ",title),
         React.createElement("span",null,"Date: ",werkorder.werkopdracht?.datum||""," | Order no.: ",werkorder.werkopdracht?.order_nummer||"")
@@ -2001,7 +2013,8 @@ function App() {
           React.createElement("b",null,"Nicoverken rapportbasis actief. "),
           "Header, rapportgegevens, werkbeschrijving, opmerkingen, status en footer worden in de vaste Nicoverken-opmaak weergegeven."
         ),
-        React.createElement(SpecialComponentReport,{report:componentRapport,onChange:updateComponentData})
+        React.createElement(SpecialComponentReport,{report:componentRapport,onChange:updateComponentData}),
+        String(activeWerkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:componentRapport,onChange:updateComponentData}):null
       );
       return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,pageHeader,
         React.createElement("div",{style:{padding:20,maxWidth:1000,margin:"0 auto"}},
