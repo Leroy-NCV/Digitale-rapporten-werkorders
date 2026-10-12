@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" width="900" height="400">
+<rect width="900" height="400" fill="white"/>
+<g fill="none" stroke="#222" stroke-width="2">
+<path d="M80 70 H160 V58 H192 V64 H222 V52 H307 V64 H338 V58 H368 V70 H418 V105 H368 V117 H338 V111 H307 V123 H222 V111 H192 V117 H160 V105 H80Z"/>
+<path d="M160 70V105M192 58V117M222 52V123M307 52V123M338 58V117M368 70V105M80 87H418" stroke-dasharray="6 5"/>
+<path d="M165 164H212V150H240V144H323V150H351V164H383V199H351V213H323V219H240V213H212V199H165Z"/>
+<path d="M212 164V199M240 144V219M323 144V219M351 164V199M165 181H383" stroke-dasharray="6 5"/>
+<circle cx="568" cy="130" r="48"/><path d="M503 130h130M568 65v130"/>
+<path d="M488 268H630V362H488Z M527 268V362 M569 268V362 M602 268V362 M488 291H630 M488 338H630"/>
+<circle cx="548" cy="315" r="19"/><circle cx="548" cy="315" r="8"/>
+<path d="M452 315H484 M633 315H676M548 260v-22M548 365v20"/>
+</g>
+<g font-family="Arial,sans-serif" font-size="18" fill="#222">
+<text x="220" y="30">Shaft measuring positions</text><text x="155" y="48">d4</text><text x="370" y="48">d1</text>
+<text x="205" y="243">d3</text><text x="351" y="243">d2</text>
+<text x="560" y="45">T/B</text><text x="641" y="135">P/S</text>
+<text x="478" y="242">Lube oil pump sectional view</text><text x="641" y="293">b</text><text x="641" y="319">c</text><text x="641" y="342">d</text>
+</g></svg>
