@@ -1074,7 +1074,73 @@ function getGenericReportTitle(klustype,label) {
   };
   return titles[klustype] || String(label || klustype || "REPAIR REPORT").toUpperCase();
 }
-function CustomerGenericReport({ werkorder, label }) {
+const FUEL_PUMP_CHECKS=["Fuel inj. pump housing","Connecting piece","Pump element","Non-return valve","Regulating rod","Gear rim","Upper spring plate","Lower spring plate","Spring","Push rod","Circlip","Plug screw"];
+function SpecialComponentReport({report,onChange,readonly=false}) {
+  const code=String(report?.rapport_type||"");
+  const pump=code.startsWith("brandstof_pompen_")||code.startsWith("brandstof_pomp_")||code.startsWith("brandstofpomp");
+
+  if(!pump)return null;
+  const d=report?.data||{};
+  const write=(patch)=>{if(!readonly&&onChange)onChange(patch)};
+  const field=(label,value,set,wide=false)=>React.createElement("label",{style:{display:"flex",flexDirection:"column",gap:3,flex:wide?"1 1 100%":"1 1 145px",fontSize:12,fontWeight:600}},label,
+    readonly?React.createElement("span",{style:{padding:"7px 6px",borderBottom:"1px solid #bbb",fontWeight:400}},value||"—"):
+    React.createElement("input",{value:value||"",onChange:e=>set(e.target.value),style:{...inputStyle,width:"100%",boxSizing:"border-box",fontWeight:400}}));
+  const select=(value,set)=>readonly?React.createElement("span",null,value||"—"):React.createElement("select",{value:value||"",onChange:e=>set(e.target.value),style:{...inputStyle,padding:5}},["","YES","NO","N/A"].map(v=>React.createElement("option",{key:v,value:v},v||"—")));
+  const section={border:"1px solid #d4d8d1",padding:12,borderRadius:5,marginTop:12,pageBreakInside:"avoid"};
+  if(pump){
+    return React.createElement("section",{style:{marginTop:15}},
+      React.createElement("h3",{style:{fontSize:15}},"FUEL INJECTION PUMP INSPECTION — 6 PUMPS"),
+      
+      Array.from({length:6},(_,i)=>{
+        const p=(Array.isArray(d.pumps)?d.pumps:[])[i]||{};
+        const change=patch=>{const a=Array.from({length:6},(_,j)=>(d.pumps||[])[j]||{});a[i]={...p,...patch};write({pumps:a})};
+        return React.createElement("div",{key:i,style:section},
+          React.createElement("h4",{style:{margin:"0 0 8px",fontSize:13}},"Fuel pump no. "+(i+1)),
+          React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:8}},
+            field("ID marks fuel injection pump",p.pumpId,v=>change({pumpId:v})),
+            field("ID marks plunger",p.plungerId,v=>change({plungerId:v})),
+            field("ID marks barrel",p.barrelId,v=>change({barrelId:v}))
+          ),
+          React.createElement("div",{style:{fontSize:11,fontWeight:700,marginTop:10}},"INITIAL INSPECTION / WORK CARRIED OUT"),React.createElement("table",{style:{width:"100%",fontSize:11,borderCollapse:"collapse",marginTop:10}},
+            React.createElement("thead",null,React.createElement("tr",null,["Inspection","YES / NO / N/A","WORK CARRIED OUT"].map(h=>React.createElement("th",{key:h,style:{borderBottom:"1px solid #aaa",textAlign:"left",padding:5}},h)))),
+            React.createElement("tbody",null,FUEL_PUMP_CHECKS.slice(0,4).map((name,j)=>{
+              const item=(p.checks||{})[name]||{};
+              const changeItem=patch=>change({checks:{...(p.checks||{}),[name]:{...item,...patch}}});
+              return React.createElement("tr",{key:j},
+                React.createElement("td",{style:{borderBottom:"1px solid #eee",padding:5}},name),
+                React.createElement("td",{style:{borderBottom:"1px solid #eee",padding:5}},select(item.result,v=>changeItem({result:v}))),
+                React.createElement("td",{style:{borderBottom:"1px solid #eee",padding:5}},readonly?(item.notes||"—"):React.createElement("select",{value:item.notes||"",onChange:e=>changeItem({notes:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box",padding:5}},["","Cleaned","Repaired","Renewed","Replaced","No action required"].map(v=>React.createElement("option",{key:v,value:v},v||"—"))))
+              );
+            }))
+          ),
+          React.createElement("div",{style:{fontWeight:700,fontSize:11,margin:"12px 0 5px"}},"PLUNGER / BARREL / CLEARANCE (A, B, C)"),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:7}},
+            ["plunger","barrel","clearance"].map(kind=>React.createElement("div",{key:kind},
+              React.createElement("div",{style:{fontSize:11,fontWeight:700,textTransform:"capitalize"}},kind),
+              ["A","B","C"].map(pos=>field(pos,(p.measurements||{})[kind+"_"+pos],v=>change({measurements:{...(p.measurements||{}),[kind+"_"+pos]:v}})))
+            ))
+          ),
+          React.createElement("div",{style:{fontWeight:700,fontSize:11,margin:"12px 0 5px"}},"REPAIR PROPOSAL"),
+          React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
+            React.createElement("thead",null,React.createElement("tr",null,["Inspection","YES / NO / N/A","REPAIR PROPOSAL"].map(h=>React.createElement("th",{key:h,style:{borderBottom:"1px solid #aaa",padding:5,textAlign:"left"}},h)))),
+            React.createElement("tbody",null,FUEL_PUMP_CHECKS.slice(4).map((name,j)=>{
+              const item=(p.checks||{})[name]||{};
+              const changeItem=patch=>change({checks:{...(p.checks||{}),[name]:{...item,...patch}}});
+              return React.createElement("tr",{key:name},
+                React.createElement("td",{style:{padding:5,borderBottom:"1px solid #eee"}},name),
+                React.createElement("td",{style:{padding:5,borderBottom:"1px solid #eee"}},select(item.result,v=>changeItem({result:v}))),
+                React.createElement("td",{style:{padding:5,borderBottom:"1px solid #eee"}},readonly?(item.notes||"—"):React.createElement("input",{value:item.notes||"",onChange:e=>changeItem({notes:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box",padding:5}}))
+              );
+            }))
+          )
+        );
+      })
+    );
+  }
+  return null;
+}
+
+function CustomerGenericReport({ werkorder, label, componentRapport }) {
   const title=getGenericReportTitle(werkorder.klustype,label);
   const statusLabel=STATUS_LABELS[werkorder.status]||werkorder.status||"";
   const metaCell={borderBottom:"1px solid #c8cbc3",padding:"2.2mm 2.5mm",fontSize:9,verticalAlign:"top"};
@@ -1120,6 +1186,7 @@ function CustomerGenericReport({ werkorder, label }) {
           )
         )
       ),
+      React.createElement(SpecialComponentReport,{report:componentRapport,readonly:true}),
       React.createElement("div",{style:{borderTop:"2px solid #1664a8",paddingTop:"2mm",marginTop:"8mm",display:"flex",justifyContent:"space-between",fontSize:7.5,color:"#304564"}},
         React.createElement("span",null,"Nicoverken Engine Repair | ",title),
         React.createElement("span",null,"Date: ",werkorder.werkopdracht?.datum||""," | Order no.: ",werkorder.werkopdracht?.order_nummer||"")
@@ -1632,7 +1699,7 @@ function App() {
               React.createElement("h2",{style:{fontSize:17,margin:"0 0 6px"}},selected.label||selected.naam),
               React.createElement("div",{style:{fontSize:12,color:"#606660",marginBottom:12}},"Rapportcode: ",code),
               React.createElement("div",{style:{overflowX:"auto",padding:12,background:"#e5e5e5"}},
-                React.createElement(CustomerGenericReport,{werkorder:demo,label:selected.label})
+                React.createElement(CustomerGenericReport,{werkorder:demo,label:selected.label,componentRapport:{rapport_type:code,data:{}}})
               ),
               React.createElement("p",{style:{fontSize:12,color:"#777"}},"Dit is de algemene klantweergave. Speciale meetformulieren worden verder geïntegreerd.")
             ):React.createElement("p",null,"Er zijn nog geen rapporttypen geladen.")
@@ -1971,11 +2038,11 @@ function App() {
     }
 
     if(!isCilinderkopKlustype(activeWerkorder.klustype)&&!isZuigerKlustype(activeWerkorder.klustype)){
-      const genericCustomer=React.createElement(CustomerGenericReport,{werkorder:activeWerkorder,label:getKlustypeNaam(activeWerkorder.klustype)});
+      const genericCustomer=React.createElement(CustomerGenericReport,{werkorder:activeWerkorder,label:getKlustypeNaam(activeWerkorder.klustype),componentRapport});
       const genericEditor=React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:20}},
         React.createElement("div",{style:{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:14}},
           React.createElement("h2",{style:{margin:0,fontSize:18}},getKlustypeNaam(activeWerkorder.klustype)),
-          mode!=="monteur"&&React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:8}},
+          React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:8}},
             btn(showGenericKlantRapport?"Technische invoer":"Eindrapport bekijken",()=>setShowGenericKlantRapport(v=>!v)),
             btn("Download eindrapport",downloadGenericPdf,{background:palette.accent,color:"#fff",border:"none"})
           )
@@ -1983,7 +2050,8 @@ function App() {
         React.createElement("div",{style:{fontSize:13,lineHeight:1.5,color:"#5b5f52"}},
           React.createElement("b",null,"Nicoverken rapportbasis actief. "),
           "Header, rapportgegevens, werkbeschrijving, opmerkingen, status en footer worden in de vaste Nicoverken-opmaak weergegeven."
-        )
+        ),
+        React.createElement(SpecialComponentReport,{report:componentRapport,onChange:updateComponentData})
       );
       return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,pageHeader,
         React.createElement("div",{style:{padding:20,maxWidth:1000,margin:"0 auto"}},
