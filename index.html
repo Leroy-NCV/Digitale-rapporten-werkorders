@@ -1245,6 +1245,47 @@ function LOPumpProtocol({report,onChange,readonly=false}) {
   );
 }
 
+const INJECTOR_ITEMS=["Fuel valve body OK","Landing surface OK","Spring OK","Adjusting screw OK","Thrust spindle OK","Screw cap OK","Lock nut OK","Guide pins OK","Stop bush OK","Nozzle & needle lift OK","Opening pressure OK","Seals OK"];
+function InjectorInspectionReport({report,onChange,readonly=false}) {
+ const code=String(report?.rapport_type||"");
+ if(code!=="verstuivers_voor"&&code!=="verstuivers_na")return null;
+ const d=report?.data?.injectors||{};
+ const write=(idx,key,patch)=>{
+   if(readonly||!onChange)return;
+   const a=Array.from({length:6},(_,i)=>(d.valves||[])[i]||{});
+   const old=a[idx]||{};
+   a[idx]={...old,[key]:{...(old[key]||{}),...patch}};
+   onChange({injectors:{...d,valves:a}});
+ };
+ const cell={border:"1px solid #b7bfc2",padding:readonly?3:5,fontSize:readonly?8:11};
+ const options=(value,choices,fn)=>readonly?React.createElement("span",null,value||"—"):React.createElement("select",{value:value||"",onChange:e=>fn(e.target.value),style:{width:"100%",boxSizing:"border-box",fontSize:11,padding:5}},...choices.map(x=>React.createElement("option",{value:x,key:x},x||"— Kies —")));
+ return React.createElement("section",{style:{fontFamily:"Arial,sans-serif",marginTop:13}},
+  React.createElement("h2",{style:{fontSize:readonly?14:18,textAlign:"center",margin:"7px 0 12px"}},"FUEL INJECTION VALVE INSPECTION REPORT — "+(code.endsWith("_na")?"AFTER":"BEFORE")),
+  React.createElement("div",{style:{fontSize:11,marginBottom:12}},"Reference Yanmar 6EY22LW · Opening pressure 280 ± 10 bar (only for this engine type)"),
+  ...Array.from({length:6},(_,idx)=>{const valve=(d.valves||[])[idx]||{};
+   return React.createElement("div",{key:idx,style:{marginBottom:14,pageBreakInside:"avoid"}},
+     React.createElement("h3",{style:{fontSize:readonly?11:14,margin:"4px 0"}},"Fuel injection valve no. "+(idx+1)),
+     React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"}},
+       React.createElement("thead",null,React.createElement("tr",null,
+        ...["Inspection","YES / NO / N/A","WORK CARRIED OUT"].map((h,i)=>React.createElement("th",{key:h,style:{...cell,background:"#f1f2ee",textAlign:"left",width:i===0?"43%":i===1?"20%":"37%"}},h))
+       )),
+       React.createElement("tbody",null,...INJECTOR_ITEMS.map(name=>{
+        const item=valve[name]||{};
+        return React.createElement("tr",{key:name},
+          React.createElement("td",{style:cell},name,name==="Opening pressure OK"?React.createElement("div",{style:{fontSize:readonly?8:10,color:"#666"}},"Ref. 280 ± 10 bar"):null),
+          React.createElement("td",{style:cell},options(item.result,["","YES","NO","N/A"],v=>write(idx,name,{result:v}))),
+          React.createElement("td",{style:cell},options(item.work,["","Cleaned","Repaired","Renewed","Replaced","No action required"],v=>write(idx,name,{work:v})))
+        );
+       }))
+     ),
+     React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginTop:5,fontSize:11,fontWeight:700}},"Measured opening pressure (bar): ",
+       readonly?React.createElement("span",null,valve.openingPressure?.value||"—"):React.createElement("input",{type:"number",step:"0.1",value:valve.openingPressure?.value||"",onChange:e=>write(idx,"openingPressure",{value:e.target.value}),style:{width:130,padding:6,border:"1px solid #c6cbca"}})
+     )
+   );
+  })
+ );
+}
+
 function CustomerGenericReport({ werkorder, label, componentRapport }) {
   const title=getGenericReportTitle(werkorder.klustype,label);
   const statusLabel=STATUS_LABELS[werkorder.status]||werkorder.status||"";
@@ -1295,6 +1336,7 @@ function CustomerGenericReport({ werkorder, label, componentRapport }) {
       React.createElement(CamshaftSizeProtocol,{report:componentRapport,readonly:true}),
       React.createElement(RockerArmProtocol,{report:componentRapport,readonly:true}),
       React.createElement(LOPumpProtocol,{report:componentRapport,readonly:true}),
+      React.createElement(InjectorInspectionReport,{report:componentRapport,readonly:true}),
       String(werkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:werkorder.motortype},readonly:true}):null,
       React.createElement("div",{style:{borderTop:"2px solid #1664a8",paddingTop:"2mm",marginTop:"8mm",display:"flex",justifyContent:"space-between",fontSize:7.5,color:"#304564"}},
         React.createElement("span",null,"Nicoverken Engine Repair | ",title),
@@ -2167,6 +2209,7 @@ function App() {
         React.createElement(CamshaftSizeProtocol,{report:componentRapport,onChange:updateComponentData}),
         React.createElement(RockerArmProtocol,{report:componentRapport,onChange:updateComponentData}),
         React.createElement(LOPumpProtocol,{report:componentRapport,onChange:updateComponentData}),
+        React.createElement(InjectorInspectionReport,{report:componentRapport,onChange:updateComponentData}),
         String(activeWerkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:activeWerkorder.motortype},onChange:updateComponentData}):null
       );
       return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,pageHeader,
