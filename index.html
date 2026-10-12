@@ -1088,7 +1088,7 @@ function SpecialComponentReport({report,onChange,readonly=false}) {
 }
 
 function GovernorTypeField({report,onChange,readonly=false}) {
-  const value=report?.data?.governor_type||"";
+  const value=report?.data?.governor_type||report?.motortype||"";
   return React.createElement("div",{style:{padding:"10px 0",marginTop:10}},
     React.createElement("label",{style:{display:"block",fontWeight:700,fontSize:12,marginBottom:5}},"Governor type"),
     readonly?React.createElement("div",{style:{border:"1px solid #c8cbc3",padding:7,fontSize:11}},value||"—"):
@@ -1145,7 +1145,7 @@ function CustomerGenericReport({ werkorder, label, componentRapport }) {
         )
       ),
       React.createElement(SpecialComponentReport,{report:componentRapport,readonly:true}),
-      String(werkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:componentRapport,readonly:true}):null,
+      String(werkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:werkorder.motortype},readonly:true}):null,
       React.createElement("div",{style:{borderTop:"2px solid #1664a8",paddingTop:"2mm",marginTop:"8mm",display:"flex",justifyContent:"space-between",fontSize:7.5,color:"#304564"}},
         React.createElement("span",null,"Nicoverken Engine Repair | ",title),
         React.createElement("span",null,"Date: ",werkorder.werkopdracht?.datum||""," | Order no.: ",werkorder.werkopdracht?.order_nummer||"")
@@ -1701,7 +1701,7 @@ function App() {
     )
   ),
   worDraft.rapportTemplateCode==="__manual__"&&React.createElement(Field,{label:"Motortype handmatig"},React.createElement(TextInput,{value:worDraft.motortype,onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),placeholder:"Vul motortype in"}))
-):React.createElement(Field,{label:"Motortype"},React.createElement(React.Fragment,null,
+):String(worDraft.klustype||"").startsWith("governor")?React.createElement(Field,{label:"Governor type"},React.createElement("select",{value:worDraft.motortype||"",onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),style:inputStyle},...["","RHD 6","RHD 10","NZ61"].map(t=>React.createElement("option",{key:t,value:t},t||"— Kies governor type —")))):React.createElement(Field,{label:"Motortype"},React.createElement(React.Fragment,null,
   React.createElement("input",{list:"draft-engine-type-list",value:worDraft.motortype,onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),placeholder:"Kies of typ motortype",style:inputStyle}),
   React.createElement("datalist",{id:"draft-engine-type-list"},...engineTypeOptions.map(x=>React.createElement("option",{key:x,value:x})))
 )),React.createElement(Field,{label:"Monteurs (meerdere mogelijk)"},React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6,padding:"8px 0"}},...MONTEURS.map(n=>{const selected=(worDraft.monteurs||[]).includes(n);return React.createElement("button",{type:"button",key:n,onClick:()=>toggleDraftMonteur(n),style:{padding:"7px 10px",borderRadius:18,border:`1px solid ${selected?palette.accent:palette.line}`,background:selected?"#fbeee6":"#fff",fontWeight:selected?700:500,cursor:"pointer"}},selected?"✓ "+n:n)}))),React.createElement(Field,{label:"Werkbeschrijving"},React.createElement("textarea",{rows:4,value:worDraft.werkbeschrijving,onChange:e=>setWorDraft({...worDraft,werkbeschrijving:e.target.value}),style:{...inputStyle,resize:"vertical"}})),isCilinderkopKlustype(worDraft.klustype)&&React.createElement(Field,{label:"Aantal cilinderkoppen"},React.createElement(TextInput,{type:"number",min:1,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),isZuigerKlustype(worDraft.klustype)&&React.createElement(Field,{label:"Aantal zuigers"},React.createElement(TextInput,{type:"number",min:1,max:24,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),isDrijfstangKlustype(worDraft.klustype)&&React.createElement(Field,{label:"Aantal drijfstangen"},React.createElement(TextInput,{type:"number",min:1,max:24,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),btn("+ Werkorder toevoegen",addWerkorder,{background:palette.accent,color:"#fff",border:"none"})),React.createElement("div",{style:{marginTop:14}},btn("Klaar — naar overzicht",()=>{setView("overzicht");setHuidigeWerkopdracht(null)}))));
@@ -2014,7 +2014,7 @@ function App() {
           "Header, rapportgegevens, werkbeschrijving, opmerkingen, status en footer worden in de vaste Nicoverken-opmaak weergegeven."
         ),
         React.createElement(SpecialComponentReport,{report:componentRapport,onChange:updateComponentData}),
-        String(activeWerkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:componentRapport,onChange:updateComponentData}):null
+        String(activeWerkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:activeWerkorder.motortype},onChange:updateComponentData}):null
       );
       return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,pageHeader,
         React.createElement("div",{style:{padding:20,maxWidth:1000,margin:"0 auto"}},
