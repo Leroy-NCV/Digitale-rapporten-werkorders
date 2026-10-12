@@ -1142,6 +1142,61 @@ function CamshaftSizeProtocol({report,onChange,readonly=false}) {
   );
 }
 
+function RockerArmProtocol({report,onChange,readonly=false}) {
+  if(String(report?.rapport_type||"")!=="rockerarms")return null;
+  const d=report?.data?.rockerArms||{};
+  const change=(patch)=>{if(!readonly&&onChange)onChange({rockerArms:{...d,...patch}})};
+  const cell={border:"1px solid #aeb5ba",padding:readonly?"3px":"5px",fontSize:readonly?9:12};
+  const input=(v,fn)=>readonly?React.createElement("span",null,v||""):
+    React.createElement("input",{value:v||"",onChange:e=>fn(e.target.value),style:{width:"100%",boxSizing:"border-box",minWidth:0,padding:5,border:"1px solid #c9cdc8",borderRadius:3,fontSize:12}});
+  const measurements=Array.from({length:6},(_,i)=>{
+    const existing=(d.arms||{})[i+1]||{};
+    const set=(key,value)=>change({arms:{...(d.arms||{}),[i+1]:{...existing,[key]:value}}});
+    return React.createElement("section",{key:i,style:{marginTop:12,pageBreakInside:"avoid"}},
+      React.createElement("div",{style:{fontWeight:800,fontSize:readonly?10:13,marginBottom:4}},"Rocker arm no: "+(i+1)),
+      React.createElement("table",{style:{borderCollapse:"collapse",width:"100%",tableLayout:"fixed"}},
+        React.createElement("thead",null,React.createElement("tr",null,
+          ...["BUSH 1 · X1 / Y1","SHAFT · X2 / Y2","SHAFT · X3 / Y3","BUSH 2 · X4 / Y4"].map(n=>React.createElement("th",{key:n,style:{...cell,background:"#f0f1ee",fontWeight:800}},n))
+        )),
+        React.createElement("tbody",null,...["X","Y"].map(axis=>React.createElement("tr",{key:axis},
+          ...[1,2,3,4].map(pos=>React.createElement("td",{key:pos,style:cell},
+            React.createElement("div",{style:{fontWeight:700,fontSize:10,marginBottom:3}},axis+pos+":"),
+            input(existing[axis+pos],v=>set(axis+pos,v))
+          ))
+        )))
+      )
+    );
+  });
+  const line=(name,value)=>React.createElement("tr",{key:name},React.createElement("td",{style:{...cell,fontWeight:700}},name),React.createElement("td",{style:cell},value));
+  const note=(label,key)=>React.createElement("label",{style:{display:"flex",flexDirection:"column",gap:4,fontSize:11,fontWeight:700}},label,input(d[key],v=>change({[key]:v})));
+  return React.createElement("section",{style:{marginTop:16,fontFamily:"Arial,sans-serif",color:"#111"}},
+    React.createElement("h2",{style:{textAlign:"center",fontSize:readonly?14:18,margin:"0 0 10px"}},"ROCKER ARM REPORT"),
+    React.createElement("div",{style:{fontSize:readonly?9:11,fontWeight:700,marginBottom:5}},"Yanmar 6EY26 · Reference dimensions / limits from Nicoverken original report"),
+    React.createElement("table",{style:{borderCollapse:"collapse",width:"100%",tableLayout:"fixed",marginBottom:13}},
+      React.createElement("tbody",null,
+        line("Outer dia. Shaft — Normal","Ø 60.00 mm"),
+        line("Shaft tolerance","-0.010 / -0.040 mm"),
+        line("Outer dia. bush — Tolerance","+0.0110 / +0.020 mm"),
+        line("St’d clearance assembling time","W = 0.030~0.060 mm"),
+        line("Max. allowable clearance","W = 0.25 mm"),
+        line("Usage limit of parts — shaft","-0.10 mm"),
+        line("Usage limit of parts — bush","+0.22 mm")
+      )
+    ),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:8}},
+      note("Condition of adjusting screws (part no. 142613-11130)","adjustingScrews"),
+      note("Condition of retainer(s)","retainers")
+    ),
+    React.createElement("label",{style:{display:"flex",gap:9,alignItems:"center",fontSize:11,fontWeight:700}},"Shafts & bushings within limits:",
+      readonly?React.createElement("span",null,d.withinLimits||""):
+      React.createElement("select",{value:d.withinLimits||"",onChange:e=>change({withinLimits:e.target.value}),style:{padding:5,border:"1px solid #bbc0b9"}},
+        ...["","YES","NO"].map(x=>React.createElement("option",{value:x,key:x},x||"— Kies —"))
+      )
+    ),
+    ...measurements
+  );
+}
+
 function CustomerGenericReport({ werkorder, label, componentRapport }) {
   const title=getGenericReportTitle(werkorder.klustype,label);
   const statusLabel=STATUS_LABELS[werkorder.status]||werkorder.status||"";
@@ -1190,6 +1245,7 @@ function CustomerGenericReport({ werkorder, label, componentRapport }) {
       ),
       React.createElement(SpecialComponentReport,{report:componentRapport,readonly:true}),
       React.createElement(CamshaftSizeProtocol,{report:componentRapport,readonly:true}),
+      React.createElement(RockerArmProtocol,{report:componentRapport,readonly:true}),
       String(werkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:werkorder.motortype},readonly:true}):null,
       React.createElement("div",{style:{borderTop:"2px solid #1664a8",paddingTop:"2mm",marginTop:"8mm",display:"flex",justifyContent:"space-between",fontSize:7.5,color:"#304564"}},
         React.createElement("span",null,"Nicoverken Engine Repair | ",title),
@@ -2060,6 +2116,7 @@ function App() {
         ),
         React.createElement(SpecialComponentReport,{report:componentRapport,onChange:updateComponentData}),
         React.createElement(CamshaftSizeProtocol,{report:componentRapport,onChange:updateComponentData}),
+        React.createElement(RockerArmProtocol,{report:componentRapport,onChange:updateComponentData}),
         String(activeWerkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:activeWerkorder.motortype},onChange:updateComponentData}):null
       );
       return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,pageHeader,
