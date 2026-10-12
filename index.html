@@ -1231,6 +1231,7 @@ function LOPumpProtocol({report,onChange,readonly=false}) {
   return React.createElement("section",{style:{marginTop:18,color:"#111",fontFamily:"Arial,sans-serif"}},
     React.createElement("h2",{style:{fontSize:readonly?14:18,textAlign:"center",marginBottom:12}},"LUBE OIL PUMP INSPECTION REPORT"),
     React.createElement("div",{style:{fontSize:11,marginBottom:8}},"Reference: Yanmar 6N21AL-DV · Lube oil pump Assy #1. Limits from the original Nicoverken report."),
+    React.createElement("div",{style:{margin:"8px 0 14px",textAlign:"center",pageBreakInside:"avoid"}},React.createElement("img",{src:"./assets/lo-pump-diagram.svg",alt:"Lube oil pump meetposities en doorsnede",style:{maxWidth:"100%",width:readonly?"155mm":"750px",height:"auto",objectFit:"contain"}})),
     measurement("Measurement of shaft pins","shaft","40.00 ± 0.008","-0.12"),
     measurement("Measurement of bushes","bush","40.00 +0.076/+0.060","+0.10"),
     React.createElement("h3",{style:{fontSize:readonly?11:14,margin:"16px 0 7px"}},"MAXIMUM CLEARANCES"),
