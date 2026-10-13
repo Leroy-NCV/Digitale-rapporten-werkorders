@@ -384,6 +384,23 @@ function PistonToleranceAndImages({template,z,compact=false}) {
       React.createElement("tbody",null,...rows.map(g=>{const t=getToleranceFor(profile,g.key);return React.createElement("tr",{key:g.key},React.createElement("td",{style:{...c,textAlign:"left"}},g.label),React.createElement("td",{style:{...c,textAlign:"center"}},t?`${Number(t.v)>=0?"+":""}${fmtNum(t.v,3)}`:"—"),React.createElement("td",{style:{...c,textAlign:"center"}},t?`${Number(t.n)>=0?"+":""}${fmtNum(t.n,3)}`:"—"))}))
     );
 }
+function pistonHasNVType(template) {
+ const name=String(template?.naam||template?.code||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+ return ["N21","EY26","EY18","EY22","N260","N330"].some(x=>name.includes(x));
+}
+function pistonGrooveOverLimit(template,key,value) {
+ if(value===null||value===undefined||String(value).trim()==="")return false;
+ const groove=(template?.grooves||[]).find(g=>g.key===key);
+ if(!groove||groove.nominal===null||groove.nominal===undefined||groove.limit===null||groove.limit===undefined)return false;
+ const measured=Number(String(value).replace(",","."));
+ const nominal=Number(groove.nominal),allowance=Number(groove.limit);
+ return Number.isFinite(measured)&&Number.isFinite(nominal)&&Number.isFinite(allowance)&&measured>nominal+allowance;
+}
+function pistonGrooveAdvice(template,z){
+ const found=[];
+ for(const g of template?.grooves||[])for(const row of z?.metingen?.angles||[])if(pistonGrooveOverLimit(template,g.key,row[g.key]))found.push(g.label+" ("+row.angle+")");
+ return [...new Set(found)];
+}
 function CustomerPistonReport({ werkorder, rapporten, template }) {
   const cell={border:"1px solid #c8cbc3",padding:"4px 5px",fontSize:8.5,textAlign:"center"};
   const head={...cell,fontWeight:700,background:"#eef1f3"};
@@ -394,18 +411,19 @@ function CustomerPistonReport({ werkorder, rapporten, template }) {
       .concat(cols.map(c=>React.createElement("th",{key:c.key,style:head},c.label)));
     const bodyRows=z.metingen.angles.map((r,ri)=>{
       const values=[React.createElement("td",{key:"angle",style:head},r.angle)]
-        .concat(cols.map(c=>React.createElement("td",{key:c.key,style:cell},r[c.key]||"")));
+        .concat(cols.map(c=>React.createElement("td",{key:c.key,style:{...cell,...(pistonGrooveOverLimit(template,c.key,r[c.key])?{background:"#ffe1e1",color:"#a21b1b",fontWeight:800}:{})}},r[c.key]||"")));
       return React.createElement("tr",{key:ri},...values);
     });
     return React.createElement("div",{key:z.id||zi,style:{pageBreakInside:"avoid",marginBottom:"4mm"}},
       React.createElement("div",{style:{display:"flex",justifyContent:"space-between",fontSize:9,fontWeight:700,margin:"1mm 0"}},
         React.createElement("span",null,"Piston ",z.nummer,z.markering?` - Marking: ${z.markering}`:""),
-        React.createElement("span",null,"Type: ",z.type_variant?`${z.type_variant}-type`:"—"),React.createElement("span",null,"Dye check: ",z.metingen?.dye_check||"—")
+        pistonHasNVType(template)?React.createElement("span",null,"Type: ",z.type_variant?`${z.type_variant}-type`:"—"):null,React.createElement("span",null,"Dye check: ",z.metingen?.dye_check||"—")
       ),
       React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"}},
         React.createElement("thead",null,React.createElement("tr",null,...headerCells)),
         React.createElement("tbody",null,...bodyRows)
       ),
+      pistonGrooveAdvice(template,z).length?React.createElement("div",{style:{padding:"2mm",border:"1px solid #e5a0a0",background:"#fff0f0",color:"#8c1616",fontSize:9,fontWeight:700}},"Groef buiten limiet: ",pistonGrooveAdvice(template,z).join(", "),". Lasercladding adviseren ter beoordeling door kantoor; niet automatisch uitgevoerd."):null,
       React.createElement("div",{style:{fontSize:8.5,minHeight:"12mm",border:"1px solid #c8cbc3",borderTop:"none",padding:"2mm"}},
         React.createElement("b",null,"REMARKS: "),z.remarks||"")
     );
@@ -422,9 +440,6 @@ function CustomerPistonReport({ werkorder, rapporten, template }) {
         React.createElement("div",null,React.createElement("b",null,"Engine type: "),template?.naam||werkorder.motortype||""),
         React.createElement("div",null,React.createElement("b",null,"Nominal size: "),template?`${fmtNum(template.nominal_size,2)} mm`:"—")
       ),
-      React.createElement("div",{style:{border:"1px solid #cbd2da",padding:"2.5mm 3mm",fontSize:8.5,marginTop:"2.5mm",background:"#fafbfd"}},
-        React.createElement("b",null,"Limits: "),React.createElement(LimitsText,{template})),
-      React.createElement(PistonToleranceAndImages,{template,z:rapporten[0],compact:true}),
       ...reportSections,
       React.createElement("div",{style:{borderTop:"2px solid #1664a8",paddingTop:"2mm",marginTop:"2mm",display:"flex",justifyContent:"space-between",fontSize:7.5,color:"#304564"}},
         React.createElement("span",null,"Nicoverken Engine Repair | Size Protocol - Piston"),
@@ -2047,7 +2062,7 @@ function App() {
         React.createElement("div",{style:{display:"flex",gap:12,alignItems:"end",justifyContent:"space-between",flexWrap:"wrap",marginBottom:14}},
           React.createElement(Field,{label:"Zuiger"},React.createElement("select",{value:activeZuiger,onChange:e=>setActiveZuiger(Number(e.target.value)),style:{...inputStyle,minWidth:180}},zuigerRapporten.map((r,i)=>React.createElement("option",{key:r.id||i,value:i},`Zuiger ${r.nummer}${r.markering?` - ${r.markering}`:""}`)))),
           React.createElement(Field,{label:"Markering / nummer"},React.createElement(TextInput,{value:z.markering||"",onChange:e=>updateZuiger({markering:e.target.value}),placeholder:"Bijv. 12, A17 of P-03",style:{minWidth:180}})),
-          React.createElement(Field,{label:"Dye check"},React.createElement("select",{value:z.metingen?.dye_check||"",onChange:e=>updateZuiger({metingen:{...z.metingen,dye_check:e.target.value}}),style:{...inputStyle,minWidth:140}},React.createElement("option",{value:""},"—"),React.createElement("option",{value:"OK"},"OK"),React.createElement("option",{value:"NOT OK"},"NOT OK"))),React.createElement(Field,{label:"Piston type"},React.createElement("select",{value:z.type_variant||"",onChange:e=>updateZuiger({type_variant:e.target.value}),style:{...inputStyle,minWidth:150}},React.createElement("option",{value:""},"—"),React.createElement("option",{value:"V"},"V-type"),React.createElement("option",{value:"N"},"N-type"))),
+          React.createElement(Field,{label:"Dye check"},React.createElement("select",{value:z.metingen?.dye_check||"",onChange:e=>updateZuiger({metingen:{...z.metingen,dye_check:e.target.value}}),style:{...inputStyle,minWidth:140}},React.createElement("option",{value:""},"—"),React.createElement("option",{value:"OK"},"OK"),React.createElement("option",{value:"NOT OK"},"NOT OK"))),pistonHasNVType(template)&&React.createElement(Field,{label:"Piston type"},React.createElement("select",{value:z.type_variant||"",onChange:e=>updateZuiger({type_variant:e.target.value}),style:{...inputStyle,minWidth:150}},React.createElement("option",{value:""},"—"),React.createElement("option",{value:"V"},"V-type"),React.createElement("option",{value:"N"},"N-type"))),
           React.createElement(Field,{label:"Motortype / template"},React.createElement("select",{value:template?.code||"",onChange:e=>{const code=e.target.value;const t=getZuigerTemplate(code);updateWerkorderMeta({rapport_template_code:code||null,motortype:t?.naam||activeWerkorder.motortype})},style:{...inputStyle,minWidth:210}},React.createElement("option",{value:""},"Kies motortype..."),zuigerTemplates.map(t=>React.createElement("option",{key:t.code,value:t.code},t.naam)))),
           profiles.length>1&&React.createElement(Field,{label:"Tolerance profile"},React.createElement("select",{value:z.metingen?.tolerance_profile||profiles[0]?.code||"",onChange:e=>updateZuiger({metingen:{...z.metingen,tolerance_profile:e.target.value}}),style:{...inputStyle,minWidth:140}},profiles.map(p=>React.createElement("option",{key:p.code,value:p.code},p.label)))),
           mode!=="monteur"&&React.createElement("div",{style:{display:"flex",gap:8}},btn(showZuigerKlantRapport?"Technische invoer":"Eindrapport bekijken",()=>setShowZuigerKlantRapport(v=>!v)),btn("Download eindrapport",downloadZuigerPdf,{background:palette.accent,color:"#fff",border:"none"}))
@@ -2062,17 +2077,14 @@ function App() {
           React.createElement("div",null,React.createElement("b",null,"Nominal size: "),template?`${fmtNum(template.nominal_size,2)} mm`:"—")
         ),
         !template&&React.createElement("div",{style:{padding:10,border:"1px solid #c25a2c",background:"#fff6ef",borderRadius:6,marginBottom:12,fontSize:13}},"Kies hierboven eerst het juiste motortype. De limieten worden daarna automatisch geladen."),
-        template&&React.createElement(React.Fragment,null,
-          React.createElement("div",{style:{border:"1px solid #d6d8ce",borderRadius:6,padding:10,background:"#fafaf7",marginBottom:10,fontSize:12,lineHeight:1.5}},React.createElement("b",null,"Limieten: "),React.createElement(LimitsText,{template})),
-          React.createElement(PistonToleranceAndImages,{template,z})
-        ),
         React.createElement("div",{style:{overflowX:"auto"}},React.createElement("div",{style:{minWidth:Math.max(650,90+cols.length*125)}},
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:`70px repeat(${cols.length},1fr)`}},React.createElement("div",{style:gridHead},"Angle"),...cols.map(c=>React.createElement("div",{key:c.key,style:gridHead},c.label))),
           ...z.metingen.angles.map((r,ri)=>React.createElement("div",{key:r.angle,style:{display:"grid",gridTemplateColumns:`70px repeat(${cols.length},1fr)`,background:ri%2?"#fafaf7":"#fff"}},
             React.createElement("div",{style:{...gridCell,fontWeight:800,paddingTop:13}},r.angle),
-            ...cols.map(c=>React.createElement("div",{key:c.key,style:gridCell},React.createElement(TextInput,{type:"number",step:"0.01",value:r[c.key]||"",onChange:e=>updateZuigerMeting(ri,c.key,e.target.value),placeholder:"mm",style:{width:"100%",boxSizing:"border-box",padding:"8px 5px",textAlign:"center"}})))
+            ...cols.map(c=>React.createElement("div",{key:c.key,style:gridCell},React.createElement(TextInput,{type:"number",step:"0.01",value:r[c.key]||"",onChange:e=>updateZuigerMeting(ri,c.key,e.target.value),placeholder:"mm",style:{width:"100%",boxSizing:"border-box",padding:"8px 5px",textAlign:"center",...(pistonGrooveOverLimit(template,c.key,r[c.key])?{background:"#ffe1e1",color:"#a21b1b",fontWeight:800,border:"2px solid #c33"}:{})}})))
           ))
         )),
+        pistonGrooveAdvice(template,z).length?React.createElement("div",{style:{marginTop:12,padding:10,border:"1px solid #c33",background:"#fff0f0",color:"#911",fontWeight:700,fontSize:12}},"Buiten limiet: ",pistonGrooveAdvice(template,z).join(", "),". Lasercladding adviseren ter beoordeling door kantoor."):null,
         React.createElement("div",{style:{marginTop:16}},React.createElement(Field,{label:"REMARKS"},React.createElement("textarea",{rows:5,value:z.remarks||"",onChange:e=>updateZuiger({remarks:e.target.value}),style:{...inputStyle,resize:"vertical",width:"100%",boxSizing:"border-box"}})))
       );
       const customer=React.createElement(CustomerPistonReport,{werkorder:activeWerkorder,rapporten:zuigerRapporten,template});
