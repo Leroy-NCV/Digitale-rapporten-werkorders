@@ -1883,7 +1883,7 @@ function App() {
   const btn=(label,onClick,extra={})=>React.createElement("button",{onClick,style:{padding:"9px 13px",borderRadius:6,border:`1px solid ${palette.line}`,background:"#fff",fontWeight:700,cursor:"pointer",...extra}},label);
 
   if(view==="rapporten"){
-    const items=[...(klustypenDb||[])].filter(k=>k.actief!==false).sort((a,b)=>String(a.label||a.naam).localeCompare(String(b.label||b.naam),"nl"));
+    const items=[...(klustypenDb||[])].filter(k=>k.actief!==false && !["voeringen_voor","voeringen_na"].includes(k.code||k.naam)).concat([{code:"voeringen_voor",label:"Voeringen (voor)",naam:"Voeringen (voor)"},{code:"voeringen_na",label:"Voeringen (na)",naam:"Voeringen (na)"}]).sort((a,b)=>String(a.label||a.naam).localeCompare(String(b.label||b.naam),"nl"));
     const selected=items.find(k=>(k.code||k.naam)===rapportPreviewCode)||items[0];
     const code=selected?.code||selected?.naam||"";
     const demo={klustype:code,motortype:"",status:"open",werkbeschrijving:"",monteur_opmerking:"",werkopdracht:{schip_klant:"",order_nummer:"",datum:""},assigned_monteurs:[],rapport_monteurs:[]};
@@ -1911,7 +1911,7 @@ function App() {
               React.createElement("div",{style:{overflowX:"auto",padding:12,background:"#e5e5e5"}},
                 pistonPreview?React.createElement(CustomerPistonReport,{werkorder:{...demo,motortype:pistonPreviewTemplate?.naam||""},rapporten:pistonPreviewReports,template:pistonPreviewTemplate}):React.createElement(CustomerGenericReport,{werkorder:demo,label:selected.label,componentRapport:{rapport_type:code,data:{}}})
               ),
-              !pistonPreview?React.createElement("p",{style:{fontSize:12,color:"#777"}},"Dit is de algemene klantweergave. Speciale meetformulieren worden verder geïntegreerd."):null
+              !pistonPreview&&!["voeringen_voor","voeringen_na"].includes(code)?React.createElement("p",{style:{fontSize:12,color:"#777"}},"Dit is de algemene klantweergave. Speciale meetformulieren worden verder geïntegreerd."):null
             ):React.createElement("p",null,"Er zijn nog geen rapporttypen geladen.")
           )
         )
