@@ -1014,8 +1014,8 @@ function getGenericReportTitle(klustype,label) {
     turbo_na: "TURBO REPAIR REPORT - AFTER",
     verstuivers_voor: "FUEL INJECTION VALVE REPORT - BEFORE",
     verstuivers_na: "FUEL INJECTION VALVE REPORT - AFTER",
-    voeringen_voor: "CYLINDER LINER MEASUREMENT REPORT - BEFORE",
-    voeringen_na: "CYLINDER LINER MEASUREMENT REPORT - AFTER",
+    voeringen_voor: "VOERINGEN MEASUREMENT REPORT - BEFORE",
+    voeringen_na: "VOERINGEN MEASUREMENT REPORT - AFTER",
     zuiger_met_losse_kroon: "PISTON WITH LOOSE CROWN REPORT",
     cilinderkop_overhaul_niet_yanmar: "CYLINDER HEAD REPAIR REPORT"
   };
@@ -1286,6 +1286,44 @@ function InjectorInspectionReport({report,onChange,readonly=false}) {
  );
 }
 
+function CylinderLinerProtocol({report,onChange,readonly=false}) {
+ const type=String(report?.rapport_type||"");
+ if(type!=="voeringen_voor"&&type!=="voeringen_na")return null;
+ const d=report?.data?.cylinderLiners||{};
+ const change=(i,key,val)=>{
+  if(readonly||!onChange)return;
+  const cylinders=Array.from({length:6},(_,j)=>(d.cylinders||[])[j]||{});
+  cylinders[i]={...cylinders[i],[key]:val};
+  onChange({cylinderLiners:{...d,cylinders}});
+ };
+ const field=(i,key)=>(readonly?React.createElement("span",null,((d.cylinders||[])[i]||{})[key]||"—"):React.createElement("input",{type:"text",value:((d.cylinders||[])[i]||{})[key]||"",onChange:e=>change(i,key,e.target.value),style:{width:"100%",maxWidth:"100%",boxSizing:"border-box",padding:4,fontSize:11}}));
+ const th={border:"1px solid #aeb7ba",padding:5,background:"#eef1ef",fontSize:10};
+ const td={border:"1px solid #aeb7ba",padding:4,fontSize:11,textAlign:"center"};
+ return React.createElement("section",{style:{marginTop:14,fontFamily:"Arial,sans-serif"}},
+  React.createElement("h2",{style:{fontSize:readonly?15:18,textAlign:"center"}},"SIZE PROTOCOL CYLINDERLINER — "+(type.endsWith("_na")?"AFTER":"BEFORE")),
+  React.createElement("p",{style:{fontSize:11}},"YANMAR 6N21 · NOMINALSIZE: Ø 210 mm · Max allow. clearance 0.30 mm · Limit of parts: +0.4 mm · Deflection wear: 0.20 mm · SIZES IN 1/100 mm"),
+  ...Array.from({length:6},(_,i)=>React.createElement("div",{key:i,style:{margin:"13px 0",pageBreakInside:"avoid"}},
+   React.createElement("div",{style:{fontWeight:700,fontSize:12,marginBottom:3}},"CIL.No.: "+(i+1)),
+   React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"}},
+    React.createElement("thead",null,
+     React.createElement("tr",null,
+      React.createElement("th",{style:th,rowSpan:2},"Direction"),
+      ...["MEASURE POINT 1","MEASURE POINT 3","MEASURE POINT 5"].map(s=>React.createElement("th",{key:s,style:th},s)),
+      React.createElement("th",{style:th},"A"),
+      React.createElement("th",{style:th},"ROUGHNESS RA µm")),
+    ),
+    React.createElement("tbody",null,...["X","Y"].map(dir=>React.createElement("tr",{key:dir},
+     React.createElement("td",{style:td},dir),
+     ...["1","3","5"].map(point=>React.createElement("td",{style:td,key:point},field(i,point+dir))),
+     React.createElement("td",{style:td},field(i,"A"+dir)),
+     React.createElement("td",{style:td},field(i,"Ra"+dir))
+    )))
+   ),
+   React.createElement("div",{style:{fontSize:11,marginTop:4}},"REMARK: ",readonly?React.createElement("span",null,((d.cylinders||[])[i]||{}).remark||"—"):React.createElement("textarea",{value:((d.cylinders||[])[i]||{}).remark||"",onChange:e=>change(i,"remark",e.target.value),rows:2,style:{width:"100%",boxSizing:"border-box",border:"1px solid #bac2c2"}}))
+  ))
+ );
+}
+
 function CustomerGenericReport({ werkorder, label, componentRapport }) {
   const title=getGenericReportTitle(werkorder.klustype,label);
   const statusLabel=STATUS_LABELS[werkorder.status]||werkorder.status||"";
@@ -1337,6 +1375,7 @@ function CustomerGenericReport({ werkorder, label, componentRapport }) {
       React.createElement(RockerArmProtocol,{report:componentRapport,readonly:true}),
       React.createElement(LOPumpProtocol,{report:componentRapport,readonly:true}),
       React.createElement(InjectorInspectionReport,{report:componentRapport,readonly:true}),
+      React.createElement(CylinderLinerProtocol,{report:componentRapport,readonly:true}),
       String(werkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:werkorder.motortype},readonly:true}):null,
       React.createElement("div",{style:{borderTop:"2px solid #1664a8",paddingTop:"2mm",marginTop:"8mm",display:"flex",justifyContent:"space-between",fontSize:7.5,color:"#304564"}},
         React.createElement("span",null,"Nicoverken Engine Repair | ",title),
@@ -2210,6 +2249,7 @@ function App() {
         React.createElement(RockerArmProtocol,{report:componentRapport,onChange:updateComponentData}),
         React.createElement(LOPumpProtocol,{report:componentRapport,onChange:updateComponentData}),
         React.createElement(InjectorInspectionReport,{report:componentRapport,onChange:updateComponentData}),
+        React.createElement(CylinderLinerProtocol,{report:componentRapport,onChange:updateComponentData}),
         String(activeWerkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:activeWerkorder.motortype},onChange:updateComponentData}):null
       );
       return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,pageHeader,
