@@ -908,8 +908,7 @@ function ConnectingRodMeasurementDiagram({template,werkorder,compact=false}) {
   const name=String(template?.naam||werkorder?.motortype||"").toLowerCase();
   const isEy26=code==="yanmar_ey26"||name.includes("ey26");
   const isAfter=String(werkorder?.klustype||"").endsWith("_after")||String(werkorder?.klustype||"").endsWith("_na");
-  if(isEy26&&isAfter)return null;
-  return React.createElement("img",{src:"./assets/drijfstang-meetposities.svg",alt:"Drijfstang meetposities A tot G",style:{display:"block",width:"100%",maxWidth:compact?"145mm":"650px",height:"auto",margin:"0 auto"}});
+  return React.createElement("img",{src:isEy26?"./assets/drijfstang-ey26-meetposities.svg":"./assets/drijfstang-meetposities.svg",alt:isEy26?"Yanmar EY26 originele drijfstang-meetposities A tot E":"Drijfstang meetposities A tot G",style:{display:"block",width:"100%",maxWidth:compact?"145mm":"650px",height:"auto",margin:"0 auto"}});
 }
 
 function CustomerConnectingRodReport({ werkorder, rapporten, template }) {
