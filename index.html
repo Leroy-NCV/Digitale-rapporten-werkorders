@@ -1302,6 +1302,7 @@ function CylinderLinerProtocol({report,onChange,readonly=false}) {
  return React.createElement("section",{style:{marginTop:14,fontFamily:"Arial,sans-serif"}},
   React.createElement("h2",{style:{fontSize:readonly?15:18,textAlign:"center"}},"SIZE PROTOCOL CYLINDERLINER — "+(type.endsWith("_na")?"AFTER":"BEFORE")),
   React.createElement("p",{style:{fontSize:11}},"YANMAR 6N21 · NOMINALSIZE: Ø 210 mm · Max allow. clearance 0.30 mm · Limit of parts: +0.4 mm · Deflection wear: 0.20 mm · SIZES IN 1/100 mm"),
+  React.createElement("div",{style:{textAlign:"center",margin:"12px 0 18px",pageBreakInside:"avoid"}},React.createElement("img",{src:"./assets/voeringen-meetposities.svg",alt:"Meetposities voering: X/Y, A en meetpunten 1, 3 en 5",style:{width:"100%",maxWidth:readonly?"145mm":"672px",height:"auto"}})),
   ...Array.from({length:6},(_,i)=>React.createElement("div",{key:i,style:{margin:"13px 0",pageBreakInside:"avoid"}},
    React.createElement("div",{style:{fontWeight:700,fontSize:12,marginBottom:3}},"CIL.No.: "+(i+1)),
    React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"}},
