@@ -342,7 +342,7 @@ function compressImage(file,maxSide=1100,quality=.68){
   });
 }
 function makeZuigerRapport(nummer=1) {
-  return { nummer, markering: "", type_variant: "", metingen: { tolerance_profile:"standaard", angles: PISTON_ANGLES.map(angle => ({ angle, groove1:"", groove2:"", groove3:"", oil:"", pinA:"", pinB:"" })) }, remarks: "" };
+  return { nummer, markering: "", type_variant: "", metingen: { tolerance_profile:"standaard", dye_check:"", angles: PISTON_ANGLES.map(angle => ({ angle, groove1:"", groove2:"", groove3:"", oil:"", pinA:"", pinB:"" })) }, remarks: "" };
 }
 function normaliseZuiger(row) {
   if (!row) return makeZuigerRapport(1);
@@ -400,7 +400,7 @@ function CustomerPistonReport({ werkorder, rapporten, template }) {
     return React.createElement("div",{key:z.id||zi,style:{pageBreakInside:"avoid",marginBottom:"4mm"}},
       React.createElement("div",{style:{display:"flex",justifyContent:"space-between",fontSize:9,fontWeight:700,margin:"1mm 0"}},
         React.createElement("span",null,"Piston ",z.nummer,z.markering?` - Marking: ${z.markering}`:""),
-        React.createElement("span",null,"Type: ",z.type_variant?`${z.type_variant}-type`:"—")
+        React.createElement("span",null,"Type: ",z.type_variant?`${z.type_variant}-type`:"—"),React.createElement("span",null,"Dye check: ",z.metingen?.dye_check||"—")
       ),
       React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"}},
         React.createElement("thead",null,React.createElement("tr",null,...headerCells)),
@@ -1412,6 +1412,7 @@ function App() {
   const [loginError, setLoginError] = useState("");
   const [view, setView] = useState("overzicht");
   const [rapportPreviewCode,setRapportPreviewCode]=useState("");
+  const [rapportPreviewPistonTemplate,setRapportPreviewPistonTemplate]=useState("");
   const [werkopdrachten, setWerkopdrachten] = useState([]);
   const [monteurWerkorders, setMonteurWerkorders] = useState([]);
   const [klustypenDb, setKlustypenDb] = useState([]);
@@ -1872,6 +1873,9 @@ function App() {
     const selected=items.find(k=>(k.code||k.naam)===rapportPreviewCode)||items[0];
     const code=selected?.code||selected?.naam||"";
     const demo={klustype:code,motortype:"",status:"open",werkbeschrijving:"",monteur_opmerking:"",werkopdracht:{schip_klant:"",order_nummer:"",datum:""},assigned_monteurs:[],rapport_monteurs:[]};
+    const pistonPreview=["zuiger_voor","zuiger_na","zuiger"].includes(code);
+    const pistonPreviewTemplate=zuigerTemplates.find(t=>t.code===rapportPreviewPistonTemplate)||zuigerTemplates[0]||null;
+    const pistonPreviewReports=Array.from({length:6},(_,i)=>makeZuigerRapport(i+1));
     return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,
       React.createElement("div",{style:{padding:20,maxWidth:1250,margin:"0 auto"}},
         React.createElement("div",{style:{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}},
@@ -1889,10 +1893,11 @@ function App() {
             selected?React.createElement(React.Fragment,null,
               React.createElement("h2",{style:{fontSize:17,margin:"0 0 6px"}},selected.label||selected.naam),
               React.createElement("div",{style:{fontSize:12,color:"#606660",marginBottom:12}},"Rapportcode: ",code),
+              pistonPreview?React.createElement("div",{style:{marginBottom:12}},React.createElement("label",{style:{fontSize:12,fontWeight:700}},"Motortype / zuigersjabloon"),React.createElement("select",{value:pistonPreviewTemplate?.code||"",onChange:e=>setRapportPreviewPistonTemplate(e.target.value),style:{...inputStyle,display:"block",marginTop:5,maxWidth:"100%"}},...zuigerTemplates.map(t=>React.createElement("option",{value:t.code,key:t.code},t.naam))),React.createElement("p",{style:{fontSize:11,color:"#59615a"}},"Volledig voorbeeld met zes zuigers; geen meetwaarden of werkorders opgeslagen.")):null,
               React.createElement("div",{style:{overflowX:"auto",padding:12,background:"#e5e5e5"}},
-                React.createElement(CustomerGenericReport,{werkorder:demo,label:selected.label,componentRapport:{rapport_type:code,data:{}}})
+                pistonPreview?React.createElement(CustomerPistonReport,{werkorder:{...demo,motortype:pistonPreviewTemplate?.naam||""},rapporten:pistonPreviewReports,template:pistonPreviewTemplate}):React.createElement(CustomerGenericReport,{werkorder:demo,label:selected.label,componentRapport:{rapport_type:code,data:{}}})
               ),
-              React.createElement("p",{style:{fontSize:12,color:"#777"}},"Dit is de algemene klantweergave. Speciale meetformulieren worden verder geïntegreerd.")
+              !pistonPreview?React.createElement("p",{style:{fontSize:12,color:"#777"}},"Dit is de algemene klantweergave. Speciale meetformulieren worden verder geïntegreerd."):null
             ):React.createElement("p",null,"Er zijn nog geen rapporttypen geladen.")
           )
         )
@@ -2042,7 +2047,7 @@ function App() {
         React.createElement("div",{style:{display:"flex",gap:12,alignItems:"end",justifyContent:"space-between",flexWrap:"wrap",marginBottom:14}},
           React.createElement(Field,{label:"Zuiger"},React.createElement("select",{value:activeZuiger,onChange:e=>setActiveZuiger(Number(e.target.value)),style:{...inputStyle,minWidth:180}},zuigerRapporten.map((r,i)=>React.createElement("option",{key:r.id||i,value:i},`Zuiger ${r.nummer}${r.markering?` - ${r.markering}`:""}`)))),
           React.createElement(Field,{label:"Markering / nummer"},React.createElement(TextInput,{value:z.markering||"",onChange:e=>updateZuiger({markering:e.target.value}),placeholder:"Bijv. 12, A17 of P-03",style:{minWidth:180}})),
-          React.createElement(Field,{label:"Piston type"},React.createElement("select",{value:z.type_variant||"",onChange:e=>updateZuiger({type_variant:e.target.value}),style:{...inputStyle,minWidth:150}},React.createElement("option",{value:""},"—"),React.createElement("option",{value:"V"},"V-type"),React.createElement("option",{value:"N"},"N-type"))),
+          React.createElement(Field,{label:"Dye check"},React.createElement("select",{value:z.metingen?.dye_check||"",onChange:e=>updateZuiger({metingen:{...z.metingen,dye_check:e.target.value}}),style:{...inputStyle,minWidth:140}},React.createElement("option",{value:""},"—"),React.createElement("option",{value:"OK"},"OK"),React.createElement("option",{value:"NOT OK"},"NOT OK"))),React.createElement(Field,{label:"Piston type"},React.createElement("select",{value:z.type_variant||"",onChange:e=>updateZuiger({type_variant:e.target.value}),style:{...inputStyle,minWidth:150}},React.createElement("option",{value:""},"—"),React.createElement("option",{value:"V"},"V-type"),React.createElement("option",{value:"N"},"N-type"))),
           React.createElement(Field,{label:"Motortype / template"},React.createElement("select",{value:template?.code||"",onChange:e=>{const code=e.target.value;const t=getZuigerTemplate(code);updateWerkorderMeta({rapport_template_code:code||null,motortype:t?.naam||activeWerkorder.motortype})},style:{...inputStyle,minWidth:210}},React.createElement("option",{value:""},"Kies motortype..."),zuigerTemplates.map(t=>React.createElement("option",{key:t.code,value:t.code},t.naam)))),
           profiles.length>1&&React.createElement(Field,{label:"Tolerance profile"},React.createElement("select",{value:z.metingen?.tolerance_profile||profiles[0]?.code||"",onChange:e=>updateZuiger({metingen:{...z.metingen,tolerance_profile:e.target.value}}),style:{...inputStyle,minWidth:140}},profiles.map(p=>React.createElement("option",{key:p.code,value:p.code},p.label)))),
           mode!=="monteur"&&React.createElement("div",{style:{display:"flex",gap:8}},btn(showZuigerKlantRapport?"Technische invoer":"Eindrapport bekijken",()=>setShowZuigerKlantRapport(v=>!v)),btn("Download eindrapport",downloadZuigerPdf,{background:palette.accent,color:"#fff",border:"none"}))
