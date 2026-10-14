@@ -1211,47 +1211,53 @@ function RockerArmProtocol({report,onChange,readonly=false}) {
   );
 }
 
-function LOPumpProtocol({report,onChange,readonly=false}) {
+// Historische Nicoverken-inspectierapporten: geen OEM-manualverificatie.
+const LO_PUMP_MOTOR_LIMITS={"6EY18ALW":{"axial_max_mm":0.18,"case_gear_max_mm":0.3,"bush_tolerance_mm":"+0.021 / 0","shaft_bush_max_mm":0.2,"shaft_tolerance_mm":"-0.04 / -0.053"},"6EY22LW":{"axial_max_mm":0.22,"bush_nominal_mm":40,"gear_nominal_mm":84,"case_gear_max_mm":0.5,"shaft_nominal_mm":40,"shaft_bush_max_mm":0.15,"bush_wear_limit_mm":0.1,"shaft_wear_limit_mm":-0.12},"6EY26L":{"axial_max_mm":0.18,"bush_nominal_mm":40,"case_gear_max_mm":0.5,"shaft_nominal_mm":40,"bush_tolerance_mm":"+0.076 / +0.060","shaft_bush_max_mm":0.15,"bush_wear_limit_mm":0.1,"shaft_tolerance_mm":"±0.008","shaft_wear_limit_mm":-0.12,"measurement_positions":6},"6N18L-EV":{"axial_max_mm":0.18,"bush_nominal_mm":30,"case_gear_max_mm":0.3,"shaft_nominal_mm":30,"shaft_bush_max_mm":0.2,"bush_wear_limit_mm":0.15,"measurement_positions":4},"6N21AL-DV":{"axial_max_mm":0.18,"bush_nominal_mm":40,"case_gear_max_mm":0.5,"shaft_nominal_mm":40,"bush_tolerance_mm":"+0.076 / +0.060","shaft_bush_max_mm":0.15,"bush_wear_limit_mm":0.1,"shaft_tolerance_mm":"±0.008","shaft_wear_limit_mm":-0.12,"measurement_positions":4},"6N280L-EV":{"bush_nominal_mm":50,"shaft_nominal_mm":50,"bush_wear_limit_mm":0.2,"shaft_wear_limit_mm":-0.2,"measurement_positions":4,"case_gear_standard_range_mm":[0.18,0.237],"gear_side_plate_standard_range_mm":[0.2,0.375]},"6N330L-GV":{"measurement_positions":4},"M200":{"axial_max_mm":0.18,"bush_nominal_mm":30,"case_gear_max_mm":0.3,"shaft_nominal_mm":30,"shaft_bush_max_mm":0.2,"bush_wear_limit_mm":0.15,"measurement_positions":4},"M220L-EN":{"axial_max_mm":0.18,"bush_nominal_mm":30,"case_gear_max_mm":0.3,"shaft_nominal_mm":30,"shaft_bush_max_mm":0.2,"bush_wear_limit_mm":0.15,"measurement_positions":4},"T240L-ET":{"axial_max_mm":0.5,"case_gear_max_mm":0.25,"shaft_nominal_mm":45,"shaft_bush_max_mm":0.15,"measurement_positions":4},"W20":{"measurement_axes":["X","Y"],"shaft_bush_max_mm":0.09,"measurement_positions":4}};
+function LOPumpProtocol({report,onChange,readonly=false,motortype=""}) {
   const code=String(report?.rapport_type||"").toLowerCase();
   if(!["smeer_olie_pomp","lo_pomp","lo_pomp_voor","lo_pomp_na"].includes(code)&&!code.includes("lube_oil_pump"))return null;
   const data=report?.data?.loPump||{};
+  const selectedMotor=String(motortype||"").trim();
+  const limits=LO_PUMP_MOTOR_LIMITS[selectedMotor]||null;
+  const positions=Math.max(1,Math.min(12,Number(limits?.measurement_positions)||4));
+  const axes=Array.isArray(limits?.measurement_axes)?limits.measurement_axes:["T/B","P/S"];
+  const positionsList=Array.from({length:positions},(_,i)=>i+1);
+  const val=k=>limits?.[k]===undefined?"Niet vastgelegd":String(limits[k]);
+  const formatNominal=(nominal,tolerance)=>val(nominal)+(limits?.[tolerance]!==undefined?" ("+val(tolerance)+")":"");
   const update=patch=>{if(!readonly&&onChange)onChange({loPump:{...data,...patch}})};
   const cell={border:"1px solid #aeb7b9",padding:readonly?"3px":"6px",fontSize:readonly?9:12};
-  const entry=(value,action)=>readonly?React.createElement("span",null,value||"—"):
-    React.createElement("input",{value:value||"",onChange:e=>action(e.target.value),style:{width:"100%",boxSizing:"border-box",minWidth:0,padding:5,border:"1px solid #c4c9c7",borderRadius:3}});
-  const measurement=(title,key,nominal,limit)=>{
+  const entry=(value,action)=>readonly?React.createElement("span",null,value??"—"):
+    React.createElement("input",{value:value??"",onChange:e=>action(e.target.value),style:{width:"100%",boxSizing:"border-box",minWidth:0,padding:5,border:"1px solid #c4c9c7",borderRadius:3}});
+  const measurement=(title,key,nominal,tolerance,wear)=>{
     const values=data[key]||{};
     return React.createElement("section",{style:{marginTop:14,pageBreakInside:"avoid"}},
       React.createElement("h3",{style:{fontSize:readonly?11:14,margin:"0 0 5px"}},title),
-      React.createElement("p",{style:{fontSize:readonly?9:11,margin:"2px 0 7px"}},"Nominal: "+nominal+" mm · Usage limit of parts: "+limit+" mm"),
-      React.createElement("div",{style:{overflowX:"auto"}},React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"}},
-        React.createElement("thead",null,React.createElement("tr",null,...[1,2,3,4].map(i=>React.createElement("th",{key:i,colSpan:2,style:{...cell,background:"#f0f2ef"}} ,(key==="shaft"?"Pin Ø d":"Bush Ø d")+i))),
-          React.createElement("tr",null,...[1,2,3,4].flatMap(i=>["T/B","P/S"].map(axis=>React.createElement("th",{key:i+axis,style:{...cell,background:"#f6f7f4"}},axis))))),
-        React.createElement("tbody",null,React.createElement("tr",null,...[1,2,3,4].flatMap(i=>["TB","PS"].map(axis=>{
-          const k="d"+i+"_"+axis;
+      React.createElement("p",{style:{fontSize:readonly?9:11,margin:"2px 0 7px"}},"Nominal: "+formatNominal(nominal,tolerance)+" mm · Usage limit: "+val(wear)+" mm"),
+      React.createElement("div",{style:{overflowX:"auto"}},React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:positions*100}},
+        React.createElement("thead",null,React.createElement("tr",null,...positionsList.map(i=>React.createElement("th",{key:i,colSpan:axes.length,style:{...cell,background:"#f0f2ef"}},(key==="shaft"?"Pin Ø d":"Bush Ø d")+i))),
+          React.createElement("tr",null,...positionsList.flatMap(i=>axes.map(axis=>React.createElement("th",{key:i+axis,style:{...cell,background:"#f6f7f4"}},axis))))),
+        React.createElement("tbody",null,React.createElement("tr",null,...positionsList.flatMap(i=>axes.map(axis=>{
+          const k="d"+i+"_"+axis.replace(/[^A-Za-z0-9]/g,"").toUpperCase();
           return React.createElement("td",{key:k,style:cell},entry(values[k],v=>update({[key]:{...values,[k]:v}})));
         }))))
       )),
-      React.createElement("label",{style:{display:"block",fontSize:11,fontWeight:700,marginTop:6}},"Remark",
-        entry(data[key+"Remark"],v=>update({[key+"Remark"]:v}))
-      )
+      React.createElement("label",{style:{display:"block",fontSize:11,fontWeight:700,marginTop:6}},"Remark",entry(data[key+"Remark"],v=>update({[key+"Remark"]:v})))
     );
   };
-  const clearances=[
-    ["b","Shaft & bush","0.15"],
-    ["c","Pump case & gear","0.50"],
-    ["d","Pump case width & pump gear","0.18"]
-  ];
+  const clearances=[["b","Shaft & bush","shaft_bush_max_mm"],["c","Pump case & gear","case_gear_max_mm"],["d","Pump case width & pump gear","axial_max_mm"]];
   return React.createElement("section",{style:{marginTop:18,color:"#111",fontFamily:"Arial,sans-serif"}},
     React.createElement("h2",{style:{fontSize:readonly?14:18,textAlign:"center",marginBottom:12}},"LUBE OIL PUMP INSPECTION REPORT"),
-    React.createElement("div",{style:{fontSize:11,marginBottom:8}},"Reference: Yanmar 6N21AL-DV · Lube oil pump Assy #1. Limits from the original Nicoverken report."),
+    React.createElement("div",{style:{fontSize:11,marginBottom:6}},"Engine type: "+(selectedMotor||"Niet geselecteerd")+". Source: historical Nicoverken inspection reports."),
+    React.createElement("div",{style:{padding:"7px 9px",marginBottom:9,background:"#fff6e4",border:"1px solid #e4c68c",fontSize:readonly?9:11,fontWeight:700}},limits?"Nicoverken report limits; not yet checked against factory manuals.":"No approved source limits available for this engine type; no limits are assumed."),
     React.createElement("div",{style:{margin:"8px 0 14px",textAlign:"center",pageBreakInside:"avoid"}},React.createElement("img",{src:"./assets/lo-pump-diagram.svg",alt:"Lube oil pump meetposities en doorsnede",style:{maxWidth:"100%",width:readonly?"155mm":"750px",height:"auto",objectFit:"contain"}})),
-    measurement("Measurement of shaft pins","shaft","40.00 ± 0.008","-0.12"),
-    measurement("Measurement of bushes","bush","40.00 +0.076/+0.060","+0.10"),
+    measurement("Measurement of shaft pins","shaft","shaft_nominal_mm","shaft_tolerance_mm","shaft_wear_limit_mm"),
+    measurement("Measurement of bushes","bush","bush_nominal_mm","bush_tolerance_mm","bush_wear_limit_mm"),
     React.createElement("h3",{style:{fontSize:readonly?11:14,margin:"16px 0 7px"}},"MAXIMUM CLEARANCES"),
-    ...clearances.map(([key,name,limit])=>React.createElement("div",{key,style:{display:"grid",gridTemplateColumns:"1fr 100px 1fr",gap:8,alignItems:"center",marginBottom:7,fontSize:11}},
-      React.createElement("strong",null,name),React.createElement("span",null,key+" = "+limit+" mm"),entry(data["clearance_"+key],v=>update({["clearance_"+key]:v}))
+    ...clearances.map(([key,name,field])=>React.createElement("div",{key,style:{display:"grid",gridTemplateColumns:"1fr 130px 1fr",gap:8,alignItems:"center",marginBottom:7,fontSize:11}},
+      React.createElement("strong",null,name),React.createElement("span",null,key+" = "+val(field)+(limits?.[field]===undefined?"":" mm")),entry(data["clearance_"+key],v=>update({["clearance_"+key]:v}))
     )),
+    limits?.case_gear_standard_range_mm?React.createElement("p",{style:{fontSize:11}},"Pump case / gear standard range (NOT a wear limit): "+limits.case_gear_standard_range_mm.join(" – ")+" mm"):null,
+    limits?.gear_side_plate_standard_range_mm?React.createElement("p",{style:{fontSize:11}},"Gear / side plate standard range (NOT a wear limit): "+limits.gear_side_plate_standard_range_mm.join(" – ")+" mm"):null,
     React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:12}},
       ...[["MPI of gears","mpi"],["Bushing, housing & cover","condition"],["Reassembly / packaging","assembly"]].map(([label,key])=>
         React.createElement("label",{key,style:{display:"flex",flexDirection:"column",fontSize:11,fontWeight:700,gap:4}},label,entry(data[key],v=>update({[key]:v}))))
@@ -1388,7 +1394,7 @@ function CustomerGenericReport({ werkorder, label, componentRapport }) {
       React.createElement(SpecialComponentReport,{report:componentRapport,readonly:true}),
       React.createElement(CamshaftSizeProtocol,{report:componentRapport,readonly:true}),
       React.createElement(RockerArmProtocol,{report:componentRapport,readonly:true}),
-      React.createElement(LOPumpProtocol,{report:componentRapport,readonly:true}),
+      React.createElement(LOPumpProtocol,{report:componentRapport,readonly:true,motortype:werkorder.motortype}),
       React.createElement(InjectorInspectionReport,{report:componentRapport,readonly:true}),
       React.createElement(CylinderLinerProtocol,{report:componentRapport,readonly:true}),
       String(werkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:werkorder.motortype},readonly:true}):null,
@@ -2286,7 +2292,7 @@ function App() {
         React.createElement(SpecialComponentReport,{report:componentRapport,onChange:updateComponentData}),
         React.createElement(CamshaftSizeProtocol,{report:componentRapport,onChange:updateComponentData}),
         React.createElement(RockerArmProtocol,{report:componentRapport,onChange:updateComponentData}),
-        React.createElement(LOPumpProtocol,{report:componentRapport,onChange:updateComponentData}),
+        React.createElement(LOPumpProtocol,{report:componentRapport,onChange:updateComponentData,motortype:activeWerkorder.motortype}),
         React.createElement(InjectorInspectionReport,{report:componentRapport,onChange:updateComponentData}),
         React.createElement(CylinderLinerProtocol,{report:componentRapport,onChange:updateComponentData}),
         String(activeWerkorder.klustype||"").startsWith("governor")?React.createElement(GovernorTypeField,{report:{...componentRapport,motortype:activeWerkorder.motortype},onChange:updateComponentData}):null
