@@ -1217,7 +1217,9 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
   const code=String(klustype||report?.rapport_type||"").toLowerCase();
   if(!["smeer_olie_pomp","lo_pomp","lo_pomp_voor","lo_pomp_na"].includes(code)&&!code.includes("lube_oil_pump"))return null;
   const data=report?.data?.loPump||{};
-  const selectedMotor=String(motortype||"").trim();
+  const werkorderMotor=String(motortype||"").trim();
+  const exactMotor=Object.keys(LO_PUMP_MOTOR_LIMITS).find(k=>k.toLowerCase()===werkorderMotor.toLowerCase());
+  const selectedMotor=data.tolerantieMotortype||exactMotor||"";
   const limits=LO_PUMP_MOTOR_LIMITS[selectedMotor]||null;
   const positions=Math.max(1,Math.min(12,Number(limits?.measurement_positions)||4));
   const axes=Array.isArray(limits?.measurement_axes)?limits.measurement_axes:["T/B","P/S"];
@@ -1247,8 +1249,9 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
   const clearances=[["b","Shaft & bush","shaft_bush_max_mm"],["c","Pump case & gear","case_gear_max_mm"],["d","Pump case width & pump gear","axial_max_mm"]];
   return React.createElement("section",{style:{marginTop:18,color:"#111",fontFamily:"Arial,sans-serif"}},
     React.createElement("h2",{style:{fontSize:readonly?14:18,textAlign:"center",marginBottom:12}},"LUBE OIL PUMP INSPECTION REPORT"),
-    React.createElement("div",{style:{fontSize:11,marginBottom:6}},"Engine type: "+(selectedMotor||"Niet geselecteerd")+". Source: historical Nicoverken inspection reports."),
-    React.createElement("div",{style:{padding:"7px 9px",marginBottom:9,background:"#fff6e4",border:"1px solid #e4c68c",fontSize:readonly?9:11,fontWeight:700}},limits?"Nicoverken report limits; not yet checked against factory manuals.":"No approved source limits available for this engine type; no limits are assumed."),
+    React.createElement("div",{style:{fontSize:11,marginBottom:6}},"Motor werkorder: "+(werkorderMotor||"Niet geselecteerd")+" · Tolerantiebron: "+(selectedMotor||"Niet gekozen")),
+    !readonly?React.createElement("label",{style:{display:"block",fontWeight:700,fontSize:12,marginBottom:10}},"Selecteer exacte motoruitvoering voor toleranties",React.createElement("select",{value:selectedMotor,onChange:e=>update({tolerantieMotortype:e.target.value}),style:{display:"block",maxWidth:"100%",padding:"8px",marginTop:4,border:"1px solid #aeb7b9",borderRadius:5}},React.createElement("option",{value:""},"Kies motoruitvoering"),...Object.keys(LO_PUMP_MOTOR_LIMITS).sort((a,b)=>a.localeCompare(b,"nl",{numeric:true})).map(m=>React.createElement("option",{key:m,value:m},m)))):null,
+    React.createElement("div",{style:{padding:"7px 9px",marginBottom:9,background:"#fff6e4",border:"1px solid #e4c68c",fontSize:readonly?9:11,fontWeight:700}},limits?"Historische Nicoverken-limieten voor "+selectedMotor+"; niet vergeleken met fabrieksmanuals.":"Selecteer de exacte motoruitvoering. Er worden geen waarden van andere motortypen ingevuld."),
     React.createElement("div",{style:{margin:"8px 0 14px",textAlign:"center",pageBreakInside:"avoid"}},React.createElement("img",{src:"./assets/lo-pump-diagram.svg",alt:"Lube oil pump meetposities en doorsnede",style:{maxWidth:"100%",width:readonly?"155mm":"750px",height:"auto",objectFit:"contain"}})),
     measurement("Measurement of shaft pins","shaft","shaft_nominal_mm","shaft_tolerance_mm","shaft_wear_limit_mm"),
     measurement("Measurement of bushes","bush","bush_nominal_mm","bush_tolerance_mm","bush_wear_limit_mm"),
