@@ -1226,6 +1226,19 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
   const allowedMotors=Object.keys(LO_PUMP_MOTOR_LIMITS).filter(m=>!/caterpillar|stork|deutz|deuts/i.test(m));
   const axes=Array.isArray(limits?.measurement_axes)?limits.measurement_axes:["T/B","P/S"];
   const positionsList=Array.from({length:positions},(_,i)=>i+1);
+  const isW20=selectedMotor==="W20";
+  const detailMaten={
+    "6EY26L":[["Nominale as","Ø 40.00 mm · ±0.008 mm"],["Nominale bus","Ø 40.00 mm · +0.076 / +0.060 mm"],["Buitendiameter tandwiel","Ø 84.00 mm"],["Breedte pomphuis / tandwiel","105.00 mm"]],
+    "6N21AL-DV":[["Standaardspeling as / bus","b = 0.052 – 0.084 mm"],["Standaardspeling huis / tandwiel","c = 0.200 – 0.304 mm"],["SM-68 standaardspeling breedte","d = 0.060 – 0.136 mm; max. 0.18 mm"],["LA-92 standaardspeling breedte","d = 0.072 – 0.161 mm; max. 0.20 mm"]],
+    "6N18L-EV":[["As","Ø 30 mm · -0.040 / -0.053 mm"],["Bus","Ø 30 mm · +0.021 / 0 mm"],["Standaardspeling as / bus","b = 0.040 – 0.074 mm"],["Standaardspeling huis / tandwiel","c = 0.200 – 0.296 mm"],["Breedtespeling","d = 0.060 – 0.136 mm"]],
+    "M200":[["As","Ø 30 mm · -0.040 / -0.053 mm"],["Bus","Ø 30 mm · +0.021 / 0 mm"],["Standaardspeling as / bus","a = 0.040 – 0.074 mm"],["Standaardspeling huis / tandwiel","b = 0.200 – 0.296 mm"],["Breedtespeling","c = 0.060 – 0.136 mm"]],
+    "M220L-EN":[["As","Ø 30 mm · -0.040 / -0.053 mm"],["Bus","Ø 30 mm · +0.021 / 0 mm"],["Standaardspeling as / bus","a = 0.040 – 0.074 mm"],["Standaardspeling huis / tandwiel","b = 0.200 – 0.296 mm"],["Breedtespeling","c = 0.060 – 0.136 mm"]],
+    "6N280L-EV":[["As","Ø 50 mm · +0.011 / -0.005 mm"],["Bus","Ø 50 mm · +0.100 / +0.070 mm"],["Standaardspeling as / bus","a = 0.059 – 0.105 mm"],["Standaardspeling huis / tandwiel","0.180 – 0.237 mm"],["Standaardspeling tandwiel / zijplaat","0.200 – 0.375 mm"]],
+    "6N330L-GV":[["As","Ø 50 mm · ±0.008 mm"],["Bus","Ø 50 mm · +0.100 / +0.070 mm"],["Standaardspeling as / bus","a = 0.062 – 0.108 mm"],["Standaardspeling huis / tandwiel","b = 0.018 – 0.237 mm"],["Standaardspeling tandwiel / zijplaat","c = 0.30 – 0.40 mm"]],
+    "T240L-ET":[["Nominale as","45.00 mm"],["Maximale speling as / bus","A = 0.15 mm"],["Maximale speling huis / tandwiel","B = 0.25 mm"],["Maximale axiale speling","C = 0.50 mm"]],
+    "W20":[["Pompasdiameter","49.895 – 49.92 mm"],["Gemonteerde busdiameter","49.99 – 50.045 mm"],["Normale lagerspeling","0.080 – 0.165 mm · slijtagegrens 0.20 mm"],["Normale axiale speling 4/5/6L20","0.120 – 0.230 mm"],["Normale axiale speling 8/9L20","0.130 – 0.220 mm"],["Backlash pomptandwielen","0.432 – 0.736 mm"]]
+  };
+
   const val=k=>limits?.[k]===undefined?"Niet vastgelegd":String(limits[k]);
   const formatNominal=(nominal,tolerance)=>val(nominal)+(limits?.[tolerance]!==undefined?" ("+val(tolerance)+")":"");
   const update=patch=>{if(!readonly&&onChange)onChange({loPump:{...data,...patch}})};
@@ -1255,6 +1268,10 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
     !readonly?React.createElement("label",{style:{display:"block",fontWeight:700,fontSize:12,marginBottom:10}},"Selecteer exacte motoruitvoering voor toleranties",React.createElement("select",{value:selectedMotor,onChange:e=>update({tolerantieMotortype:e.target.value}),style:{display:"block",maxWidth:"100%",padding:"8px",marginTop:4,border:"1px solid #aeb7b9",borderRadius:5}},React.createElement("option",{value:""},"Kies motoruitvoering"),...allowedMotors.sort((a,b)=>a.localeCompare(b,"nl",{numeric:true})).map(m=>React.createElement("option",{key:m,value:m},m)))):null,
     React.createElement("div",{style:{padding:"7px 9px",marginBottom:9,background:"#fff6e4",border:"1px solid #e4c68c",fontSize:readonly?9:11,fontWeight:700}},limits?"Historische Nicoverken-limieten voor "+selectedMotor+"; niet vergeleken met fabrieksmanuals.":"Selecteer de exacte motoruitvoering. Er worden geen waarden van andere motortypen ingevuld."),
     React.createElement("div",{style:{margin:"8px 0 14px",textAlign:"center",pageBreakInside:"avoid"}},React.createElement("img",{src:"./assets/lo-pump-diagram.svg",alt:"Lube oil pump meetposities en doorsnede",style:{maxWidth:"100%",width:readonly?"155mm":"750px",height:"auto",objectFit:"contain"}})),
+    detailMaten[selectedMotor]?React.createElement("div",{style:{border:"1px solid #aeb7b9",padding:10,marginBottom:12,fontSize:readonly?9:12}},
+      React.createElement("strong",null,"Vaste maten en toleranties – "+selectedMotor),
+      ...detailMaten[selectedMotor].map(([label,value])=>React.createElement("div",{key:label,style:{display:"flex",gap:12,borderBottom:"1px solid #e4e4e4",padding:"4px 0"}},React.createElement("span",{style:{minWidth:"45%"}},label),React.createElement("strong",null,value)))
+    ):null,
     isEY18?React.createElement("div",{style:{border:"1px solid #333",padding:10,fontSize:readonly?9:11,marginBottom:10,pageBreakInside:"avoid"}},
       React.createElement("strong",null,"EY18 – Original dimensional reference (mm)"),
       React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginTop:6}},
