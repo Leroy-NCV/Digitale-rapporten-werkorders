@@ -1235,7 +1235,7 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
     const values=data[key]||{};
     return React.createElement("section",{style:{marginTop:14,pageBreakInside:"avoid"}},
       React.createElement("h3",{style:{fontSize:readonly?11:14,margin:"0 0 5px"}},title),
-      React.createElement("p",{style:{fontSize:readonly?9:11,margin:"2px 0 7px"}},"Nominal: "+formatNominal(nominal,tolerance)+" mm · Usage limit: "+val(wear)+" mm"),
+      React.createElement("p",{style:{fontSize:readonly?9:11,margin:"2px 0 7px"}},isEY18?(key==="shaft"?"Standard tolerance: -0.040 / -0.053 mm": "Standard tolerance: +0.021 / 0 mm"):"Nominal: "+formatNominal(nominal,tolerance)+" mm · Usage limit: "+val(wear)+" mm"),
       React.createElement("div",{style:{overflowX:"auto"}},React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",minWidth:positions*100}},
         React.createElement("thead",null,React.createElement("tr",null,...positionsList.map(i=>React.createElement("th",{key:i,colSpan:axes.length,style:{...cell,background:"#f0f2ef"}},(key==="shaft"?"Pin Ø d":"Bush Ø d")+i))),
           React.createElement("tr",null,...positionsList.flatMap(i=>axes.map(axis=>React.createElement("th",{key:i+axis,style:{...cell,background:"#f6f7f4"}},axis))))),
@@ -1244,7 +1244,7 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
           return React.createElement("td",{key:k,style:cell},entry(values[k],v=>update({[key]:{...values,[k]:v}})));
         }))))
       )),
-      React.createElement("label",{style:{display:"block",fontSize:11,fontWeight:700,marginTop:6}},"Remark",entry(data[key+"Remark"],v=>update({[key+"Remark"]:v})))
+      React.createElement("label",{style:{display:"block",fontSize:11,fontWeight:700,marginTop:6}},"Remark",entry(data[key+"Remark"]??(isEY18?(key==="shaft"?"Shaft pins still within standard tolerance of -0.04 / -0.053 mm":"All bushings within limit (near standard tolerance of +0.021 / 0 mm)"):""),v=>update({[key+"Remark"]:v})))
     );
   };
   const clearances=[["b","Shaft & bush","shaft_bush_max_mm"],["c","Pump case & gear","case_gear_max_mm"],["d","Pump case width & pump gear","axial_max_mm"]];
@@ -1271,10 +1271,11 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
       ),
       React.createElement("p",{style:{margin:"8px 0 0"}},"All measurements in shaft and bush tables are in 1/100 mm.")
     ):null,
-    measurement("Measurement of shaft pins","shaft","shaft_nominal_mm","shaft_tolerance_mm","shaft_wear_limit_mm"),
-    measurement("Measurement of bushes","bush","bush_nominal_mm","bush_tolerance_mm","bush_wear_limit_mm"),
-    isEY18?React.createElement("div",{style:{fontSize:readonly?9:11,margin:"8px 0 12px"}},React.createElement("strong",null,"Original report remarks: "),React.createElement("div",null,"Shaft pins still within standard tolerance of -0.04 / -0.053 mm."),React.createElement("div",null,"All bushings within limit (near standard tolerance of +0.021 / 0 mm).")):null,
+    measurement(isEY18?"Measurement of shaft pins. Sizes in 1/100 mm":"Measurement of shaft pins","shaft","shaft_nominal_mm","shaft_tolerance_mm","shaft_wear_limit_mm"),
+    measurement(isEY18?"Measurement of bushes. Sizes in 1/100 mm":"Measurement of bushes","bush","bush_nominal_mm","bush_tolerance_mm","bush_wear_limit_mm"),
+
     React.createElement("h3",{style:{fontSize:readonly?11:14,margin:"16px 0 7px"}},"MAXIMUM CLEARANCES"),
+    isEY18?React.createElement("p",{style:{fontSize:readonly?9:11,margin:"0 0 10px"}},"Standard clearances: b = 0.040 mm; c = 0.200–0.296 mm; d = 0.060–0.136 mm. Measured clearances are entered below."):null,
     ...clearances.map(([key,name,field])=>React.createElement("div",{key,style:{display:"grid",gridTemplateColumns:"1fr 130px 1fr",gap:8,alignItems:"center",marginBottom:7,fontSize:11}},
       React.createElement("strong",null,name),React.createElement("span",null,key+" = "+val(field)+(limits?.[field]===undefined?"":" mm")),entry(data["clearance_"+key],v=>update({["clearance_"+key]:v}))
     )),
