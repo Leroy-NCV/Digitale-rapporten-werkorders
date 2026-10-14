@@ -1222,6 +1222,7 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
   const selectedMotor=data.tolerantieMotortype||exactMotor||"";
   const limits=LO_PUMP_MOTOR_LIMITS[selectedMotor]||null;
   const isEY18=selectedMotor==="6EY18ALW";
+  const isEY22=selectedMotor==="6EY22LW";
   const positions=Math.max(1,Math.min(12,Number(limits?.measurement_positions)||4));
   const axes=Array.isArray(limits?.measurement_axes)?limits.measurement_axes:["T/B","P/S"];
   const positionsList=Array.from({length:positions},(_,i)=>i+1);
@@ -1244,7 +1245,7 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
           return React.createElement("td",{key:k,style:cell},entry(values[k],v=>update({[key]:{...values,[k]:v}})));
         }))))
       )),
-      React.createElement("label",{style:{display:"block",fontSize:11,fontWeight:700,marginTop:6}},"Remark",entry(data[key+"Remark"]??(isEY18?(key==="shaft"?"Shaft pins still within standard tolerance of -0.04 / -0.053 mm":"All bushings within limit (near standard tolerance of +0.021 / 0 mm)"):""),v=>update({[key+"Remark"]:v})))
+      React.createElement("label",{style:{display:"block",fontSize:11,fontWeight:700,marginTop:6}},"Remark",entry(data[key+"Remark"]??"",v=>update({[key+"Remark"]:v})))
     );
   };
   const clearances=[["b","Shaft & bush","shaft_bush_max_mm"],["c","Pump case & gear","case_gear_max_mm"],["d","Pump case width & pump gear","axial_max_mm"]];
@@ -1254,6 +1255,20 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
     !readonly?React.createElement("label",{style:{display:"block",fontWeight:700,fontSize:12,marginBottom:10}},"Selecteer exacte motoruitvoering voor toleranties",React.createElement("select",{value:selectedMotor,onChange:e=>update({tolerantieMotortype:e.target.value}),style:{display:"block",maxWidth:"100%",padding:"8px",marginTop:4,border:"1px solid #aeb7b9",borderRadius:5}},React.createElement("option",{value:""},"Kies motoruitvoering"),...Object.keys(LO_PUMP_MOTOR_LIMITS).sort((a,b)=>a.localeCompare(b,"nl",{numeric:true})).map(m=>React.createElement("option",{key:m,value:m},m)))):null,
     React.createElement("div",{style:{padding:"7px 9px",marginBottom:9,background:"#fff6e4",border:"1px solid #e4c68c",fontSize:readonly?9:11,fontWeight:700}},limits?"Historische Nicoverken-limieten voor "+selectedMotor+"; niet vergeleken met fabrieksmanuals.":"Selecteer de exacte motoruitvoering. Er worden geen waarden van andere motortypen ingevuld."),
     React.createElement("div",{style:{margin:"8px 0 14px",textAlign:"center",pageBreakInside:"avoid"}},React.createElement("img",{src:"./assets/lo-pump-diagram.svg",alt:"Lube oil pump meetposities en doorsnede",style:{maxWidth:"100%",width:readonly?"155mm":"750px",height:"auto",objectFit:"contain"}})),
+    isEY22?React.createElement("div",{style:{border:"1px solid #333",padding:10,fontSize:readonly?9:11,marginBottom:10,pageBreakInside:"avoid"}},
+      React.createElement("strong",null,"6EY22LW – dimensional reference (mm)"),
+      React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginTop:6}},
+        React.createElement("thead",null,React.createElement("tr",null,...["Part name","Nominal","Tolerance","Standard clearance","Max. clearance","Usage limit"].map(h=>React.createElement("th",{key:h,style:{border:"1px solid #777",padding:4,background:"#eee"}},h)))),
+        React.createElement("tbody",null,...[
+          ["Outer diameter of pump shaft","Ø 40","+0.008 / -0.008","b = 0.052 – 0.084","b = 0.15","-0.12"],
+          ["Inner diameter of pump shaft bush","Ø 40","+0.076 / +0.060","b = 0.052 – 0.084","b = 0.15","+0.10"],
+          ["Pump case","Ø 84","+0.054 / 0","c = 0.200 – 0.304","c = 0.50","—"],
+          ["Outer diameter of gear","Ø 84","-0.200 / -0.250","c = 0.200 – 0.304","c = 0.50","—"],
+          ["Width of pump case","130","+0.063 / 0","d = 0.080 – 0.193","d = 0.22","—"],
+          ["Width of pump gear","130","-0.080 / -0.130","d = 0.080 – 0.193","d = 0.22","—"]
+        ].map((row,i)=>React.createElement("tr",{key:i},...row.map((v,j)=>React.createElement("td",{key:j,style:{border:"1px solid #777",padding:4,textAlign:j===0?"left":"center"}},v))))))
+      )
+    ):null,
     isEY18?React.createElement("div",{style:{border:"1px solid #333",padding:10,fontSize:readonly?9:11,marginBottom:10,pageBreakInside:"avoid"}},
       React.createElement("strong",null,"EY18 – Original dimensional reference (mm)"),
       React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginTop:6}},
