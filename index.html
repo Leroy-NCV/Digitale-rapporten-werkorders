@@ -1289,9 +1289,24 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
       ),
       React.createElement("p",{style:{margin:"8px 0 0"}},"All measurements in shaft and bush tables are in 1/100 mm.")
     ):null,
-    measurement(isEY18?"Measurement of shaft pins. Sizes in 1/100 mm":"Measurement of shaft pins","shaft","shaft_nominal_mm","shaft_tolerance_mm","shaft_wear_limit_mm"),
-    measurement(isEY18?"Measurement of bushes. Sizes in 1/100 mm":"Measurement of bushes","bush","bush_nominal_mm","bush_tolerance_mm","bush_wear_limit_mm"),
+    !isW20?measurement(isEY18?"Measurement of shaft pins. Sizes in 1/100 mm":"Measurement of shaft pins","shaft","shaft_nominal_mm","shaft_tolerance_mm","shaft_wear_limit_mm"):null,
+    !isW20?measurement(isEY18?"Measurement of bushes. Sizes in 1/100 mm":"Measurement of bushes","bush","bush_nominal_mm","bush_tolerance_mm","bush_wear_limit_mm"):null,
 
+    isW20?React.createElement("div",null,...[["driveShaft","Drive gear shaft"],["gearShaft","Gear shaft"],["driveBush","Bushing drive gear shaft"],["gearBush","Bushing gear shaft"]].map(([key,title])=>{
+      const saved=data[key]||{};
+      const headers=[1,2,3,4].map(i=>React.createElement("th",{key:i,style:cell},"Position "+i));
+      const rows=["X","Y"].map(axis=>{
+        const fields=[1,2,3,4].map(i=>React.createElement("td",{key:i,style:cell},entry(saved[axis+i],v=>update({[key]:{...saved,[axis+i]:v}}))));
+        return React.createElement("tr",{key:axis},React.createElement("th",{style:cell},axis),...fields);
+      });
+      return React.createElement("div",{key,style:{marginTop:12,overflowX:"auto"}},
+        React.createElement("h3",{style:{fontSize:readonly?11:14}},title+" (mm)"),
+        React.createElement("table",{style:{width:"100%",minWidth:400,borderCollapse:"collapse"}},
+          React.createElement("thead",null,React.createElement("tr",null,React.createElement("th",{style:cell},""),...headers)),
+          React.createElement("tbody",null,...rows)
+        )
+      );
+    })):null,
     React.createElement("h3",{style:{fontSize:readonly?11:14,margin:"16px 0 7px"}},"MAXIMUM CLEARANCES"),
     isEY18?React.createElement("p",{style:{fontSize:readonly?9:11,margin:"0 0 10px"}},"Standard clearances: b = 0.040 mm; c = 0.200–0.296 mm; d = 0.060–0.136 mm. Measured clearances are entered below."):null,
     ...clearances.map(([key,name,field])=>React.createElement("div",{key,style:{display:"grid",gridTemplateColumns:"1fr 130px 1fr",gap:8,alignItems:"center",marginBottom:7,fontSize:11}},
