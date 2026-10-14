@@ -2403,5 +2403,24 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   React.createElement(AppErrorBoundary,null,React.createElement(App))
 );
 </script>
+<script>
+(function(){
+  function check(){
+    var root=document.getElementById("root");
+    if(!root||root.textContent.trim()!=="Applicatie laden...")return;
+    var details=window.__nicoLastError||"Onbekende opstartfout";
+    root.innerHTML="";
+    var wrap=document.createElement("div");
+    wrap.style.cssText="font-family:Arial,sans-serif;padding:24px;color:#1f231c;max-width:700px";
+    var h=document.createElement("h2");h.textContent="De Nicoverken-app kon niet starten";wrap.appendChild(h);
+    var p=document.createElement("p");p.textContent="De pagina is geladen, maar de applicatie is niet gestart. Fout: "+details;wrap.appendChild(p);
+    var b=document.createElement("button");b.textContent="Opnieuw proberen";b.onclick=function(){location.reload()};wrap.appendChild(b);
+    root.appendChild(wrap);
+  }
+  window.addEventListener("error",function(e){window.__nicoLastError=String(e.message||e.error||"Scriptfout");setTimeout(check,100)});
+  window.addEventListener("unhandledrejection",function(e){window.__nicoLastError=String(e.reason?.message||e.reason||"Promise-fout");setTimeout(check,100)});
+  setTimeout(check,3500);
+})();
+</script>
 </body>
 </html>
