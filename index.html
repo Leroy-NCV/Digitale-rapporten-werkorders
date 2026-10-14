@@ -1224,19 +1224,6 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
   const isEY18=selectedMotor==="6EY18ALW";
   const isEY22=selectedMotor==="6EY22LW";
   const positions=Math.max(1,Math.min(12,Number(limits?.measurement_positions)||4));
-  const isW20=selectedMotor==="W20";
-  const engineTypes=Object.keys(LO_PUMP_MOTOR_LIMITS).filter(m=>!/caterpillar|cat(?:erpillar)?\b|stork|deutz|deuts/i.test(m));
-  const referenceRows={
-    "6EY26L":[["Shaft","Ø 40","±0.008","-0.12"],["Bush","Ø 40","+0.076 / +0.060","+0.10"],["Shaft / bush clearance","b","Max. 0.15",""],["Pump case / gear clearance","c","Max. 0.50",""],["Axial clearance","d","Max. 0.18",""],["Gear outside diameter","Ø 84","Reference",""],["Pump case / gear width","105.00","Reference",""]],
-    "6N21AL-DV":[["Shaft","Ø 40","±0.008","-0.12"],["Bush","Ø 40","+0.076 / +0.060","+0.10"],["Shaft / bush clearance","b","0.052 – 0.084","Max. 0.15"],["Pump case / gear","Ø 84","0.200 – 0.304","Max. 0.50"],["SM-68 width","d","0.060 – 0.136","Max. 0.18"],["LA-92 width","d","0.072 – 0.161","Max. 0.20"]],
-    "6N18L-EV":[["Shaft","Ø 30","-0.040 / -0.053",""],["Bush","Ø 30","+0.021 / 0","+0.15"],["Shaft / bush clearance","b","0.040 – 0.074","Max. 0.20"],["Pump case / gear","Ø 72","0.200 – 0.296","Max. 0.30"],["Pump case / gear width","72","0.060 – 0.136","Max. 0.18"]],
-    "M200":[["Shaft","Ø 30","-0.040 / -0.053",""],["Bush","Ø 30","+0.021 / 0","+0.15"],["Shaft / bush clearance","a","0.040 – 0.074","Max. 0.20"],["Pump case / gear","b","0.200 – 0.296","Max. 0.30"],["Pump case / gear width","60","0.060 – 0.136","Max. 0.18"]],
-    "M220L-EN":[["Shaft","Ø 30","-0.040 / -0.053",""],["Bush","Ø 30","+0.021 / 0","+0.15"],["Shaft / bush clearance","a","0.040 – 0.074","Max. 0.20"],["Pump case / gear","b","0.200 – 0.296","Max. 0.30"],["Pump case / gear width","60","0.060 – 0.136","Max. 0.18"]],
-    "6N280L-EV":[["Shaft","Ø 50","+0.011 / -0.005","-0.20"],["Bush","Ø 50","+0.100 / +0.070","+0.20"],["Shaft / bush clearance","a","0.059 – 0.105","Standard"],["Pump case / gear","b","0.180 – 0.237","Standard"],["Gear / side plate","c","0.200 – 0.375","Standard"]],
-    "6N330L-GV":[["Shaft","Ø 50","±0.008","-0.20"],["Bush","Ø 50","+0.100 / +0.070","+0.20"],["Shaft / bush clearance","a","0.062 – 0.108","Standard"],["Pump case / gear clearance","b","0.018 – 0.237","Standard"],["Gear / side plate clearance","c","0.30 – 0.40","Standard"]],
-    "T240L-ET":[["Shaft","Ø 45","Nominal",""],["Shaft / bush clearance","A","Max. 0.15",""],["Pump case / gear","B","Max. 0.25",""],["Axial clearance","C","Max. 0.50",""]],
-    "W20":[["Drive gear shaft diameter","49.895 – 49.92","mm",""],["Assembled bush diameter","49.99 – 50.045","mm",""],["Bearing clearance","0.080 – 0.165","Normal","Wear limit 0.20"],["Axial clearance (4,5,6L20)","0.120 – 0.230","Normal",""],["Axial clearance (8,9L20)","0.130 – 0.220","Normal",""],["Pump gear backlash","0.432 – 0.736","Normal",""],["Intermediate gear bearing clearance","0.06 – 0.15","Normal",""],["Intermediate gear axial clearance","0.10 – 0.20","Normal",""],["Gear-wheel backlash","0.10 – 0.30","Normal",""]]
-  };
   const axes=Array.isArray(limits?.measurement_axes)?limits.measurement_axes:["T/B","P/S"];
   const positionsList=Array.from({length:positions},(_,i)=>i+1);
   const val=k=>limits?.[k]===undefined?"Niet vastgelegd":String(limits[k]);
@@ -1265,15 +1252,9 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
   return React.createElement("section",{style:{marginTop:18,color:"#111",fontFamily:"Arial,sans-serif"}},
     React.createElement("h2",{style:{fontSize:readonly?14:18,textAlign:"center",marginBottom:12}},"LUBE OIL PUMP INSPECTION REPORT"),
     React.createElement("div",{style:{fontSize:11,marginBottom:6}},"Motor werkorder: "+(werkorderMotor||"Niet geselecteerd")+" · Tolerantiebron: "+(selectedMotor||"Niet gekozen")),
-    !readonly?React.createElement("label",{style:{display:"block",fontWeight:700,fontSize:12,marginBottom:10}},"Selecteer exacte motoruitvoering voor toleranties",React.createElement("select",{value:selectedMotor,onChange:e=>update({tolerantieMotortype:e.target.value}),style:{display:"block",maxWidth:"100%",padding:"8px",marginTop:4,border:"1px solid #aeb7b9",borderRadius:5}},React.createElement("option",{value:""},"Kies motoruitvoering"),...engineTypes.sort((a,b)=>a.localeCompare(b,"nl",{numeric:true})).map(m=>React.createElement("option",{key:m,value:m},m)))):null,
+    !readonly?React.createElement("label",{style:{display:"block",fontWeight:700,fontSize:12,marginBottom:10}},"Selecteer exacte motoruitvoering voor toleranties",React.createElement("select",{value:selectedMotor,onChange:e=>update({tolerantieMotortype:e.target.value}),style:{display:"block",maxWidth:"100%",padding:"8px",marginTop:4,border:"1px solid #aeb7b9",borderRadius:5}},React.createElement("option",{value:""},"Kies motoruitvoering"),...Object.keys(LO_PUMP_MOTOR_LIMITS).sort((a,b)=>a.localeCompare(b,"nl",{numeric:true})).map(m=>React.createElement("option",{key:m,value:m},m)))):null,
     React.createElement("div",{style:{padding:"7px 9px",marginBottom:9,background:"#fff6e4",border:"1px solid #e4c68c",fontSize:readonly?9:11,fontWeight:700}},limits?"Historische Nicoverken-limieten voor "+selectedMotor+"; niet vergeleken met fabrieksmanuals.":"Selecteer de exacte motoruitvoering. Er worden geen waarden van andere motortypen ingevuld."),
     React.createElement("div",{style:{margin:"8px 0 14px",textAlign:"center",pageBreakInside:"avoid"}},React.createElement("img",{src:"./assets/lo-pump-diagram.svg",alt:"Lube oil pump meetposities en doorsnede",style:{maxWidth:"100%",width:readonly?"155mm":"750px",height:"auto",objectFit:"contain"}})),
-    referenceRows[selectedMotor]?React.createElement("div",{style:{border:"1px solid #aeb7b9",padding:10,marginBottom:10,pageBreakInside:"avoid"}},
-      React.createElement("strong",null,selectedMotor+" – Originele Nicoverken referentiematen (mm)"),
-      React.createElement("div",{style:{overflowX:"auto",marginTop:7}},React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:readonly?9:11}},
-        React.createElement("tbody",null,...referenceRows[selectedMotor].map((row,i)=>React.createElement("tr",{key:i},...row.map((v,j)=>React.createElement("td",{key:j,style:{border:"1px solid #bbb",padding:"5px",fontWeight:j===0?700:400}},v))))))
-      )
-    ):null,
     isEY22?React.createElement("div",{style:{border:"1px solid #333",padding:10,fontSize:readonly?9:11,marginBottom:10,pageBreakInside:"avoid"}},
       React.createElement("strong",null,"6EY22LW – dimensional reference (mm)"),
       React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginTop:6}},
@@ -1305,19 +1286,9 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
       ),
       React.createElement("p",{style:{margin:"8px 0 0"}},"All measurements in shaft and bush tables are in 1/100 mm.")
     ):null,
-    !isW20?measurement(isEY18?"Measurement of shaft pins. Sizes in 1/100 mm":"Measurement of shaft pins","shaft","shaft_nominal_mm","shaft_tolerance_mm","shaft_wear_limit_mm"):null,
-    !isW20?measurement(isEY18?"Measurement of bushes. Sizes in 1/100 mm":"Measurement of bushes","bush","bush_nominal_mm","bush_tolerance_mm","bush_wear_limit_mm"):null,
+    measurement(isEY18?"Measurement of shaft pins. Sizes in 1/100 mm":"Measurement of shaft pins","shaft","shaft_nominal_mm","shaft_tolerance_mm","shaft_wear_limit_mm"),
+    measurement(isEY18?"Measurement of bushes. Sizes in 1/100 mm":"Measurement of bushes","bush","bush_nominal_mm","bush_tolerance_mm","bush_wear_limit_mm"),
 
-    isW20?React.createElement("div",null,...[["driveShaft","Drive gear shaft"],["gearShaft","Gear shaft"],["driveBush","Bushing drive gear shaft"],["gearBush","Bushing gear shaft"]].map(([key,title])=>{
-      const saved=data[key]||{};
-      return React.createElement("div",{key,style:{marginTop:12,overflowX:"auto"}},
-        React.createElement("h3",{style:{fontSize:readonly?11:14,margin:"4px 0"}},title+" – measurements in mm"),
-        React.createElement("table",{style:{borderCollapse:"collapse",width:"100%",minWidth:400}},
-          React.createElement("thead",null,React.createElement("tr",null,React.createElement("th",{style:cell},""),...[1,2,3,4].map(i=>React.createElement("th",{key:i,style:cell},"Position "+i)))),
-          React.createElement("tbody",null,...["X","Y"].map(axis=>React.createElement("tr",{key:axis},React.createElement("th",{style:cell},axis),...[1,2,3,4].map(i=>React.createElement("td",{key:i,style:cell},entry(saved[axis+i],v=>update({[key]:{...saved,[axis+i]:v}})))))))
-        )
-      );
-    })):null,
     React.createElement("h3",{style:{fontSize:readonly?11:14,margin:"16px 0 7px"}},"MAXIMUM CLEARANCES"),
     isEY18?React.createElement("p",{style:{fontSize:readonly?9:11,margin:"0 0 10px"}},"Standard clearances: b = 0.040 mm; c = 0.200–0.296 mm; d = 0.060–0.136 mm. Measured clearances are entered below."):null,
     ...clearances.map(([key,name,field])=>React.createElement("div",{key,style:{display:"grid",gridTemplateColumns:"1fr 130px 1fr",gap:8,alignItems:"center",marginBottom:7,fontSize:11}},
