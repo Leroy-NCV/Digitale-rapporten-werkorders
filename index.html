@@ -1267,7 +1267,7 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
           ["Width pump case","—","+0.046 / 0"],
           ["Width pump gear","—","-0.060 / -0.090"],
           ["Pump case / gear width clearance (d)","0.060 – 0.136","Max. 0.18"]
-        ].map(([name,nom,tol])=>React.createElement("tr",{key:name},...[name,nom,tol].map(v=>React.createElement("td",{style:{border:"1px solid #777",padding:"4px"},},v))))))
+        ].map(([name,nom,tol])=>React.createElement("tr",{key:name},...[name,nom,tol].map(v=>React.createElement("td",{style:{border:"1px solid #777",padding:"4px"},},v)))))
       ),
       React.createElement("p",{style:{margin:"8px 0 0"}},"All measurements in shaft and bush tables are in 1/100 mm.")
     ):null,
