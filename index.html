@@ -1221,6 +1221,7 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
   const exactMotor=Object.keys(LO_PUMP_MOTOR_LIMITS).find(k=>k.toLowerCase()===werkorderMotor.toLowerCase());
   const selectedMotor=data.tolerantieMotortype||exactMotor||"";
   const limits=LO_PUMP_MOTOR_LIMITS[selectedMotor]||null;
+  const isEY18=selectedMotor==="6EY18ALW";
   const positions=Math.max(1,Math.min(12,Number(limits?.measurement_positions)||4));
   const axes=Array.isArray(limits?.measurement_axes)?limits.measurement_axes:["T/B","P/S"];
   const positionsList=Array.from({length:positions},(_,i)=>i+1);
@@ -1253,8 +1254,26 @@ function LOPumpProtocol({report,onChange,readonly=false,motortype="",klustype=""
     !readonly?React.createElement("label",{style:{display:"block",fontWeight:700,fontSize:12,marginBottom:10}},"Selecteer exacte motoruitvoering voor toleranties",React.createElement("select",{value:selectedMotor,onChange:e=>update({tolerantieMotortype:e.target.value}),style:{display:"block",maxWidth:"100%",padding:"8px",marginTop:4,border:"1px solid #aeb7b9",borderRadius:5}},React.createElement("option",{value:""},"Kies motoruitvoering"),...Object.keys(LO_PUMP_MOTOR_LIMITS).sort((a,b)=>a.localeCompare(b,"nl",{numeric:true})).map(m=>React.createElement("option",{key:m,value:m},m)))):null,
     React.createElement("div",{style:{padding:"7px 9px",marginBottom:9,background:"#fff6e4",border:"1px solid #e4c68c",fontSize:readonly?9:11,fontWeight:700}},limits?"Historische Nicoverken-limieten voor "+selectedMotor+"; niet vergeleken met fabrieksmanuals.":"Selecteer de exacte motoruitvoering. Er worden geen waarden van andere motortypen ingevuld."),
     React.createElement("div",{style:{margin:"8px 0 14px",textAlign:"center",pageBreakInside:"avoid"}},React.createElement("img",{src:"./assets/lo-pump-diagram.svg",alt:"Lube oil pump meetposities en doorsnede",style:{maxWidth:"100%",width:readonly?"155mm":"750px",height:"auto",objectFit:"contain"}})),
+    isEY18?React.createElement("div",{style:{border:"1px solid #333",padding:10,fontSize:readonly?9:11,marginBottom:10,pageBreakInside:"avoid"}},
+      React.createElement("strong",null,"EY18 – Original dimensional reference (mm)"),
+      React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginTop:6}},
+        React.createElement("tbody",null,...[
+          ["Outer dia. of lub. oil pump shaft","Ø 30","-0.040 / -0.053"],
+          ["Inner dia. of lub. oil pump shaft bush","—","+0.021 / 0"],
+          ["Shaft / bush clearance (b)","0.040 – 0.074","Max. 0.20; usage limit of parts +0.15"],
+          ["Inner dia. of pump case","Ø 72","+0.040 / 0"],
+          ["Outer dia. of pump gear","—","-0.200 / -0.250"],
+          ["Pump case / gear clearance (c)","0.200 – 0.296","Max. 0.30"],
+          ["Width pump case","—","+0.046 / 0"],
+          ["Width pump gear","—","-0.060 / -0.090"],
+          ["Pump case / gear width clearance (d)","0.060 – 0.136","Max. 0.18"]
+        ].map(([name,nom,tol])=>React.createElement("tr",{key:name},...[name,nom,tol].map(v=>React.createElement("td",{style:{border:"1px solid #777",padding:"4px"},},v))))))
+      ),
+      React.createElement("p",{style:{margin:"8px 0 0"}},"All measurements in shaft and bush tables are in 1/100 mm.")
+    ):null,
     measurement("Measurement of shaft pins","shaft","shaft_nominal_mm","shaft_tolerance_mm","shaft_wear_limit_mm"),
     measurement("Measurement of bushes","bush","bush_nominal_mm","bush_tolerance_mm","bush_wear_limit_mm"),
+    isEY18?React.createElement("div",{style:{fontSize:readonly?9:11,margin:"8px 0 12px"}},React.createElement("strong",null,"Original report remarks: "),React.createElement("div",null,"Shaft pins still within standard tolerance of -0.04 / -0.053 mm."),React.createElement("div",null,"All bushings within limit (near standard tolerance of +0.021 / 0 mm).")):null,
     React.createElement("h3",{style:{fontSize:readonly?11:14,margin:"16px 0 7px"}},"MAXIMUM CLEARANCES"),
     ...clearances.map(([key,name,field])=>React.createElement("div",{key,style:{display:"grid",gridTemplateColumns:"1fr 130px 1fr",gap:8,alignItems:"center",marginBottom:7,fontSize:11}},
       React.createElement("strong",null,name),React.createElement("span",null,key+" = "+val(field)+(limits?.[field]===undefined?"":" mm")),entry(data["clearance_"+key],v=>update({["clearance_"+key]:v}))
