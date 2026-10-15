@@ -1126,14 +1126,11 @@ function GovernorTypeField({report,onChange,readonly=false}) {
       React.createElement("strong",null,group),
       React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:readonly?9:11}},
         React.createElement("thead",null,React.createElement("tr",null,...["Drawing part no.","Item","Part no.","Qty.","STD","Required / remarks"].map(t=>React.createElement("th",{key:t,style:{border:"1px solid #aab0b7",padding:4}},t)))),
-        React.createElement("tbody",null,...list.map((r,i)=>({r,i})).filter(x=>x.r[0]===group).map(({r,i})=>React.createElement("tr",{key:i},...[r[1],r[2],r[3],r[4],r[5]].map((v,j)=>React.createElement("td",{key:j,style:{border:"1px solid #aab0b7",padding:3,background:r[5]==="STD"?"#fff8d4":undefined}},v)),React.createElement("td",{style:{border:"1px solid #aab0b7",padding:3}},miniInput("part_"+model+"_"+i)))))
+        React.createElement("tbody",null,...list.map((r,i)=>({r,i})).filter(x=>x.r[0]===group).map(({r,i})=>React.createElement("tr",{key:i,style:{background:String(savedParts["part_"+model+"_"+i]||"").trim()?"#fff2a8":undefined}},...[r[1],r[2],r[3],r[4],r[5]].map((v,j)=>React.createElement("td",{key:j,style:{border:"1px solid #aab0b7",padding:3,background:String(savedParts["part_"+model+"_"+i]||"").trim()?undefined:(r[5]==="STD"?"#fff8d4":undefined)}},v)),React.createElement("td",{style:{border:"1px solid #aab0b7",padding:3}},miniInput("part_"+model+"_"+i)))))
       )
     )),
-    React.createElement("h4",null,"PHOTO OVERVIEW OF (WORN) PARTS"),
-    miniInput("photos"),
     React.createElement("h4",null,"Recommendation"),
-    React.createElement("p",null,"Governor to be ultrasonic cleaned and to be rebuild with standard overhaul kit and above-mentioned needed items."),
-    miniInput("recommendation"),
+    readonly?React.createElement("div",{style:{padding:6,border:"1px solid #aab0b7"}},savedParts.recommendation||""):React.createElement("select",{value:savedParts.recommendation||"",onChange:e=>writeParts("recommendation",e.target.value),style:{width:"100%",maxWidth:"100%",padding:7,border:"1px solid #aab0b7",borderRadius:4}},React.createElement("option",{value:""},"— Choose recommendation —"),React.createElement("option",{value:"Governor to be ultrasonic cleaned and to be rebuild with standard overhaul kit and above-mentioned needed items."},"Governor to be ultrasonic cleaned and to be rebuild with standard overhaul kit and above-mentioned needed items."),React.createElement("option",{value:"Rejected"},"Rejected"),...(savedParts.recommendation&&!["Rejected","Governor to be ultrasonic cleaned and to be rebuild with standard overhaul kit and above-mentioned needed items."].includes(savedParts.recommendation)?[React.createElement("option",{key:"legacy",value:savedParts.recommendation},savedParts.recommendation)]:[])),
     React.createElement("h4",null,"Test-run"),
     React.createElement("table",{style:{width:"100%",borderCollapse:"collapse"}},
       React.createElement("thead",null,React.createElement("tr",null,...["No.","(+) Torque","(-) Torque","Oil press. (kg/cm3)","RPM"].map(x=>React.createElement("th",{key:x,style:{border:"1px solid #999"}},x)))),
