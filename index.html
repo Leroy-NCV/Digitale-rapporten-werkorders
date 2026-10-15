@@ -15,6 +15,7 @@
 </head>
 <body>
 <div id="root"><div style="font-family:Arial,sans-serif;padding:24px;color:#1f231c">Applicatie laden...</div></div>
+<script src="./assets/governor-parts-source.js"></script>
 <script>
 window.addEventListener("error",function(e){
   const root=document.getElementById("root");
@@ -1104,6 +1105,43 @@ function SpecialComponentReport({report,onChange,readonly=false}) {
 function GovernorTypeField({report,onChange,readonly=false}) {
   const value=report?.data?.governor_type||report?.motortype||"";
   const d=report?.data?.governor||{};
+  const [originalParts,setOriginalParts]=React.useState(null);
+  React.useEffect(()=>{
+    let live=true;
+    if(typeof DecompressionStream!=="function"||!window.NICOVERKEN_GOVERNOR_PARTS_BASE64)return;
+    const b=Uint8Array.from(atob(window.NICOVERKEN_GOVERNOR_PARTS_BASE64),x=>x.charCodeAt(0));
+    new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream("deflate"))).json().then(v=>{if(live)setOriginalParts(v)}).catch(e=>console.warn("Governor parts:",e));
+    return ()=>{live=false};
+  },[]);
+  const model=/NZ61/i.test(value)?"NZ61":/RHD\\s*10/i.test(value)?"RHD10":"RHD6";
+  const list=originalParts?.[model]||[];
+  const savedParts=report?.data?.governorParts||{};
+  const writeParts=(key,v)=>{if(!readonly&&onChange)onChange({governorParts:{...savedParts,[key]:v}})};
+  const miniInput=k=>readonly?React.createElement("span",null,savedParts[k]||""):React.createElement("input",{value:savedParts[k]||"",onChange:e=>writeParts(k,e.target.value),style:{width:"100%",minWidth:55,boxSizing:"border-box",padding:4}});
+  const orig=React.createElement("section",{style:{marginTop:18,pageBreakBefore:"auto"}},
+    React.createElement("h3",null,model+" – ORIGINAL GOVERNOR PARTS / REPAIR REPORT"),
+    React.createElement("p",null,"Governor received including / excluding top-cover (Governor Motor Assy). Open-up governor. Cleaned and inspected inner parts. We found the following item(s) worn / damaged and must be replaced:"),
+    ...[["Standard items / kit","stdKit"],["Additional req. parts","additionalParts"]].map(([t,k])=>React.createElement("label",{key:k,style:{display:"block",margin:"8px 0"}},t,miniInput(k))),
+    ...Array.from(new Set(list.map(r=>r[0]))).map(group=>React.createElement("div",{key:group,style:{overflowX:"auto",margin:"12px 0"}},
+      React.createElement("strong",null,group),
+      React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:readonly?9:11}},
+        React.createElement("thead",null,React.createElement("tr",null,...["Drawing part no.","Item","Part no.","Qty.","STD","Required / remarks"].map(t=>React.createElement("th",{key:t,style:{border:"1px solid #aab0b7",padding:4}},t)))),
+        React.createElement("tbody",null,...list.map((r,i)=>({r,i})).filter(x=>x.r[0]===group).map(({r,i})=>React.createElement("tr",{key:i},...[r[1],r[2],r[3],r[4],r[5]].map((v,j)=>React.createElement("td",{key:j,style:{border:"1px solid #aab0b7",padding:3,background:r[5]==="STD"?"#fff8d4":undefined}},v)),React.createElement("td",{style:{border:"1px solid #aab0b7",padding:3}},miniInput("part_"+model+"_"+i)))))
+      )
+    )),
+    React.createElement("h4",null,"PHOTO OVERVIEW OF (WORN) PARTS"),
+    miniInput("photos"),
+    React.createElement("h4",null,"Recommendation"),
+    React.createElement("p",null,"Governor to be ultrasonic cleaned and to be rebuild with standard overhaul kit and above-mentioned needed items."),
+    miniInput("recommendation"),
+    React.createElement("h4",null,"Test-run"),
+    React.createElement("table",{style:{width:"100%",borderCollapse:"collapse"}},
+      React.createElement("thead",null,React.createElement("tr",null,...["No.","(+) Torque","(-) Torque","Oil press. (kg/cm3)","RPM"].map(x=>React.createElement("th",{key:x,style:{border:"1px solid #999"}},x)))),
+      React.createElement("tbody",null,...[600,1200,1800].map((rpm,i)=>React.createElement("tr",{key:rpm},React.createElement("td",null,i+1),...["plus","minus","oil"].map(x=>React.createElement("td",{key:x},miniInput("test_"+rpm+"_"+x))),React.createElement("td",null,rpm))))
+    ),
+    ...[["Motor tested: SATISFIED YES / NO","motorTest"],["Condensator tested: SATISFIED YES / NO","condensatorTest"],...(model==="NZ61"?[["Gearbox tested: SATISFIED YES / NO","gearboxTest"]]:[])].map(([t,k])=>React.createElement("label",{key:k,style:{display:"block",marginTop:8}},t,miniInput(k)))
+  );
+
   const write=(key,v)=>{if(!readonly&&onChange)onChange({governor:{...d,[key]:v}})};
   const box={border:"1px solid #bfc6ce",borderRadius:3,padding:readonly?"4px":"7px",fontSize:readonly?10:12,boxSizing:"border-box",width:"100%",minHeight:readonly?22:32,background:"#fff"};
   const field=(label,key)=>React.createElement("label",{key,style:{display:"flex",flexDirection:"column",gap:4,fontSize:readonly?10:12,fontWeight:700,minWidth:0}},label,
@@ -1148,7 +1186,8 @@ function GovernorTypeField({report,onChange,readonly=false}) {
     textField("Work carried out / replaced parts","workCarriedOut"),
     section("ASSEMBLY / FUNCTION TEST",[["Oil leakage test","leakageTest"],["Speed regulation test","regulationTest"],["Overspeed / safety test","safetyTest"],["Final setting / test result","finalTest"],["Test date","testDate"]]),
     textField("Final remarks / recommendations","finalRemarks"),
-    section("SIGN-OFF",[["Performed by","performedBy"],["Checked by","checkedBy"],["Date","signoffDate"]])
+    section("SIGN-OFF",[["Performed by","performedBy"],["Checked by","checkedBy"],["Date","signoffDate"]]),
+    orig
   );
 }
 
