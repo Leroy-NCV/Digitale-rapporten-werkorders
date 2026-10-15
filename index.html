@@ -1113,7 +1113,7 @@ function GovernorTypeField({report,onChange,readonly=false}) {
     new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream("deflate"))).json().then(v=>{if(live)setOriginalParts(v)}).catch(e=>console.warn("Governor parts:",e));
     return ()=>{live=false};
   },[]);
-  const model=/NZ61/i.test(value)?"NZ61":/RHD\\s*10/i.test(value)?"RHD10":"RHD6";
+  const model=/NZ61/i.test(value)?"NZ61":/RHD\s*10/i.test(value)?"RHD10":"RHD6";
   const list=originalParts?.[model]||[];
   const savedParts=report?.data?.governorParts||{};
   const writeParts=(key,v)=>{if(!readonly&&onChange)onChange({governorParts:{...savedParts,[key]:v}})};
