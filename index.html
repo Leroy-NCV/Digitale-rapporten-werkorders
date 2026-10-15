@@ -1103,12 +1103,52 @@ function SpecialComponentReport({report,onChange,readonly=false}) {
 
 function GovernorTypeField({report,onChange,readonly=false}) {
   const value=report?.data?.governor_type||report?.motortype||"";
-  return React.createElement("div",{style:{padding:"10px 0",marginTop:10}},
-    React.createElement("label",{style:{display:"block",fontWeight:700,fontSize:12,marginBottom:5}},"Governor type"),
-    readonly?React.createElement("div",{style:{border:"1px solid #c8cbc3",padding:7,fontSize:11}},value||"—"):
-    React.createElement("select",{value,onChange:e=>onChange&&onChange({governor_type:e.target.value}),style:{...inputStyle,minWidth:190,maxWidth:"100%"}},
-      ...["","RHD 6","RHD 10","NZ61"].map(t=>React.createElement("option",{key:t,value:t},t||"— Kies type —"))
-    )
+  const d=report?.data?.governor||{};
+  const write=(key,v)=>{if(!readonly&&onChange)onChange({governor:{...d,[key]:v}})};
+  const box={border:"1px solid #bfc6ce",borderRadius:3,padding:readonly?"4px":"7px",fontSize:readonly?10:12,boxSizing:"border-box",width:"100%",minHeight:readonly?22:32,background:"#fff"};
+  const field=(label,key)=>React.createElement("label",{key,style:{display:"flex",flexDirection:"column",gap:4,fontSize:readonly?10:12,fontWeight:700,minWidth:0}},label,
+    readonly?React.createElement("div",{style:box},d[key]||""):
+    React.createElement("input",{style:box,value:d[key]||"",onChange:e=>write(key,e.target.value),placeholder:""})
+  );
+  const textField=(label,key)=>React.createElement("label",{key,style:{display:"block",fontSize:readonly?10:12,fontWeight:700,marginTop:10}},label,
+    readonly?React.createElement("div",{style:{...box,minHeight:40,whiteSpace:"pre-wrap",fontWeight:400}},d[key]||""):
+    React.createElement("textarea",{rows:3,value:d[key]||"",onChange:e=>write(key,e.target.value),style:{...box,resize:"vertical",display:"block",marginTop:4,fontWeight:400}})
+  );
+  const section=(label,fields)=>React.createElement("section",{style:{marginTop:15,pageBreakInside:"avoid"}},
+    React.createElement("h3",{style:{fontSize:readonly?12:15,margin:"0 0 8px",borderBottom:"1px solid #abb5bd",paddingBottom:5}},label),
+    React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(165px,1fr))",gap:10}},...fields.map(([name,key])=>field(name,key)))
+  );
+  const checkRows=[
+    ["Housing / cover","housing"],["Shafts / bearings","shaft"],["Flyweights / centrifugal mechanism","flyweights"],
+    ["Springs / linkage","springs"],["Oil system / seals","seals"],["Speed setting mechanism","speedMechanism"],
+    ["Governor drive / coupling","drive"],["Safety / overspeed mechanism","overspeed"],["Other parts","other"]
+  ];
+  return React.createElement("section",{style:{marginTop:15,padding:"10px 0",fontFamily:"Arial,sans-serif",color:"#18232e"}},
+    React.createElement("h2",{style:{fontSize:readonly?14:18,margin:"0 0 10px",textAlign:"center"}},"GOVERNOR INSPECTION / REPAIR REPORT"),
+    React.createElement("label",{style:{display:"block",fontWeight:700,fontSize:12,marginBottom:12}},"Governor type",
+      readonly?React.createElement("div",{style:{...box,marginTop:4}},value||""):
+      React.createElement("select",{value,onChange:e=>onChange&&onChange({governor_type:e.target.value}),style:{...box,marginTop:4}},
+        ...Array.from(new Set(["","RHD 6","RHD 10","NZ61",value])).map(t=>React.createElement("option",{key:t,value:t},t||"— Kies type —"))
+      )
+    ),
+    section("GENERAL INFORMATION",[["Serial no.","serialNumber"],["Maker / model","makerModel"],["Governor no. / identification","governorNumber"],["Inspection date","inspectionDate"],["Technician","technician"],["Condition received","receivedCondition"]]),
+    React.createElement("section",{style:{marginTop:15,pageBreakInside:"avoid"}},
+      React.createElement("h3",{style:{fontSize:readonly?12:15,margin:"0 0 8px",borderBottom:"1px solid #abb5bd",paddingBottom:5}},"DISASSEMBLY / PARTS INSPECTION"),
+      React.createElement("div",{style:{overflowX:"auto"}},React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:readonly?9:11}},
+        React.createElement("thead",null,React.createElement("tr",null,...["Part / item","Condition","Action / repair","Remarks"].map(x=>React.createElement("th",{key:x,style:{border:"1px solid #bfc6ce",padding:6,background:"#f1f4f6",textAlign:"left"}},x)))),
+        React.createElement("tbody",null,...checkRows.map(([label,key])=>React.createElement("tr",{key},
+          React.createElement("td",{style:{border:"1px solid #bfc6ce",padding:5}},label),
+          ...["condition","action","remarks"].map(k=>React.createElement("td",{key:k,style:{border:"1px solid #bfc6ce",padding:4}},readonly?d[key+"_"+k]||"":React.createElement("input",{value:d[key+"_"+k]||"",onChange:e=>write(key+"_"+k,e.target.value),style:{...box,minWidth:95,padding:5}})))
+        )))
+      ))
+    ),
+    section("MEASUREMENTS / SETTINGS",[["Measured speed (rpm)","speedMeasured"],["Set speed (rpm)","speedSet"],["Overspeed trip (rpm)","overspeedMeasured"],["Oil pressure (bar)","oilPressure"],["Axial clearance (mm)","axialClearance"],["Radial clearance (mm)","radialClearance"],["Other measurement / unit","otherMeasurement"]]),
+    React.createElement("p",{style:{fontSize:readonly?9:11,color:"#765121",marginTop:8}},"Enter maker tolerances only when verified from the relevant governor manual. No inspection results or limits are prefilled."),
+    textField("Applicable maker limits / reference","makerLimits"),
+    textField("Work carried out / replaced parts","workCarriedOut"),
+    section("ASSEMBLY / FUNCTION TEST",[["Oil leakage test","leakageTest"],["Speed regulation test","regulationTest"],["Overspeed / safety test","safetyTest"],["Final setting / test result","finalTest"],["Test date","testDate"]]),
+    textField("Final remarks / recommendations","finalRemarks"),
+    section("SIGN-OFF",[["Performed by","performedBy"],["Checked by","checkedBy"],["Date","signoffDate"]])
   );
 }
 
