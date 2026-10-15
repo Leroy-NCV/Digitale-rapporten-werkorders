@@ -1509,20 +1509,6 @@ function CustomerGenericReport({ werkorder, label, componentRapport }) {
           )
         )
       ),
-      React.createElement("div",{style:sectionTitle},"SCOPE / WORK DESCRIPTION"),
-      React.createElement("div",{style:{minHeight:"24mm",fontSize:9.5,lineHeight:1.5,whiteSpace:"pre-wrap",border:"1px solid #c8cbc3",padding:"3mm"}},werkorder.werkbeschrijving||""),
-      React.createElement("div",{style:sectionTitle},"WORK CARRIED OUT / REMARKS"),
-      React.createElement("div",{style:{minHeight:"30mm",fontSize:9.5,lineHeight:1.5,whiteSpace:"pre-wrap",border:"1px solid #c8cbc3",padding:"3mm"}},werkorder.monteur_opmerking||""),
-      React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginTop:"4mm",fontSize:9}},
-        React.createElement("tbody",null,
-          React.createElement("tr",null,
-            React.createElement("td",{style:{border:"1px solid #c8cbc3",padding:"2.5mm",fontWeight:700,width:"25%"}},"Report status"),
-            React.createElement("td",{style:{border:"1px solid #c8cbc3",padding:"2.5mm"}},statusLabel),
-            React.createElement("td",{style:{border:"1px solid #c8cbc3",padding:"2.5mm",fontWeight:700,width:"20%"}},"Executed"),
-            React.createElement("td",{style:{border:"1px solid #c8cbc3",padding:"2.5mm",width:"15%"}},werkorder.uitgevoerd?"YES":"NO")
-          )
-        )
-      ),
       React.createElement(SpecialComponentReport,{report:componentRapport,readonly:true}),
       React.createElement(CamshaftSizeProtocol,{report:componentRapport,readonly:true}),
       React.createElement(RockerArmProtocol,{report:componentRapport,readonly:true}),
