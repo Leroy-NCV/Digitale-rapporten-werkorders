@@ -1098,7 +1098,7 @@ function SpecialComponentReport({report,onChange,readonly=false,pumpCount=6}) {
               return React.createElement("tr",{key:j},
                 React.createElement("td",{style:{borderBottom:"1px solid #eee",padding:5}},name),
                 React.createElement("td",{style:{borderBottom:"1px solid #eee",padding:5}},select(item.result,v=>changeItem({result:v}))),
-                React.createElement("td",{style:{borderBottom:"1px solid #eee",padding:5}},readonly?(item.notes||"—"):React.createElement("select",{value:item.notes||"",onChange:e=>changeItem({notes:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box",padding:5}},Array.from(new Set(["",...(before?["To be cleaned","To be renewed","No action required"]:["Cleaned","Repaired","Renewed","Replaced","No action required"]),item.notes||""])).map(v=>React.createElement("option",{key:v,value:v},v||"—"))))
+                React.createElement("td",{style:{borderBottom:"1px solid #eee",padding:5}},readonly?(item.notes||"—"):React.createElement("select",{value:item.notes||"",onChange:e=>changeItem({notes:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box",padding:5}},Array.from(new Set(["",...(before?["To be cleaned","To be renewed","No action required"]:["Cleaned","Renewed"]),item.notes||""])).map(v=>React.createElement("option",{key:v,value:v},v||"—"))))
               );
             }))
           ),
