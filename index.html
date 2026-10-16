@@ -1187,16 +1187,6 @@ function GovernorTypeField({report,onChange,readonly=false}) {
       )
     ),
     section("GENERAL INFORMATION",[["Serial no.","serialNumber"],["Maker / model","makerModel"],["Governor no. / identification","governorNumber"],["Inspection date","inspectionDate"],["Technician","technician"],["Condition received","receivedCondition"]]),
-    React.createElement("section",{style:{marginTop:15,pageBreakInside:"avoid"}},
-      React.createElement("h3",{style:{fontSize:readonly?12:15,margin:"0 0 8px",borderBottom:"1px solid #abb5bd",paddingBottom:5}},"DISASSEMBLY / PARTS INSPECTION"),
-      React.createElement("div",{style:{overflowX:"auto"}},React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:readonly?9:11}},
-        React.createElement("thead",null,React.createElement("tr",null,...["Part / item","Condition","Action / repair","Remarks"].map(x=>React.createElement("th",{key:x,style:{border:"1px solid #bfc6ce",padding:6,background:"#f1f4f6",textAlign:"left"}},x)))),
-        React.createElement("tbody",null,...checkRows.map(([label,key])=>React.createElement("tr",{key},
-          React.createElement("td",{style:{border:"1px solid #bfc6ce",padding:5}},label),
-          ...["condition","action","remarks"].map(k=>React.createElement("td",{key:k,style:{border:"1px solid #bfc6ce",padding:4}},readonly?d[key+"_"+k]||"":React.createElement("input",{value:d[key+"_"+k]||"",onChange:e=>write(key+"_"+k,e.target.value),style:{...box,minWidth:95,padding:5}})))
-        )))
-      ))
-    ),
     section("MEASUREMENTS / SETTINGS",[["Measured speed (rpm)","speedMeasured"],["Set speed (rpm)","speedSet"],["Overspeed trip (rpm)","overspeedMeasured"],["Oil pressure (bar)","oilPressure"],["Axial clearance (mm)","axialClearance"],["Radial clearance (mm)","radialClearance"],["Other measurement / unit","otherMeasurement"]]),
     React.createElement("p",{style:{fontSize:readonly?9:11,color:"#765121",marginTop:8}},"Enter maker tolerances only when verified from the relevant governor manual. No inspection results or limits are prefilled."),
     textField("Applicable maker limits / reference","makerLimits"),
