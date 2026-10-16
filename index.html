@@ -1049,7 +1049,7 @@ function SpecialComponentReport({report,onChange,readonly=false,pumpCount=6}) {
   const field=(label,value,set,wide=false)=>React.createElement("label",{style:{display:"flex",flexDirection:"column",gap:3,flex:wide?"1 1 100%":"1 1 145px",minWidth:0,fontSize:12,fontWeight:600}},label,
     readonly?React.createElement("span",{style:{padding:"7px 6px",borderBottom:"1px solid #bbb",fontWeight:400}},value||"—"):
     React.createElement("input",{value:value||"",onChange:e=>set(e.target.value),style:{...inputStyle,width:"100%",boxSizing:"border-box",fontWeight:400}}));
-  const select=(value,set)=>readonly?React.createElement("span",null,value||"—"):React.createElement("select",{value:value||"",onChange:e=>set(e.target.value),style:{...inputStyle,padding:5}},["","YES","NO","N/A"].map(v=>React.createElement("option",{key:v,value:v},v||"—")));
+  const select=(value,set)=>readonly?React.createElement("span",null,value||"—"):React.createElement("select",{value:value||"",onChange:e=>set(e.target.value),style:{...inputStyle,padding:5}},Array.from(new Set(["","OK","NOT OK","N.A.",value||""])).map(v=>React.createElement("option",{key:v,value:v},v||"—")));
   const fuelPhotos=Array.isArray(d.fuelPumpReportPhotos)?d.fuelPumpReportPhotos:[];
   const [photoError,setPhotoError]=React.useState("");
   const addFuelPhotos=async(files)=>{
@@ -1090,8 +1090,8 @@ function SpecialComponentReport({report,onChange,readonly=false,pumpCount=6}) {
             field("ID marks plunger",p.plungerId,v=>change({plungerId:v})),
             field("ID marks barrel",p.barrelId,v=>change({barrelId:v}))
           ),
-          React.createElement("div",{style:{fontSize:11,fontWeight:700,marginTop:10}},"INITIAL INSPECTION / WORK CARRIED OUT"),React.createElement("table",{style:{width:"100%",fontSize:11,borderCollapse:"collapse",marginTop:10}},
-            React.createElement("thead",null,React.createElement("tr",null,["Inspection","YES / NO / N/A","WORK CARRIED OUT"].map(h=>React.createElement("th",{key:h,style:{borderBottom:"1px solid #aaa",textAlign:"left",padding:5}},h)))),
+          React.createElement("div",{style:{fontSize:11,fontWeight:700,marginTop:10}},before?"INITIAL INSPECTION / WORK TO BE PERFORMED":"INITIAL INSPECTION / WORK CARRIED OUT"),React.createElement("table",{style:{width:"100%",fontSize:11,borderCollapse:"collapse",marginTop:10}},
+            React.createElement("thead",null,React.createElement("tr",null,["Inspection","OK / NOT OK / N.A.",before?"WORK TO BE PERFORMED":"WORK CARRIED OUT"].map(h=>React.createElement("th",{key:h,style:{borderBottom:"1px solid #aaa",textAlign:"left",padding:5}},h)))),
             React.createElement("tbody",null,FUEL_PUMP_CHECKS.map((name,j)=>{
               const item=(p.checks||{})[name]||{};
               const changeItem=patch=>change({checks:{...(p.checks||{}),[name]:{...item,...patch}}});
