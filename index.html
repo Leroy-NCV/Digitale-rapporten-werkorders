@@ -1610,7 +1610,7 @@ function App() {
   const [editingKlustype, setEditingKlustype] = useState(null);
 
   const palette = { bg: "#f4f4ef", ink: "#1f231c", accent: "#c25a2c", panel: "#ffffff", line: "#dfe1d8" };
-  const KLUSTYPEN = klustypenDb.length ? klustypenDb : KLUSTYPEN_FALLBACK;
+  const KLUSTYPEN = (klustypenDb.length ? klustypenDb : KLUSTYPEN_FALLBACK).filter(k=>!["governor_voor","governor_na"].includes(String(k.value||k.code||"").toLowerCase()));
   const getKlustype = code => KLUSTYPEN.find(k => (k.value||k.code) === code) || KLUSTYPEN_FALLBACK.find(k=>k.value===code);
   const getKlustypeNaam = code => getKlustype(code)?.label || code;
   const getWerkbeschrijving = code => getKlustype(code)?.werkbeschrijving || "";
@@ -2041,7 +2041,7 @@ function App() {
 
   if(view==="rapporten"){
     const motorToleranties={"6EY18ALW":{"axial_max_mm":0.18,"case_gear_max_mm":0.3,"bush_tolerance_mm":"+0.021 / 0","shaft_bush_max_mm":0.2,"shaft_tolerance_mm":"-0.04 / -0.053"},"6EY22LW":{"axial_max_mm":0.22,"bush_nominal_mm":40,"gear_nominal_mm":84,"case_gear_max_mm":0.5,"shaft_nominal_mm":40,"shaft_bush_max_mm":0.15,"bush_wear_limit_mm":0.1,"shaft_wear_limit_mm":-0.12},"6EY26L":{"axial_max_mm":0.18,"bush_nominal_mm":40,"case_gear_max_mm":0.5,"shaft_nominal_mm":40,"bush_tolerance_mm":"+0.076 / +0.060","shaft_bush_max_mm":0.15,"bush_wear_limit_mm":0.1,"shaft_tolerance_mm":"±0.008","shaft_wear_limit_mm":-0.12,"measurement_positions":6},"6N18L-EV":{"axial_max_mm":0.18,"bush_nominal_mm":30,"case_gear_max_mm":0.3,"shaft_nominal_mm":30,"shaft_bush_max_mm":0.2,"bush_wear_limit_mm":0.15,"measurement_positions":4},"6N21AL-DV":{"axial_max_mm":0.18,"bush_nominal_mm":40,"case_gear_max_mm":0.5,"shaft_nominal_mm":40,"bush_tolerance_mm":"+0.076 / +0.060","shaft_bush_max_mm":0.15,"bush_wear_limit_mm":0.1,"shaft_tolerance_mm":"±0.008","shaft_wear_limit_mm":-0.12,"measurement_positions":4},"6N280L-EV":{"bush_nominal_mm":50,"shaft_nominal_mm":50,"bush_wear_limit_mm":0.2,"shaft_wear_limit_mm":-0.2,"measurement_positions":4,"case_gear_standard_range_mm":[0.18,0.237],"gear_side_plate_standard_range_mm":[0.2,0.375]},"6N330L-GV":{"measurement_positions":4},"M200":{"axial_max_mm":0.18,"bush_nominal_mm":30,"case_gear_max_mm":0.3,"shaft_nominal_mm":30,"shaft_bush_max_mm":0.2,"bush_wear_limit_mm":0.15,"measurement_positions":4},"M220L-EN":{"axial_max_mm":0.18,"bush_nominal_mm":30,"case_gear_max_mm":0.3,"shaft_nominal_mm":30,"shaft_bush_max_mm":0.2,"bush_wear_limit_mm":0.15,"measurement_positions":4},"T240L-ET":{"axial_max_mm":0.5,"case_gear_max_mm":0.25,"shaft_nominal_mm":45,"shaft_bush_max_mm":0.15,"measurement_positions":4},"W20":{"measurement_axes":["X","Y"],"shaft_bush_max_mm":0.09,"measurement_positions":4}};
-    const basisItems=(klustypenDb&&klustypenDb.length?klustypenDb:KLUSTYPEN_FALLBACK).filter(k=>k.actief!==false);
+    const basisItems=(klustypenDb&&klustypenDb.length?klustypenDb:KLUSTYPEN_FALLBACK).filter(k=>k.actief!==false&&!["governor_voor","governor_na"].includes(String(k.value||k.code||"").toLowerCase()));
     const aanvullingen=[{code:"voeringen_voor",label:"Voeringen (voor)"},{code:"voeringen_na",label:"Voeringen (na)"},{code:"smeer_olie_pomp",label:"Smeeroliepomp / L.O. pump"}];
     const alleItems=[...basisItems];
     aanvullingen.forEach(k=>{if(!alleItems.some(v=>(v.code||v.naam)===k.code))alleItems.push(k)});
