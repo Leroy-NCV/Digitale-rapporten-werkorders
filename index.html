@@ -1169,6 +1169,12 @@ function GovernorTypeField({report,onChange,readonly=false}) {
     readonly?React.createElement("div",{style:{...box,minHeight:40,whiteSpace:"pre-wrap",fontWeight:400}},d[key]||""):
     React.createElement("textarea",{rows:3,value:d[key]||"",onChange:e=>write(key,e.target.value),style:{...box,resize:"vertical",display:"block",marginTop:4,fontWeight:400}})
   );
+  const governorDropdown=(label,key,options)=>React.createElement("label",{key,style:{display:"flex",flexDirection:"column",gap:4,fontSize:readonly?10:12,fontWeight:700}},label,
+    readonly?React.createElement("div",{style:box},d[key]||""):
+    React.createElement("select",{value:d[key]||"",onChange:e=>write(key,e.target.value),style:box},
+      ...Array.from(new Set(["",...options,d[key]||""])).map(v=>React.createElement("option",{value:v,key:v},v||"— Kies —"))
+    )
+  );
   const section=(label,fields)=>React.createElement("section",{style:{marginTop:15,pageBreakInside:"avoid"}},
     React.createElement("h3",{style:{fontSize:readonly?12:15,margin:"0 0 8px",borderBottom:"1px solid #abb5bd",paddingBottom:5}},label),
     React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(165px,1fr))",gap:10}},...fields.map(([name,key])=>field(name,key)))
@@ -1186,7 +1192,7 @@ function GovernorTypeField({report,onChange,readonly=false}) {
         ...Array.from(new Set(["","RHD 6","RHD 10","NZ61",value])).map(t=>React.createElement("option",{key:t,value:t},t||"— Kies type —"))
       )
     ),
-    section("GENERAL INFORMATION",[["Serial no.","serialNumber"],["Maker / model","makerModel"],["Governor no. / identification","governorNumber"],["Inspection date","inspectionDate"],["Technician","technician"],["Condition received","receivedCondition"]]),
+    React.createElement("section",{style:{marginTop:15,pageBreakInside:"avoid"}},React.createElement("h3",{style:{fontSize:readonly?12:15,margin:"0 0 8px",borderBottom:"1px solid #abb5bd",paddingBottom:5}},"GENERAL INFORMATION"),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(165px,1fr))",gap:10}},field("Serial no.","serialNumber"),governorDropdown("Motor voltage","motorVoltage",["110V","220V","N.A."]),field("Inspection date","inspectionDate"),field("Technician","technician"),governorDropdown("Condition received","receivedCondition",["Poor","Normal","New"]))),
     section("MEASUREMENTS / SETTINGS",[["Measured speed (rpm)","speedMeasured"],["Set speed (rpm)","speedSet"],["Overspeed trip (rpm)","overspeedMeasured"],["Oil pressure (bar)","oilPressure"],["Axial clearance (mm)","axialClearance"],["Radial clearance (mm)","radialClearance"],["Other measurement / unit","otherMeasurement"]]),
     React.createElement("p",{style:{fontSize:readonly?9:11,color:"#765121",marginTop:8}},"Enter maker tolerances only when verified from the relevant governor manual. No inspection results or limits are prefilled."),
     textField("Applicable maker limits / reference","makerLimits"),
