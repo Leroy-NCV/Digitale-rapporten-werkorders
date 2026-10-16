@@ -1037,10 +1037,11 @@ function getGenericReportTitle(klustype,label) {
   return titles[klustype] || String(label || klustype || "REPAIR REPORT").toUpperCase();
 }
 const FUEL_PUMP_CHECKS=["Fuel inj. pump housing","Connecting piece","Pump element","Non-return valve","Regulating rod","Gear rim","Upper spring plate","Lower spring plate","Spring","Push rod","Circlip","Plug screw"];
-function SpecialComponentReport({report,onChange,readonly=false}) {
+function SpecialComponentReport({report,onChange,readonly=false,pumpCount=6}) {
   const code=String(report?.rapport_type||"");
   const pump=code.startsWith("brandstof_pompen_")||code.startsWith("brandstof_pomp_")||code.startsWith("brandstofpomp");
   const before=code.endsWith("_voor")||code.endsWith("_before");
+  const count=Math.max(1,Math.min(100,Number(pumpCount)||6));
 
   if(!pump)return null;
   const d=report?.data||{};
@@ -1077,11 +1078,11 @@ function SpecialComponentReport({report,onChange,readonly=false}) {
   const section={border:"1px solid #d4d8d1",padding:12,borderRadius:5,marginTop:12,pageBreakInside:"avoid"};
   if(pump){
     return React.createElement("section",{style:{marginTop:15}},
-      React.createElement("h3",{style:{fontSize:15}},"FUEL INJECTION PUMP INSPECTION — 6 PUMPS"),
+      React.createElement("h3",{style:{fontSize:15}},"FUEL INJECTION PUMP INSPECTION — "+count+" PUMPS"),
       
-      Array.from({length:6},(_,i)=>{
+      Array.from({length:count},(_,i)=>{
         const p=(Array.isArray(d.pumps)?d.pumps:[])[i]||{};
-        const change=patch=>{const a=Array.from({length:6},(_,j)=>(d.pumps||[])[j]||{});a[i]={...p,...patch};write({pumps:a})};
+        const change=patch=>{const a=Array.from({length:Math.max(count,(d.pumps||[]).length)},(_,j)=>(d.pumps||[])[j]||{});a[i]={...p,...patch};write({pumps:a})};
         return React.createElement("div",{key:i,style:section},
           React.createElement("h4",{style:{margin:"0 0 8px",fontSize:13}},"Fuel pump no. "+(i+1)),
           React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8}},
@@ -1528,7 +1529,7 @@ function CustomerGenericReport({ werkorder, label, componentRapport }) {
           )
         )
       ),
-      React.createElement(SpecialComponentReport,{report:componentRapport,readonly:true}),
+      React.createElement(SpecialComponentReport,{report:componentRapport,readonly:true,pumpCount:werkorder.aantal_koppen||6}),
       React.createElement(CamshaftSizeProtocol,{report:componentRapport,readonly:true}),
       React.createElement(RockerArmProtocol,{report:componentRapport,readonly:true}),
       React.createElement(LOPumpProtocol,{report:componentRapport,readonly:true,motortype:werkorder.motortype,klustype:werkorder.klustype}),
@@ -1782,7 +1783,7 @@ function App() {
       const kt=getKlustype(worDraft.klustype);
       const [createdWO]=await sb("werkorders",{method:"POST",body:JSON.stringify({
         werkopdracht_id:huidigeWerkopdracht.id, klustype:worDraft.klustype, motortype:worDraft.motortype || "-", rapport_template_code: isMotortypeTemplateKlustype(worDraft.klustype)&&worDraft.rapportTemplateCode!=="__manual__"?(worDraft.rapportTemplateCode||null):null, monteur:(worDraft.monteurs||[])[0]||"", assigned_monteurs:worDraft.monteurs||[], rapport_monteurs:[],
-        aantal_koppen:(isCilinderkopKlustype(worDraft.klustype)||isZuigerKlustype(worDraft.klustype)||isDrijfstangKlustype(worDraft.klustype))?(Number(worDraft.aantal)||1):1, werkbeschrijving:worDraft.werkbeschrijving, rapport_type:kt?.rapport_type||worDraft.klustype||"generiek"
+        aantal_koppen:(isCilinderkopKlustype(worDraft.klustype)||isZuigerKlustype(worDraft.klustype)||isDrijfstangKlustype(worDraft.klustype)||String(worDraft.klustype).startsWith("brandstof_pomp"))?(Number(worDraft.aantal)||1):1, werkbeschrijving:worDraft.werkbeschrijving, rapport_type:kt?.rapport_type||worDraft.klustype||"generiek"
       })});
       if(isCilinderkopKlustype(worDraft.klustype)){
         const blanks=Array.from({length:Number(worDraft.aantal)||1},(_,i)=>makeCilinderkop(i+1));
@@ -2130,7 +2131,7 @@ function App() {
 ):String(worDraft.klustype||"").startsWith("governor")?React.createElement(Field,{label:"Governor type"},React.createElement("select",{value:worDraft.motortype||"",onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),style:inputStyle},...["","RHD 6","RHD 10","NZ61"].map(t=>React.createElement("option",{key:t,value:t},t||"— Kies governor type —")))):React.createElement(Field,{label:"Motortype"},React.createElement(React.Fragment,null,
   React.createElement("input",{list:"draft-engine-type-list",value:worDraft.motortype,onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),placeholder:"Kies of typ motortype",style:inputStyle}),
   React.createElement("datalist",{id:"draft-engine-type-list"},...availableMotorsForReport(engineTypeOptions,worDraft.klustype).map(x=>React.createElement("option",{key:x,value:x})))
-)),React.createElement(Field,{label:"Monteurs (meerdere mogelijk)"},React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6,padding:"8px 0"}},...MONTEURS.map(n=>{const selected=(worDraft.monteurs||[]).includes(n);return React.createElement("button",{type:"button",key:n,onClick:()=>toggleDraftMonteur(n),style:{padding:"7px 10px",borderRadius:18,border:`1px solid ${selected?palette.accent:palette.line}`,background:selected?"#fbeee6":"#fff",fontWeight:selected?700:500,cursor:"pointer"}},selected?"✓ "+n:n)}))),React.createElement(Field,{label:"Werkbeschrijving"},React.createElement("textarea",{rows:4,value:worDraft.werkbeschrijving,onChange:e=>setWorDraft({...worDraft,werkbeschrijving:e.target.value}),style:{...inputStyle,resize:"vertical"}})),isCilinderkopKlustype(worDraft.klustype)&&React.createElement(Field,{label:"Aantal cilinderkoppen"},React.createElement(TextInput,{type:"number",min:1,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),isZuigerKlustype(worDraft.klustype)&&React.createElement(Field,{label:"Aantal zuigers"},React.createElement(TextInput,{type:"number",min:1,max:24,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),isDrijfstangKlustype(worDraft.klustype)&&React.createElement(Field,{label:"Aantal drijfstangen"},React.createElement(TextInput,{type:"number",min:1,max:24,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),btn("+ Werkorder toevoegen",addWerkorder,{background:palette.accent,color:"#fff",border:"none"})),React.createElement("div",{style:{marginTop:14}},btn("Klaar — naar overzicht",()=>{setView("overzicht");setHuidigeWerkopdracht(null)}))));
+)),React.createElement(Field,{label:"Monteurs (meerdere mogelijk)"},React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6,padding:"8px 0"}},...MONTEURS.map(n=>{const selected=(worDraft.monteurs||[]).includes(n);return React.createElement("button",{type:"button",key:n,onClick:()=>toggleDraftMonteur(n),style:{padding:"7px 10px",borderRadius:18,border:`1px solid ${selected?palette.accent:palette.line}`,background:selected?"#fbeee6":"#fff",fontWeight:selected?700:500,cursor:"pointer"}},selected?"✓ "+n:n)}))),React.createElement(Field,{label:"Werkbeschrijving"},React.createElement("textarea",{rows:4,value:worDraft.werkbeschrijving,onChange:e=>setWorDraft({...worDraft,werkbeschrijving:e.target.value}),style:{...inputStyle,resize:"vertical"}})),isCilinderkopKlustype(worDraft.klustype)&&React.createElement(Field,{label:"Aantal cilinderkoppen"},React.createElement(TextInput,{type:"number",min:1,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),isZuigerKlustype(worDraft.klustype)&&React.createElement(Field,{label:"Aantal zuigers"},React.createElement(TextInput,{type:"number",min:1,max:24,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),String(worDraft.klustype).startsWith("brandstof_pomp")&&React.createElement(Field,{label:"Aantal brandstofpompen"},React.createElement(TextInput,{type:"number",min:1,max:100,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),isDrijfstangKlustype(worDraft.klustype)&&React.createElement(Field,{label:"Aantal drijfstangen"},React.createElement(TextInput,{type:"number",min:1,max:24,value:worDraft.aantal,onChange:e=>setWorDraft({...worDraft,aantal:e.target.value})})),btn("+ Werkorder toevoegen",addWerkorder,{background:palette.accent,color:"#fff",border:"none"})),React.createElement("div",{style:{marginTop:14}},btn("Klaar — naar overzicht",()=>{setView("overzicht");setHuidigeWerkopdracht(null)}))));
 
   if(mode==="monteur"&&view==="overzicht") return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,React.createElement("div",{style:{padding:24,maxWidth:650,margin:"0 auto"}},React.createElement("h1",{style:{fontSize:20}},"Mijn werkorders"),!monteurNaam&&React.createElement("div",{style:{background:"#fff6ef",border:"1px solid #c25a2c",borderRadius:6,padding:10,marginBottom:12,fontSize:13}},"Kies eerst jouw naam rechtsboven."),ErrorBanner,React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:10}},monteurWerkorders.map(wor=>React.createElement("button",{key:wor.id,onClick:()=>openWerkorder(wor,wor.werkopdrachten),style:{textAlign:"left",padding:14,borderRadius:8,border:`1px solid ${palette.line}`,background:"#fff",cursor:"pointer"}},React.createElement("b",null,wor.werkopdrachten?.order_nummer," — ",wor.werkopdrachten?.schip_klant),React.createElement("div",{style:{fontSize:13,color:"#666",margin:"4px 0"}},getKlustypeNaam(wor.klustype)," · ",wor.motortype==="-"?"":wor.motortype),React.createElement(StatusBadge,{status:wor.status}))))));
 
@@ -2436,7 +2437,7 @@ function App() {
           React.createElement("b",null,"Nicoverken rapportbasis actief. "),
           "Header, rapportgegevens, werkbeschrijving, opmerkingen, status en footer worden in de vaste Nicoverken-opmaak weergegeven."
         ),
-        React.createElement(SpecialComponentReport,{report:componentRapport,onChange:updateComponentData}),
+        React.createElement(SpecialComponentReport,{report:componentRapport,onChange:updateComponentData,pumpCount:activeWerkorder.aantal_koppen||6}),
         React.createElement(CamshaftSizeProtocol,{report:componentRapport,onChange:updateComponentData}),
         React.createElement(RockerArmProtocol,{report:componentRapport,onChange:updateComponentData}),
         React.createElement(LOPumpProtocol,{report:componentRapport,onChange:updateComponentData,motortype:activeWerkorder.motortype,klustype:activeWerkorder.klustype}),
