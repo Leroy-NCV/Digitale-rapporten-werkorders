@@ -1055,7 +1055,7 @@ function SpecialComponentReport({report,onChange,readonly=false}) {
     if(readonly||!files?.length)return;
     try{
       setPhotoError("");
-      const selected=Array.from(files).slice(0,Math.max(0,6-fuelPhotos.length));
+      const selected=Array.from(files);
       const compressed=await Promise.all(selected.map(file=>compressImage(file,900,.62)));
       write({fuelPumpReportPhotos:[...fuelPhotos,...compressed]});
     }catch(e){setPhotoError(e.message||"Foto kon niet worden toegevoegd.");}
@@ -1064,7 +1064,7 @@ function SpecialComponentReport({report,onChange,readonly=false}) {
     React.createElement("h3",{style:{fontSize:14,margin:"0 0 8px"}},"PHOTOS – FUEL INJECTION PUMP REPORT"),
     !readonly?React.createElement("div",null,
       React.createElement("label",{style:{display:"inline-block",cursor:"pointer",fontSize:12,fontWeight:700,padding:"8px 12px",border:"1px solid #aeb7bf",borderRadius:5,background:"#f5f7f7"}},"+ Foto's toevoegen",React.createElement("input",{type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:e=>{addFuelPhotos(e.target.files);e.target.value="";}})),
-      React.createElement("span",{style:{fontSize:11,marginLeft:9}},fuelPhotos.length+" / 6 foto's"),
+      React.createElement("span",{style:{fontSize:11,marginLeft:9}},fuelPhotos.length+" foto's"),
       photoError?React.createElement("p",{style:{color:"#af2121",fontSize:12}},photoError):null
     ):null,
     fuelPhotos.length?React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10,marginTop:10}},
@@ -1108,6 +1108,11 @@ function SpecialComponentReport({report,onChange,readonly=false}) {
               ["A","B","C"].map(pos=>field(pos,(p.measurements||{})[kind+"_"+pos],v=>change({measurements:{...(p.measurements||{}),[kind+"_"+pos]:v}})))
             ))
           ),
+          React.createElement("label",{style:{display:"block",marginTop:12,fontSize:11,fontWeight:700}},
+            "REMARKS / FINDINGS – FUEL PUMP NO. "+(i+1),
+            readonly?React.createElement("div",{style:{minHeight:45,border:"1px solid #c8cbc3",padding:7,whiteSpace:"pre-wrap",fontWeight:400,marginTop:5}},p.remarks||""):
+            React.createElement("textarea",{rows:4,value:p.remarks||"",onChange:e=>change({remarks:e.target.value}),placeholder:"Bevindingen en opmerkingen bij deze brandstofpomp...",style:{...inputStyle,width:"100%",boxSizing:"border-box",marginTop:5,resize:"vertical",fontWeight:400}})
+          )
         );
       }),
       photosSection
