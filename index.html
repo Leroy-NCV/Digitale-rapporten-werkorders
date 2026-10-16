@@ -1049,6 +1049,31 @@ function SpecialComponentReport({report,onChange,readonly=false}) {
     readonly?React.createElement("span",{style:{padding:"7px 6px",borderBottom:"1px solid #bbb",fontWeight:400}},value||"—"):
     React.createElement("input",{value:value||"",onChange:e=>set(e.target.value),style:{...inputStyle,width:"100%",boxSizing:"border-box",fontWeight:400}}));
   const select=(value,set)=>readonly?React.createElement("span",null,value||"—"):React.createElement("select",{value:value||"",onChange:e=>set(e.target.value),style:{...inputStyle,padding:5}},["","YES","NO","N/A"].map(v=>React.createElement("option",{key:v,value:v},v||"—")));
+  const fuelPhotos=Array.isArray(d.fuelPumpReportPhotos)?d.fuelPumpReportPhotos:[];
+  const [photoError,setPhotoError]=React.useState("");
+  const addFuelPhotos=async(files)=>{
+    if(readonly||!files?.length)return;
+    try{
+      setPhotoError("");
+      const selected=Array.from(files).slice(0,Math.max(0,6-fuelPhotos.length));
+      const compressed=await Promise.all(selected.map(file=>compressImage(file,900,.62)));
+      write({fuelPumpReportPhotos:[...fuelPhotos,...compressed]});
+    }catch(e){setPhotoError(e.message||"Foto kon niet worden toegevoegd.");}
+  };
+  const photosSection=React.createElement("section",{style:{border:"1px solid #d4d8d1",padding:12,borderRadius:5,marginTop:15,pageBreakInside:"avoid"}},
+    React.createElement("h3",{style:{fontSize:14,margin:"0 0 8px"}},"PHOTOS – FUEL INJECTION PUMP REPORT"),
+    !readonly?React.createElement("div",null,
+      React.createElement("label",{style:{display:"inline-block",cursor:"pointer",fontSize:12,fontWeight:700,padding:"8px 12px",border:"1px solid #aeb7bf",borderRadius:5,background:"#f5f7f7"}},"+ Foto's toevoegen",React.createElement("input",{type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:e=>{addFuelPhotos(e.target.files);e.target.value="";}})),
+      React.createElement("span",{style:{fontSize:11,marginLeft:9}},fuelPhotos.length+" / 6 foto's"),
+      photoError?React.createElement("p",{style:{color:"#af2121",fontSize:12}},photoError):null
+    ):null,
+    fuelPhotos.length?React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10,marginTop:10}},
+      ...fuelPhotos.map((photo,i)=>React.createElement("div",{key:i,style:{pageBreakInside:"avoid",border:"1px solid #c7ccd0",padding:5}},
+        React.createElement("img",{src:photo,alt:"Fuel injection pump photo "+(i+1),style:{width:"100%",height:"auto",maxHeight:readonly?"75mm":"240px",objectFit:"contain",display:"block"}}),
+        !readonly?React.createElement("button",{type:"button",onClick:()=>write({fuelPumpReportPhotos:fuelPhotos.filter((_,j)=>j!==i)}),style:{marginTop:6,padding:"5px 8px",cursor:"pointer"}},"Foto verwijderen"):null
+      ))
+    ):null
+  );
   const section={border:"1px solid #d4d8d1",padding:12,borderRadius:5,marginTop:12,pageBreakInside:"avoid"};
   if(pump){
     return React.createElement("section",{style:{marginTop:15}},
@@ -1084,7 +1109,8 @@ function SpecialComponentReport({report,onChange,readonly=false}) {
             ))
           ),
         );
-      })
+      }),
+      photosSection
     );
   }
   return null;
