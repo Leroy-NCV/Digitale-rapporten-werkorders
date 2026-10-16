@@ -1040,11 +1040,12 @@ const FUEL_PUMP_CHECKS=["Fuel inj. pump housing","Connecting piece","Pump elemen
 function SpecialComponentReport({report,onChange,readonly=false}) {
   const code=String(report?.rapport_type||"");
   const pump=code.startsWith("brandstof_pompen_")||code.startsWith("brandstof_pomp_")||code.startsWith("brandstofpomp");
+  const before=code.endsWith("_voor")||code.endsWith("_before");
 
   if(!pump)return null;
   const d=report?.data||{};
   const write=(patch)=>{if(!readonly&&onChange)onChange(patch)};
-  const field=(label,value,set,wide=false)=>React.createElement("label",{style:{display:"flex",flexDirection:"column",gap:3,flex:wide?"1 1 100%":"1 1 145px",fontSize:12,fontWeight:600}},label,
+  const field=(label,value,set,wide=false)=>React.createElement("label",{style:{display:"flex",flexDirection:"column",gap:3,flex:wide?"1 1 100%":"1 1 145px",minWidth:0,fontSize:12,fontWeight:600}},label,
     readonly?React.createElement("span",{style:{padding:"7px 6px",borderBottom:"1px solid #bbb",fontWeight:400}},value||"—"):
     React.createElement("input",{value:value||"",onChange:e=>set(e.target.value),style:{...inputStyle,width:"100%",boxSizing:"border-box",fontWeight:400}}));
   const select=(value,set)=>readonly?React.createElement("span",null,value||"—"):React.createElement("select",{value:value||"",onChange:e=>set(e.target.value),style:{...inputStyle,padding:5}},["","YES","NO","N/A"].map(v=>React.createElement("option",{key:v,value:v},v||"—")));
@@ -1058,20 +1059,20 @@ function SpecialComponentReport({report,onChange,readonly=false}) {
         const change=patch=>{const a=Array.from({length:6},(_,j)=>(d.pumps||[])[j]||{});a[i]={...p,...patch};write({pumps:a})};
         return React.createElement("div",{key:i,style:section},
           React.createElement("h4",{style:{margin:"0 0 8px",fontSize:13}},"Fuel pump no. "+(i+1)),
-          React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:8}},
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8}},
             field("ID marks fuel injection pump",p.pumpId,v=>change({pumpId:v})),
             field("ID marks plunger",p.plungerId,v=>change({plungerId:v})),
             field("ID marks barrel",p.barrelId,v=>change({barrelId:v}))
           ),
           React.createElement("div",{style:{fontSize:11,fontWeight:700,marginTop:10}},"INITIAL INSPECTION / WORK CARRIED OUT"),React.createElement("table",{style:{width:"100%",fontSize:11,borderCollapse:"collapse",marginTop:10}},
             React.createElement("thead",null,React.createElement("tr",null,["Inspection","YES / NO / N/A","WORK CARRIED OUT"].map(h=>React.createElement("th",{key:h,style:{borderBottom:"1px solid #aaa",textAlign:"left",padding:5}},h)))),
-            React.createElement("tbody",null,FUEL_PUMP_CHECKS.slice(0,4).map((name,j)=>{
+            React.createElement("tbody",null,FUEL_PUMP_CHECKS.map((name,j)=>{
               const item=(p.checks||{})[name]||{};
               const changeItem=patch=>change({checks:{...(p.checks||{}),[name]:{...item,...patch}}});
               return React.createElement("tr",{key:j},
                 React.createElement("td",{style:{borderBottom:"1px solid #eee",padding:5}},name),
                 React.createElement("td",{style:{borderBottom:"1px solid #eee",padding:5}},select(item.result,v=>changeItem({result:v}))),
-                React.createElement("td",{style:{borderBottom:"1px solid #eee",padding:5}},readonly?(item.notes||"—"):React.createElement("select",{value:item.notes||"",onChange:e=>changeItem({notes:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box",padding:5}},["","Cleaned","Repaired","Renewed","Replaced","No action required"].map(v=>React.createElement("option",{key:v,value:v},v||"—"))))
+                React.createElement("td",{style:{borderBottom:"1px solid #eee",padding:5}},readonly?(item.notes||"—"):React.createElement("select",{value:item.notes||"",onChange:e=>changeItem({notes:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box",padding:5}},Array.from(new Set(["",...(before?["To be cleaned","To be renewed","No action required"]:["Cleaned","Repaired","Renewed","Replaced","No action required"]),item.notes||""])).map(v=>React.createElement("option",{key:v,value:v},v||"—"))))
               );
             }))
           ),
@@ -1082,19 +1083,6 @@ function SpecialComponentReport({report,onChange,readonly=false}) {
               ["A","B","C"].map(pos=>field(pos,(p.measurements||{})[kind+"_"+pos],v=>change({measurements:{...(p.measurements||{}),[kind+"_"+pos]:v}})))
             ))
           ),
-          React.createElement("div",{style:{fontWeight:700,fontSize:11,margin:"12px 0 5px"}},"REPAIR PROPOSAL"),
-          React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:11}},
-            React.createElement("thead",null,React.createElement("tr",null,["Inspection","YES / NO / N/A","REPAIR PROPOSAL"].map(h=>React.createElement("th",{key:h,style:{borderBottom:"1px solid #aaa",padding:5,textAlign:"left"}},h)))),
-            React.createElement("tbody",null,FUEL_PUMP_CHECKS.slice(4).map((name,j)=>{
-              const item=(p.checks||{})[name]||{};
-              const changeItem=patch=>change({checks:{...(p.checks||{}),[name]:{...item,...patch}}});
-              return React.createElement("tr",{key:name},
-                React.createElement("td",{style:{padding:5,borderBottom:"1px solid #eee"}},name),
-                React.createElement("td",{style:{padding:5,borderBottom:"1px solid #eee"}},select(item.result,v=>changeItem({result:v}))),
-                React.createElement("td",{style:{padding:5,borderBottom:"1px solid #eee"}},readonly?(item.notes||"—"):React.createElement("input",{value:item.notes||"",onChange:e=>changeItem({notes:e.target.value}),style:{...inputStyle,width:"100%",boxSizing:"border-box",padding:5}}))
-              );
-            }))
-          )
         );
       })
     );
