@@ -725,7 +725,7 @@ function KopMatrixTable(props){
     ["Seat pocket","seatPocket",["Hole E1","Hole E2","Hole S1","Hole S2"],["E1","E2","S1","S2"]],
     ["Rotator","rotator",["RTT E1","RTT E2","RTT S1","RTT S2"],["E1","E2","S1","S2"]],
     ["CW. Chamber condition","cwChamber",["Chamber"],["Chamber"]],
-    ["Heli-coils required","heliCoils",["Qty."],["Qty"]]
+    ["Threaded inserts required","heliCoils",["Qty."],["Qty"]]
   ];
   return React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"}},
     React.createElement("thead",null,React.createElement("tr",null,
@@ -767,6 +767,25 @@ function CustomerCylinderHeadReport(props){
       React.createElement("tr",null,React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Technician"),React.createElement("td",{style:cell},werkorderMonteursTekst(werkorder)||""),React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Subject"),React.createElement("td",{style:cell},"Cylinder head Assy, "+String(koppen.length).padStart(2,"0")+" pc."))
     )),
     React.createElement(KopMatrixTable,{data:p,heads:koppen,phase:phase,editable:false}),
+    React.createElement("div",{style:{pageBreakBefore:"always",marginTop:"4mm"}},
+      React.createElement("h2",{style:{fontSize:12}},phase==="before"?"BEFORE — Workshop Inspection & Measurements":"AFTER — Assembly & Testing"),
+      ...koppen.map(k=>React.createElement("div",{key:k.nummer,style:{marginBottom:"6mm"}},
+        React.createElement("h3",{style:{fontSize:10}},"Cylinder head No."+k.nummer),
+        ...(phase==="before"?[["Dismantling & Inspection",k.disassembly],["Seat ring measurements",k.seatRing],["Valve measurements",k.valve],["Valve stems",k.valveStem],["Valve guides",k.valveGuide],["Valve checks",k.valveChecks]]:[["Assembly checklist",k.assembly]]).map(([title,rows])=>React.createElement("div",{key:title,style:{marginBottom:"3mm",pageBreakInside:"avoid"}},
+          React.createElement("strong",{style:{fontSize:8.5}},title),
+          React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:8}},React.createElement("tbody",null,
+            ...(Array.isArray(rows)?rows:[]).map((row,i)=>React.createElement("tr",{key:i},
+              React.createElement("td",{style:cell},row.label||row.id||""),
+              React.createElement("td",{style:cell},row.result||((row.measuredQ!==undefined||row.measuredR!==undefined)?"Q: "+(row.measuredQ||"—")+", R: "+(row.measuredR||"—"):(row.measured??"—"))),
+              React.createElement("td",{style:cell},row.remarks||((row.limitQ!==undefined||row.limitR!==undefined)?"Limits Q/R: "+(row.limitQ??"")+" / "+(row.limitR??""):row.limit!==undefined?"Limit: "+row.limit:""))
+            ))
+          ))
+        )),
+        phase==="after"&&React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:8}},React.createElement("tbody",null,
+          ...(k.onderdelen||[]).map((part,i)=>React.createElement("tr",{key:i},...[part.name,part.qty,part.afterStatus,part.remark].map((v,j)=>React.createElement("td",{key:j,style:cell},v??""))))
+        ))
+      ))
+    ),
     React.createElement("div",{style:{pageBreakBefore:"always",paddingTop:"2mm"}},
       React.createElement("img",{src:NICOVERKEN_HEADER_IMAGE,style:{display:"block",width:"100%",height:"auto",marginBottom:"3mm"}}),
       React.createElement("h2",{style:{fontSize:12,margin:"0 0 2mm"}},"Inspection / overhaul summary"),
@@ -830,7 +849,7 @@ function CylinderCustomerEditor(props){
         React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:8,flexWrap:"wrap"}},
           btn("Tekst opnieuw voorstellen",regenerateKopCustomerText),
           btn("Voorbeeld eindrapport",()=>setKopView("preview")),
-          btn("Download PDF",downloadKopPdf,{background:palette.accent,color:"#fff",border:"none"})
+          btn("Download PDF",()=>downloadKopPdf(phase),{background:palette.accent,color:"#fff",border:"none"})
         )
       ),
       React.createElement("div",{style:{marginTop:10,fontSize:12,color:"#666"}},"Before = conditie/bevinding. After = uitgevoerd/eindresultaat. Kantoor controleert altijd vóór goedkeuring.")
@@ -1945,7 +1964,7 @@ function App() {
   function updateKopCustomerSection(key,value){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); updateKopCustomer({...kopKlantData,[phase]:{...p,sections:{...p.sections,[key]:value}}}); }
   function updateKopCustomerAction(key,value){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); updateKopCustomer({...kopKlantData,[phase]:{...p,actions:{...p.actions,[key]:value}}}); }
   function regenerateKopCustomerText(){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); updateKopCustomer({...kopKlantData,[phase]:{...p,sections:suggestedKopTexts(koppen,p.matrix,phase)}}); }
-  async function downloadKopPdf(){ const el=document.getElementById("cilinderkop-klantrapport"); if(!el||!window.html2pdf){setLoadError("PDF-module kon niet worden geladen. Probeer de pagina opnieuw te openen.");return;} const order=(activeWerkorder?.werkopdracht?.order_nummer||"werkorder").replace(/[^a-zA-Z0-9_-]/g,"_"); const phase=kopKlantData.activePhase||"before"; await window.html2pdf().set({margin:[4,4,4,4],filename:`${order}_cilinderkop_${phase}.pdf`,image:{type:"jpeg",quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},pagebreak:{mode:["css","legacy"]}}).from(el).save(); }
+  async function downloadKopPdf(selectedPhase){ const phase=(typeof selectedPhase==="string"?selectedPhase:kopKlantData.activePhase)==="after"?"after":"before"; const el=document.getElementById("cilinderkop-pdf-"+phase); if(!el||!window.html2pdf){setLoadError("PDF-module kon niet worden geladen. Probeer de pagina opnieuw te openen.");return;} const order=(activeWerkorder?.werkopdracht?.order_nummer||"werkorder").replace(/[^a-zA-Z0-9_-]/g,"_"); await window.html2pdf().set({margin:[4,4,4,4],filename:`${order}_cilinderkop_${phase.toUpperCase()}.pdf`,image:{type:"jpeg",quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},pagebreak:{mode:["css","legacy"]}}).from(el).save(); }
 
   function controleWaarschuwingen(){
     if(!activeWerkorder) return [];
@@ -2464,35 +2483,19 @@ function App() {
         React.createElement("div",{style:{position:"fixed",left:"-10000px",top:0,width:"794px",zIndex:-1}},report)
       );
     }
-    if(kopView==="matrix"&&koppen.length){
-      const phase=kopKlantData.activePhase||"before";
-      const data=makeKopCustomerPhase(koppen,phase,kopKlantData?.[phase]);
-      const afterAllowed=koppen.every(k=>Boolean(k.assembly?.[0]?.customerApproved&&k.assembly?.[0]?.partsReceived));
-      return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,pageHeader,
-        React.createElement("div",{style:{padding:20,maxWidth:1200,margin:"0 auto"}},
-          btn("← Back to Workshop Report",()=>setKopView("intern")),
-          React.createElement("h2",null,"Cylinder Head Inspection Matrix"),
-          React.createElement("p",{style:{fontSize:12}},"De monteur vult de inspectiematrix in. De gegevens worden ook gebruikt in het klantgerichte rapport van kantoor."),
-          React.createElement("div",{style:{display:"flex",gap:8,marginBottom:12}},
-            btn("BEFORE – Inspection",()=>setKopPhase("before"),{background:phase==="before"?palette.accent:"#fff",color:phase==="before"?"#fff":palette.ink}),
-            btn("AFTER – Assembly & Testing",()=>{if(afterAllowed)setKopPhase("after")},{background:phase==="after"?palette.accent:"#fff",color:phase==="after"?"#fff":palette.ink,opacity:afterAllowed?1:.5})
-          ),
-          phase==="after"&&!afterAllowed?React.createElement("p",null,"AFTER is locked until customer approval and parts receipt are confirmed for all heads."):
-          React.createElement("div",{style:{overflowX:"auto",background:"#fff",padding:12,border:"1px solid "+palette.line}},
-            React.createElement("div",{style:{minWidth:880}},React.createElement(KopMatrixTable,{data,heads:koppen,phase,onCellChange:updateKopCustomerCell,editable:true}))
-          )
-        )
-      );
-    }
+    const pdfExports=React.createElement("div",{style:{position:"fixed",left:"-10000px",top:0,zIndex:-1,width:"794px"}},...["before","after"].map(phase=>React.createElement("div",{id:"cilinderkop-pdf-"+phase,key:phase},React.createElement(CustomerCylinderHeadReport,{werkorder:activeWerkorder,koppen,data:{...kopKlantData,activePhase:phase,[phase]:makeKopCustomerPhase(koppen,phase,kopKlantData[phase])}}))));
     const kop=koppen[activeKop]; const assemblyReleased=Boolean(kop?.assembly?.[0]?.customerApproved&&kop?.assembly?.[0]?.partsReceived); if(!kop) return React.createElement("div",null,ModeSwitch,pageHeader,React.createElement("div",{style:{padding:24}},"Geen cilinderkoprapport gevonden."));
-    return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,pageHeader,React.createElement("div",{style:{display:"flex"}},React.createElement("div",{style:{width:190,background:"#fff",borderRight:`1px solid ${palette.line}`,padding:14}},React.createElement("b",{style:{fontSize:12}},"CILINDERKOPPEN"),koppen.map((k,i)=>React.createElement("button",{key:i,onClick:()=>{setActiveKop(i);setActivePage(1)},style:{display:"flex",justifyContent:"space-between",width:"100%",padding:"9px 10px",marginTop:6,borderRadius:5,border:i===activeKop?`1px solid ${palette.accent}`:"1px solid transparent",background:i===activeKop?"#fbeee6":"transparent",cursor:"pointer"}},React.createElement("span",null,"Kop ",k.nummer),countRejected(k)>0&&React.createElement("span",{style:{background:"#d9483a",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10}},countRejected(k))))),React.createElement("div",{style:{flex:1,padding:20,maxWidth:900}},React.createElement("div",{style:{display:"flex",gap:6,marginBottom:14,alignItems:"center",flexWrap:"wrap"}},[[1,"BEFORE – Inspection"],[3,"AFTER – Assembly & Testing"]].map(([p,label])=>btn(label,()=>setActivePage(p),{background:(p===1?activePage!==3:activePage===3)?palette.accent:"#fff",color:(p===1?activePage!==3:activePage===3)?"#fff":palette.ink,border:`1px solid ${(p===1?activePage!==3:activePage===3)?palette.accent:palette.line}`})),btn("Inspection Matrix",()=>setKopView("matrix")),mode==="kantoor"&&React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:8}},btn("Workshop Report",()=>setKopView("intern"),{background:palette.accent,color:"#fff",border:"none"}),btn("Final Report",()=>setKopView("customer")))),React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:14,marginBottom:12}},
+    return React.createElement("div",{style:{minHeight:"100%",background:palette.bg}},ModeSwitch,pageHeader,pdfExports,React.createElement("div",{style:{display:"flex"}},React.createElement("div",{style:{width:190,background:"#fff",borderRight:`1px solid ${palette.line}`,padding:14}},React.createElement("b",{style:{fontSize:12}},"CILINDERKOPPEN"),koppen.map((k,i)=>React.createElement("button",{key:i,onClick:()=>{setActiveKop(i);setActivePage(1)},style:{display:"flex",justifyContent:"space-between",width:"100%",padding:"9px 10px",marginTop:6,borderRadius:5,border:i===activeKop?`1px solid ${palette.accent}`:"1px solid transparent",background:i===activeKop?"#fbeee6":"transparent",cursor:"pointer"}},React.createElement("span",null,"Kop ",k.nummer),countRejected(k)>0&&React.createElement("span",{style:{background:"#d9483a",color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10}},countRejected(k))))),React.createElement("div",{style:{flex:1,padding:20,maxWidth:900}},React.createElement("div",{style:{display:"flex",gap:6,marginBottom:14,alignItems:"center",flexWrap:"wrap"}},[[1,"BEFORE – Inspection"],[3,"AFTER – Assembly & Testing"]].map(([p,label])=>btn(label,()=>setActivePage(p),{background:(p===1?activePage!==3:activePage===3)?palette.accent:"#fff",color:(p===1?activePage!==3:activePage===3)?"#fff":palette.ink,border:`1px solid ${(p===1?activePage!==3:activePage===3)?palette.accent:palette.line}`})),btn(activePage===3?"Download AFTER Report":"Download BEFORE Report",()=>downloadKopPdf(activePage===3?"after":"before")),mode==="kantoor"&&React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:8}},btn("Workshop Report",()=>setKopView("intern"),{background:palette.accent,color:"#fff",border:"none"}),btn("Final Report",()=>setKopView("customer")))),React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:14,marginBottom:12}},
  React.createElement("strong",null,"AFTER release — klantgoedkeuring en onderdelen"),
  React.createElement("div",{style:{fontSize:12,color:"#555",margin:"6px 0 10px"}},"Beide bevestigingen zijn nodig voordat AFTER beschikbaar is. Dit geldt per cilinderkop."),
  ...[["customerApproved","Customer approval received"],["partsReceived","Required parts received"]].map(([key,label])=>React.createElement("label",{key,style:{display:"flex",gap:8,alignItems:"center",margin:"7px 0",fontSize:13}},
    React.createElement("input",{type:"checkbox",checked:Boolean(kop.assembly?.[0]?.[key]),onChange:e=>{const first=kop.assembly?.[0];if(first)updateRow("assembly",0,{...first,[key]:e.target.checked});}}),label)),
  React.createElement("div",{style:{fontSize:12,fontWeight:700,color:assemblyReleased?"#277444":"#9a4a12"}},assemblyReleased?"Released for Assembly & Testing":"Awaiting Customer Approval & Parts")
  ),
- React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:20}},activePage===3&&!assemblyReleased&&React.createElement("div",{style:{padding:16,background:"#fff5e8",borderRadius:6,fontWeight:700}},"AFTER is locked until customer approval and required parts receipt are confirmed."),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Dismantling & Inspection"),React.createElement(ChecklistTable,{rows:kop.disassembly,onChange:(i,v)=>updateRow("disassembly",i,v)}),React.createElement("div",{style:{fontWeight:700,margin:"18px 0 6px"}},"Zittingring"),React.createElement(SeatRingTable,{rows:kop.seatRing,onChange:(i,v)=>updateRow("seatRing",i,v)})),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Valve Inspection & Measurements"),React.createElement(ValveTable,{rows:kop.valve,onChange:(i,v)=>updateRow("valve",i,v)}),React.createElement(ToleranceTable,{title:"Klepsteel",rows:kop.valveStem,onChange:(i,v)=>updateRow("valveStem",i,v)}),React.createElement(ToleranceTable,{title:"Klepgeleider",rows:kop.valveGuide,onChange:(i,v)=>updateRow("valveGuide",i,v)}),React.createElement(ChecklistTable,{rows:kop.valveChecks,onChange:(i,v)=>updateRow("valveChecks",i,v)})),activePage===3&&assemblyReleased&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Assembly & Testing"),React.createElement(ChecklistTable,{rows:kop.assembly,onChange:(i,v)=>updateRow("assembly",i,v)}),
+ React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:20}},activePage!==3&&React.createElement("div",{style:{overflowX:"auto",marginBottom:16}},
+ React.createElement("h2",{style:{fontSize:15}},"Inspection Matrix — BEFORE"),
+ React.createElement("div",{style:{minWidth:880}},React.createElement(KopMatrixTable,{data:makeKopCustomerPhase(koppen,"before",kopKlantData.before),heads:koppen,phase:"before",editable:true,onCellChange:(section,row,headIndex,value)=>{const p=makeKopCustomerPhase(koppen,"before",kopKlantData.before);const arr=[...(p.matrix?.[section]?.[row]||[])];arr[headIndex]=value;updateKopCustomer({...kopKlantData,before:{...p,matrix:{...p.matrix,[section]:{...p.matrix[section],[row]:arr}}}});}}))
+ ),activePage===3&&!assemblyReleased&&React.createElement("div",{style:{padding:16,background:"#fff5e8",borderRadius:6,fontWeight:700}},"AFTER is locked until customer approval and required parts receipt are confirmed."),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Dismantling & Inspection"),React.createElement(ChecklistTable,{rows:kop.disassembly,onChange:(i,v)=>updateRow("disassembly",i,v)}),React.createElement("div",{style:{fontWeight:700,margin:"18px 0 6px"}},"Zittingring"),React.createElement(SeatRingTable,{rows:kop.seatRing,onChange:(i,v)=>updateRow("seatRing",i,v)})),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Valve Inspection & Measurements"),React.createElement(ValveTable,{rows:kop.valve,onChange:(i,v)=>updateRow("valve",i,v)}),React.createElement(ToleranceTable,{title:"Klepsteel",rows:kop.valveStem,onChange:(i,v)=>updateRow("valveStem",i,v)}),React.createElement(ToleranceTable,{title:"Klepgeleider",rows:kop.valveGuide,onChange:(i,v)=>updateRow("valveGuide",i,v)}),React.createElement(ChecklistTable,{rows:kop.valveChecks,onChange:(i,v)=>updateRow("valveChecks",i,v)})),activePage===3&&assemblyReleased&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Assembly & Testing"),React.createElement(ChecklistTable,{rows:kop.assembly,onChange:(i,v)=>updateRow("assembly",i,v)}),
 React.createElement("div",{style:{marginTop:18,borderTop:`1px solid ${palette.line}`,paddingTop:14}},
  React.createElement("h3",{style:{fontSize:14,margin:"0 0 6px"}},"Parts checklist — BEFORE / AFTER"),
  React.createElement("div",{style:{fontSize:11,color:"#666",marginBottom:8}},"BEFORE = required / ordered. AFTER = renewed / installed."),
