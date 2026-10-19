@@ -686,7 +686,7 @@ function makeKopCustomerPhase(koppen,phase,existing){
   const sug=suggestedKopTexts(koppen,matrix,phase);
   const keys=["landing","findings","penetrant","landingSurfaces","valves","seats","cwConnection","guides","rotators"];
   const sections={}; keys.forEach(k=>sections[k]=(existing&&existing.sections&&existing.sections[k])||sug[k]||"");
-  return {matrix,actions:Object.assign({dyeCheck:"",pressureTest:"",painted:"",safetyValves:"",sealLips:""},existing&&existing.actions||{}),sections,parts:Array.isArray(existing&&existing.parts)?existing.parts:[],partsText:existing&&existing.partsText||"",updatedAt:new Date().toISOString()};
+  return {matrix,actions:Object.assign({dyeCheck:"",pressureTest:"",painted:"",safetyValves:"",sealLips:""},existing&&existing.actions||{}),sections,parts:Array.isArray(existing&&existing.parts)?existing.parts:[],partsText:existing&&existing.partsText||"",photos:existing&&existing.photos&&typeof existing.photos==="object"?existing.photos:{},updatedAt:new Date().toISOString()};
 }
 
 function normaliseKopCustomerData(koppen,data){
@@ -790,6 +790,15 @@ function CustomerCylinderHeadReport(props){
       React.createElement("img",{src:NICOVERKEN_HEADER_IMAGE,style:{display:"block",width:"100%",height:"auto",marginBottom:"3mm"}}),
       React.createElement("h2",{style:{fontSize:12,margin:"0 0 2mm"}},"Inspection / overhaul summary"),
       React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginBottom:"4mm"}},React.createElement("thead",null,React.createElement("tr",null,React.createElement("th",{style:Object.assign({},cell,{textAlign:"left"})},"Activity"),...koppen.map(k=>React.createElement("th",{key:k.nummer,style:Object.assign({},cell,{textAlign:"center"})},k.nummer)))),React.createElement("tbody",null,...actions.map(item=>React.createElement("tr",{key:item[1]},React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},item[0]),...koppen.map((k,i)=>React.createElement("td",{key:i,style:Object.assign({},cell,{textAlign:"center"})},p.actions&&p.actions[item[1]]||"")))))),
+      ...Object.entries(p.photos||{}).flatMap(([section,photos])=>!Array.isArray(photos)||!photos.length?[]:[React.createElement("div",{key:"photos-"+section,style:{pageBreakInside:"avoid",margin:"4mm 0"}},
+        React.createElement("h3",{style:{fontSize:10,margin:"2mm 0"}},(sections.find(x=>x[0]===section)||[section,section])[1]+" — Photos"),
+        React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"3mm"}},
+          ...photos.map((photo,i)=>React.createElement("div",{key:i,style:{pageBreakInside:"avoid"}},
+            React.createElement("div",{style:{fontSize:8,fontWeight:700}},"Cylinder head No. "+(photo.headNo||"")+" — "+(photo.caption||"")),
+            React.createElement("img",{src:photo.src,style:{display:"block",maxWidth:"100%",width:"100%",height:"auto",maxHeight:"72mm",objectFit:"contain"}})
+          ))
+        )
+      )]),
       ...sections.map(item=>p.sections&&p.sections[item[0]]?React.createElement("div",{key:item[0],style:{pageBreakInside:"avoid",marginBottom:"3mm"}},React.createElement("div",{style:{fontWeight:700,fontSize:9.2,marginBottom:"1mm"}},item[1]+":"),React.createElement("div",{style:{fontSize:9,lineHeight:1.45,whiteSpace:"pre-wrap"}},p.sections[item[0]])):null),
       Array.isArray(p.parts)&&p.parts.length>0&&React.createElement("div",{style:{pageBreakInside:"avoid",marginTop:"4mm"}},
         React.createElement("div",{style:{fontWeight:700,fontSize:9.2,marginBottom:"1mm"}},"Parts renewed / proposed:"),
@@ -1961,6 +1970,45 @@ function App() {
   function updateKopCustomer(next){ setKopKlantData(next); const patch={cilinderkop_klantdata:next}; if(activeWerkorder.status==="goedgekeurd") patch.status="ter_controle"; debounce(async()=>{await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify(patch),prefer:"return=minimal"});}); setActiveWerkorder(p=>({...p,...patch})); }
   function setKopPhase(phase){ updateKopCustomer({...kopKlantData,activePhase:phase,[phase]:makeKopCustomerPhase(koppen,phase,kopKlantData?.[phase])}); }
   function updateKopCustomerCell(section,row,headIndex,value){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); const arr=[...(p.matrix?.[section]?.[row]||[])]; arr[headIndex]=value; updateKopCustomer({...kopKlantData,[phase]:{...p,matrix:{...p.matrix,[section]:{...p.matrix[section],[row]:arr}}}}); }
+  async function addKopInspectionPhoto(phase,section,file){
+    if(!file)return;
+    try{
+      const photo=await compressImage(file);
+      const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]);
+      const list=p.photos?.[section]||[];
+      updateKopCustomer({...kopKlantData,[phase]:{...p,photos:{...p.photos,[section]:[...list,{src:photo,caption:"",headNo:String(koppen[activeKop]?.nummer||"")}].slice(-12)}}});
+    }catch(e){setLoadError(e.message);}
+  }
+  function editKopInspectionPhoto(phase,section,index,patch){
+    const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]);
+    const list=[...(p.photos?.[section]||[])];
+    list[index]={...list[index],...patch};
+    updateKopCustomer({...kopKlantData,[phase]:{...p,photos:{...p.photos,[section]:list}}});
+  }
+  function removeKopInspectionPhoto(phase,section,index){
+    const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]);
+    updateKopCustomer({...kopKlantData,[phase]:{...p,photos:{...p.photos,[section]:(p.photos?.[section]||[]).filter((_,i)=>i!==index)}}});
+  }
+  function kopPhotoEditor(phase){
+    const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]);
+    const categories=phase==="before"?[["landingSurfaces","Landing surfaces"],["valves","Suction and exhaust valves"],["seats","Valve seats & pockets"],["guides","Valve guides"],["findings","Other inspection findings"]]:[["assembly","Assembly & final result"],["testing","Testing"],["renewedParts","Renewed parts"]];
+    return React.createElement("section",{style:{marginTop:24,borderTop:"1px solid "+palette.line,paddingTop:14}},
+      React.createElement("h2",{style:{fontSize:15}},"Photos & Findings — "+phase.toUpperCase()),
+      React.createElement("p",{style:{fontSize:12}},"Voeg foto's toe per onderwerp, met cilinderkopnummer en toelichting. Ze komen onder hetzelfde onderwerp in het PDF-rapport."),
+      ...categories.map(([key,label])=>React.createElement("div",{key,style:{margin:"12px 0",padding:10,background:"#f8f8f5",borderRadius:5}},
+        React.createElement("strong",null,label),
+        React.createElement("label",{style:{display:"block",margin:"8px 0",cursor:"pointer",textDecoration:"underline"}},"+ Add photos",React.createElement("input",{type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:async e=>{const files=[...e.target.files];for(const f of files)await addKopInspectionPhoto(phase,key,f);e.target.value="";}})),
+        ...(p.photos?.[key]||[]).map((photo,i)=>React.createElement("div",{key:i,style:{display:"flex",gap:10,marginBottom:10,alignItems:"flex-start"}},
+          React.createElement("img",{src:photo.src,style:{width:105,height:95,objectFit:"cover"}}),
+          React.createElement("div",{style:{flex:1}},
+            React.createElement("label",null,"Cylinder head No. ",React.createElement("select",{value:photo.headNo||"",onChange:e=>editKopInspectionPhoto(phase,key,i,{headNo:e.target.value})},...koppen.map(k=>React.createElement("option",{key:k.nummer,value:String(k.nummer)},k.nummer)))),
+            React.createElement("input",{placeholder:"Photo caption / finding",value:photo.caption||"",onChange:e=>editKopInspectionPhoto(phase,key,i,{caption:e.target.value}),style:{...inputStyle,display:"block",width:"100%",marginTop:5}}),
+            React.createElement("button",{onClick:()=>removeKopInspectionPhoto(phase,key,i),style:{marginTop:5}},"Remove")
+          )
+        ))
+      ))
+    );
+  }
   function updateKopCustomerSection(key,value){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); updateKopCustomer({...kopKlantData,[phase]:{...p,sections:{...p.sections,[key]:value}}}); }
   function updateKopCustomerAction(key,value){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); updateKopCustomer({...kopKlantData,[phase]:{...p,actions:{...p.actions,[key]:value}}}); }
   function regenerateKopCustomerText(){ const phase=kopKlantData.activePhase||"before"; const p=makeKopCustomerPhase(koppen,phase,kopKlantData[phase]); updateKopCustomer({...kopKlantData,[phase]:{...p,sections:suggestedKopTexts(koppen,p.matrix,phase)}}); }
@@ -2492,7 +2540,7 @@ function App() {
    React.createElement("input",{type:"checkbox",checked:Boolean(kop.assembly?.[0]?.[key]),onChange:e=>{const first=kop.assembly?.[0];if(first)updateRow("assembly",0,{...first,[key]:e.target.checked});}}),label)),
  React.createElement("div",{style:{fontSize:12,fontWeight:700,color:assemblyReleased?"#277444":"#9a4a12"}},assemblyReleased?"Released for Assembly & Testing":"Awaiting Customer Approval & Parts")
  ),
- React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:20}},activePage===3&&!assemblyReleased&&React.createElement("div",{style:{padding:16,background:"#fff5e8",borderRadius:6,fontWeight:700}},"AFTER is locked until customer approval and required parts receipt are confirmed."),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Dismantling & Inspection"),React.createElement(ChecklistTable,{rows:kop.disassembly,onChange:(i,v)=>updateRow("disassembly",i,v)}),React.createElement("div",{style:{fontWeight:700,margin:"18px 0 6px"}},"Zittingring"),React.createElement(SeatRingTable,{rows:kop.seatRing,onChange:(i,v)=>updateRow("seatRing",i,v)})),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Valve Inspection & Measurements"),React.createElement(ValveTable,{rows:kop.valve,onChange:(i,v)=>updateRow("valve",i,v)}),React.createElement(ToleranceTable,{title:"Klepsteel",rows:kop.valveStem,onChange:(i,v)=>updateRow("valveStem",i,v)}),React.createElement(ToleranceTable,{title:"Klepgeleider",rows:kop.valveGuide,onChange:(i,v)=>updateRow("valveGuide",i,v)}),React.createElement(ChecklistTable,{rows:kop.valveChecks,onChange:(i,v)=>updateRow("valveChecks",i,v)})),activePage!==3&&React.createElement("div",{style:{overflowX:"auto",marginTop:24}},
+ React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:20}},activePage===3&&!assemblyReleased&&React.createElement("div",{style:{padding:16,background:"#fff5e8",borderRadius:6,fontWeight:700}},"AFTER is locked until customer approval and required parts receipt are confirmed."),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Dismantling & Inspection"),React.createElement(ChecklistTable,{rows:kop.disassembly,onChange:(i,v)=>updateRow("disassembly",i,v)}),React.createElement("div",{style:{fontWeight:700,margin:"18px 0 6px"}},"Zittingring"),React.createElement(SeatRingTable,{rows:kop.seatRing,onChange:(i,v)=>updateRow("seatRing",i,v)})),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Valve Inspection & Measurements"),React.createElement(ValveTable,{rows:kop.valve,onChange:(i,v)=>updateRow("valve",i,v)}),React.createElement(ToleranceTable,{title:"Klepsteel",rows:kop.valveStem,onChange:(i,v)=>updateRow("valveStem",i,v)}),React.createElement(ToleranceTable,{title:"Klepgeleider",rows:kop.valveGuide,onChange:(i,v)=>updateRow("valveGuide",i,v)}),React.createElement(ChecklistTable,{rows:kop.valveChecks,onChange:(i,v)=>updateRow("valveChecks",i,v)}),kopPhotoEditor("before")),activePage!==3&&React.createElement("div",{style:{overflowX:"auto",marginTop:24}},
  React.createElement("h2",{style:{fontSize:15}},"Inspection Matrix — BEFORE"),
  React.createElement("div",{style:{minWidth:880}},React.createElement(KopMatrixTable,{data:makeKopCustomerPhase(koppen,"before",kopKlantData.before),heads:koppen,phase:"before",editable:true,onCellChange:(section,row,headIndex,value)=>{const p=makeKopCustomerPhase(koppen,"before",kopKlantData.before);const arr=[...(p.matrix?.[section]?.[row]||[])];arr[headIndex]=value;updateKopCustomer({...kopKlantData,before:{...p,matrix:{...p.matrix,[section]:{...p.matrix[section],[row]:arr}}}});}}))
  ),activePage===3&&assemblyReleased&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Assembly & Testing"),React.createElement(ChecklistTable,{rows:kop.assembly,onChange:(i,v)=>updateRow("assembly",i,v)}),
@@ -2509,7 +2557,7 @@ React.createElement("div",{style:{marginTop:18,borderTop:`1px solid ${palette.li
    React.createElement("td",{style:{padding:5,borderBottom:`1px solid ${palette.line}`}},React.createElement(TextInput,{value:p.remark||"",onChange:e=>updateKopPart(i,"remark",e.target.value),style:{minWidth:180}}))  )))
  ))
 ),
-React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr",gap:14,marginTop:18}},React.createElement(Field,{label:"Aanvullende informatie"},React.createElement("textarea",{rows:3,value:kop.aanvullendeInfo,onChange:e=>updateKop(activeKop,{aanvullendeInfo:e.target.value}),style:{...inputStyle,resize:"vertical"}}))))))));
+React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr",gap:14,marginTop:18}},React.createElement(Field,{label:"Aanvullende informatie"},React.createElement("textarea",{rows:3,value:kop.aanvullendeInfo,onChange:e=>updateKop(activeKop,{aanvullendeInfo:e.target.value}),style:{...inputStyle,resize:"vertical"}}))))))),kopPhotoEditor("after"));
   }
   return React.createElement("div",{style:{fontFamily:"Arial,sans-serif",padding:24,color:"#1f231c"}},
     React.createElement("h2",null,"Werkorders"),
