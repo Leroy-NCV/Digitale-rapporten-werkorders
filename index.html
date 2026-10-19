@@ -437,7 +437,7 @@ function CustomerPistonReport({ werkorder, rapporten, template }) {
         React.createElement("div",null,React.createElement("b",null,"Customer / Vessel: "),werkorder.werkopdracht?.schip_klant||""),
         React.createElement("div",null,React.createElement("b",null,"Order no.: "),werkorder.werkopdracht?.order_nummer||""),
         React.createElement("div",null,React.createElement("b",null,"Date: "),werkorder.werkopdracht?.datum||""),
-        React.createElement("div",null,React.createElement("b",null,"Employee: "),werkorderMonteursTekst(werkorder)||""),
+        React.createElement("div",null,React.createElement("b",null,"Technician: "),werkorderMonteursTekst(werkorder)||""),
         React.createElement("div",null,React.createElement("b",null,"Engine type: "),template?.naam||werkorder.motortype||""),
         React.createElement("div",null,React.createElement("b",null,"Nominal size: "),template?`${fmtNum(template.nominal_size,2)} mm`:"—")
       ),
@@ -764,7 +764,7 @@ function CustomerCylinderHeadReport(props){
     React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginBottom:"3mm"}},React.createElement("tbody",null,
       React.createElement("tr",null,React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Vessel / Customer"),React.createElement("td",{style:cell},werkorder.werkopdracht&&werkorder.werkopdracht.schip_klant||""),React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Date"),React.createElement("td",{style:cell},werkorder.werkopdracht&&werkorder.werkopdracht.datum||"")),
       React.createElement("tr",null,React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"O/ref"),React.createElement("td",{style:cell},(werkorder.werkopdracht&&werkorder.werkopdracht.order_nummer||"")+" ("+phase+")"),React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Engine type"),React.createElement("td",{style:cell},werkorder.motortype==="-"?"":werkorder.motortype)),
-      React.createElement("tr",null,React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Employee"),React.createElement("td",{style:cell},werkorderMonteursTekst(werkorder)||""),React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Subject"),React.createElement("td",{style:cell},"Cylinder head Assy, "+String(koppen.length).padStart(2,"0")+" pc."))
+      React.createElement("tr",null,React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Technician"),React.createElement("td",{style:cell},werkorderMonteursTekst(werkorder)||""),React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Subject"),React.createElement("td",{style:cell},"Cylinder head Assy, "+String(koppen.length).padStart(2,"0")+" pc."))
     )),
     React.createElement(KopMatrixTable,{data:p,heads:koppen,phase:phase,editable:false}),
     React.createElement("div",{style:{pageBreakBefore:"always",paddingTop:"2mm"}},
@@ -986,7 +986,7 @@ function CustomerConnectingRodReport({ werkorder, rapporten, template }) {
             React.createElement("td",{style:{...cell,textAlign:"left"}},template?.naam||werkorder.motortype||"")
           ),
           React.createElement("tr",null,
-            React.createElement("td",{style:{...cell,fontWeight:700,textAlign:"left"}},"Employee"),
+            React.createElement("td",{style:{...cell,fontWeight:700,textAlign:"left"}},"Technician"),
             React.createElement("td",{style:{...cell,textAlign:"left"}},werkorderMonteursTekst(werkorder)||""),
             React.createElement("td",{style:{...cell,fontWeight:700,textAlign:"left"}},"Quantity"),
             React.createElement("td",{style:{...cell,textAlign:"left"}},String((rapporten||[]).length))
@@ -1518,7 +1518,7 @@ function CustomerGenericReport({ werkorder, label, componentRapport }) {
             React.createElement("td",{style:metaCell},werkorder.motortype==="-"?"":(werkorder.motortype||""))
           ),
           React.createElement("tr",null,
-            React.createElement("td",{style:{...metaCell,fontWeight:700}},"Employee"),
+            React.createElement("td",{style:{...metaCell,fontWeight:700}},"Technician"),
             React.createElement("td",{style:metaCell},werkorderMonteursTekst(werkorder)||""),
             React.createElement("td",{style:{...metaCell,fontWeight:700}},"Subject"),
             React.createElement("td",{style:metaCell},label||werkorder.klustype||"")
@@ -2243,7 +2243,7 @@ function App() {
           React.createElement("div",null,React.createElement("b",null,"Customer / Vessel: "),activeWerkorder.werkopdracht?.schip_klant),
           React.createElement("div",null,React.createElement("b",null,"Order no.: "),activeWerkorder.werkopdracht?.order_nummer),
           React.createElement("div",null,React.createElement("b",null,"Date: "),activeWerkorder.werkopdracht?.datum),
-          React.createElement("div",null,React.createElement("b",null,"Employee: "),werkorderMonteursTekst(activeWerkorder)||monteurNaam||""),
+          React.createElement("div",null,React.createElement("b",null,"Technician: "),werkorderMonteursTekst(activeWerkorder)||monteurNaam||""),
           React.createElement("div",null,React.createElement("b",null,"Engine type: "),template?.naam||activeWerkorder.motortype||""),
           React.createElement("div",null,React.createElement("b",null,"Nominal size: "),template?`${fmtNum(template.nominal_size,2)} mm`:"—")
         ),
@@ -2302,7 +2302,7 @@ function App() {
               React.createElement("div",null,React.createElement("b",null,"Customer / Vessel: "),activeWerkorder.werkopdracht?.schip_klant||""),
               React.createElement("div",null,React.createElement("b",null,"Order no.: "),activeWerkorder.werkopdracht?.order_nummer||""),
               React.createElement("div",null,React.createElement("b",null,"Engine type: "),template?.naam||activeWerkorder.motortype||""),
-              React.createElement("div",null,React.createElement("b",null,"Employee: "),werkorderMonteursTekst(activeWerkorder)||monteurNaam||"")
+              React.createElement("div",null,React.createElement("b",null,"Technician: "),werkorderMonteursTekst(activeWerkorder)||monteurNaam||"")
             ),
             React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:6,background:"#fafaf7",border:`1px solid ${palette.line}`,padding:10,borderRadius:6,marginBottom:14}},
               ...refBits.map(([label,val])=>React.createElement("div",{key:label,style:{fontSize:12}},React.createElement("b",null,label+": "),String(val)))
@@ -2388,7 +2388,7 @@ function App() {
               React.createElement("div",null,React.createElement("b",null,"Customer / Vessel: "),activeWerkorder.werkopdracht?.schip_klant||""),
               React.createElement("div",null,React.createElement("b",null,"Order no.: "),activeWerkorder.werkopdracht?.order_nummer||""),
               React.createElement("div",null,React.createElement("b",null,"Engine type: "),template?.naam||activeWerkorder.motortype||""),
-              React.createElement("div",null,React.createElement("b",null,"Employee: "),werkorderMonteursTekst(activeWerkorder)||monteurNaam||"")
+              React.createElement("div",null,React.createElement("b",null,"Technician: "),werkorderMonteursTekst(activeWerkorder)||monteurNaam||"")
             ),
             React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:6,marginTop:12,padding:10,background:"#fafaf7",border:`1px solid ${palette.line}`,borderRadius:6}},
               ...technical.map(([label,val])=>React.createElement("div",{key:label,style:{fontSize:11}},React.createElement("b",null,label+": "),String(val)))
