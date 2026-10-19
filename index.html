@@ -1193,13 +1193,7 @@ function GovernorTypeField({report,onChange,readonly=false}) {
       )
     ),
     React.createElement("section",{style:{marginTop:15,pageBreakInside:"avoid"}},React.createElement("h3",{style:{fontSize:readonly?12:15,margin:"0 0 8px",borderBottom:"1px solid #abb5bd",paddingBottom:5}},"GENERAL INFORMATION"),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(165px,1fr))",gap:10}},field("Serial no.","serialNumber"),governorDropdown("Motor voltage","motorVoltage",["110V","220V","N.A."]),field("Inspection date","inspectionDate"),field("Technician","technician"),governorDropdown("Condition received","receivedCondition",["Poor","Normal","New"]))),
-    section("MEASUREMENTS / SETTINGS",[["Measured speed (rpm)","speedMeasured"],["Set speed (rpm)","speedSet"],["Overspeed trip (rpm)","overspeedMeasured"],["Oil pressure (bar)","oilPressure"],["Axial clearance (mm)","axialClearance"],["Radial clearance (mm)","radialClearance"],["Other measurement / unit","otherMeasurement"]]),
-    React.createElement("p",{style:{fontSize:readonly?9:11,color:"#765121",marginTop:8}},"Enter maker tolerances only when verified from the relevant governor manual. No inspection results or limits are prefilled."),
-    textField("Applicable maker limits / reference","makerLimits"),
-    textField("Work carried out / replaced parts","workCarriedOut"),
-    section("ASSEMBLY / FUNCTION TEST",[["Oil leakage test","leakageTest"],["Speed regulation test","regulationTest"],["Overspeed / safety test","safetyTest"],["Final setting / test result","finalTest"],["Test date","testDate"]]),
     textField("Final remarks / recommendations","finalRemarks"),
-    section("SIGN-OFF",[["Performed by","performedBy"],["Checked by","checkedBy"],["Date","signoffDate"]]),
     orig
   );
 }
