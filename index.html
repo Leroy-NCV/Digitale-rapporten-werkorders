@@ -96,7 +96,7 @@ function makeCylinderHeadLimits(nummer,motortype){
  const k=makeCilinderkop(nummer),p=cylinderHeadLimitProfile(motortype);
  k.seatRing=k.seatRing.map(row=>({...row,limit:""}));
  k.valve=k.valve.map(row=>{const inlet=row.id.startsWith("S");return {...row,limitQ:p?(inlet?p.sQ:p.eQ):"",limitR:p?(inlet?p.sR:p.eR):""};});
- k.valveStem=k.valveStem.map(row=>{const inlet=row.id.startsWith("S");return {...row,nominal:p?(inlet?p.sNom:p.eNom):"",limit:p?(inlet?p.sLimit:p.eLimit)??"":"":""};});
+ k.valveStem=k.valveStem.map(row=>{const inlet=row.id.startsWith("S");return {...row,nominal:p?(inlet?p.sNom:p.eNom):"",limit:p?((inlet?p.sLimit:p.eLimit)??""):""};});
  k.valveGuide=k.valveGuide.map(row=>({...row,nominal:"",limit:""}));
  return k;
 }
