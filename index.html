@@ -822,6 +822,14 @@ function CustomerCylinderHeadReport(props){
             ))
           ))
         )),
+        isNonYanmar&&cylinderHeadSourceSpecification(werkorder.motortype)&&React.createElement("section",{style:{margin:"3mm 0",pageBreakInside:"avoid"}},
+          React.createElement("strong",{style:{fontSize:9}},"Engine-Specific Measurements — "+werkorder.motortype+" ("+phase.toUpperCase()+")"),
+          React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:8}},React.createElement("tbody",null,
+           ...cylinderHeadSourceSpecification(werkorder.motortype).map(([name,spec],i)=>{const value=k.assembly?.[0]?.sourceMeasurements?.[phase+"_"+i]||{};return React.createElement("tr",{key:i},
+            React.createElement("td",{style:cell},name),React.createElement("td",{style:cell},spec),
+            React.createElement("td",{style:cell},value.measured||"—"),React.createElement("td",{style:cell},value.result||"—"));})
+          ))
+        ),
         phase==="after"&&React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:8}},React.createElement("tbody",null,
           ...(k.onderdelen||[]).map((part,i)=>React.createElement("tr",{key:i},...[part.name,part.qty,part.afterStatus,part.remark].map((v,j)=>React.createElement("td",{key:j,style:cell},v??""))))
         ))
