@@ -86,6 +86,20 @@ const DISASSEMBLY_CHECKLIST = [
   "Visual inspection of cylinder head",
   "Visual inspection of seat ring"
 ];
+const CYLINDER_HEAD_LIMIT_PROFILES = {"6EY18ALW":{"sQ":4.3,"sR":5.4,"eQ":4.3,"eR":5.4,"sNom":14,"sLimit":-0.32,"eNom":14,"eLimit":-0.35},"6EY22LW":{"sQ":5,"sR":7.9,"eQ":5,"eR":7.9,"sNom":16,"sLimit":-0.32,"eNom":16,"eLimit":-0.35},"6N18L-EV":{"sQ":4.3,"sR":5.4,"eQ":4.3,"eR":5.4,"sNom":14,"sLimit":-0.26,"eNom":14,"eLimit":-0.28},"T260":{"sQ":4.2,"sR":9.8,"eQ":3.8,"eR":8.5,"sNom":19,"sLimit":-0.4,"eNom":19,"eLimit":-0.4},"8N21AL-GV":{"sQ":4,"sR":8,"eQ":4.5,"eR":7,"sNom":14,"sLimit":-0.32,"eNom":14,"eLimit":-0.32},"Z280":{"sQ":3.8,"sR":10.2,"eQ":3.5,"eR":9.9,"sNom":21,"sLimit":null,"eNom":21,"eLimit":null},"6N165L-SN":{"sQ":2.7,"sR":5.6,"eQ":1.6,"eR":6.1,"sNom":12,"sLimit":-0.18,"eNom":12,"eLimit":-0.18},"M200L-EN":{"sQ":3,"sR":8,"eQ":3.4,"eR":6.5,"sNom":14,"sLimit":-0.3,"eNom":14,"eLimit":-0.3},"M220L-SN":{"sQ":3.7,"sR":8,"eQ":3.2,"eR":8.1,"sNom":16,"sLimit":-0.28,"eNom":16,"eLimit":-0.37},"6N260L-UN":{"sQ":7,"sR":7.7,"eQ":4,"eR":10,"sNom":19,"sLimit":-0.4,"eNom":19,"eLimit":-0.4},"6N280L-EV":{"sQ":7.5,"sR":7.2,"eQ":4.5,"eR":9.3,"sNom":21,"sLimit":-0.4,"eNom":21,"eLimit":-0.4},"6N330":{"sQ":9,"sR":13.8,"eQ":5,"eR":12.8,"sNom":24,"sLimit":-0.4,"eNom":24,"eLimit":-0.4},"T240L-ET":{"sQ":3.8,"sR":9.6,"eQ":3.5,"eR":10,"sNom":16,"sLimit":-0.4,"eNom":16,"eLimit":-0.4},"6EY26L":{"sQ":7.1,"sR":7,"eQ":4,"eR":10.9,"sNom":19,"sLimit":-0.32,"eNom":19,"eLimit":-0.35}};
+function cylinderHeadLimitProfile(motortype){
+ const key=String(motortype||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+ const match=Object.entries(CYLINDER_HEAD_LIMIT_PROFILES).find(([model])=>key===model.toUpperCase().replace(/[^A-Z0-9]/g,"")||key==="YANMAR"+model.toUpperCase().replace(/[^A-Z0-9]/g,""));
+ return match?match[1]:null;
+}
+function makeCylinderHeadLimits(nummer,motortype){
+ const k=makeCilinderkop(nummer),p=cylinderHeadLimitProfile(motortype);
+ k.seatRing=k.seatRing.map(row=>({...row,limit:""}));
+ k.valve=k.valve.map(row=>{const inlet=row.id.startsWith("S");return {...row,limitQ:p?(inlet?p.sQ:p.eQ):"",limitR:p?(inlet?p.sR:p.eR):""};});
+ k.valveStem=k.valveStem.map(row=>{const inlet=row.id.startsWith("S");return {...row,nominal:p?(inlet?p.sNom:p.eNom):"",limit:p?(inlet?p.sLimit:p.eLimit)??"":"":""};});
+ k.valveGuide=k.valveGuide.map(row=>({...row,nominal:"",limit:""}));
+ return k;
+}
 const SEAT_RING_ROWS = [
   { id: "S1", label: "S1 (inlaat)", limit: 88, direction: "max" },
   { id: "S2", label: "S2 (inlaat)", limit: 88, direction: "max" },
@@ -1804,7 +1818,7 @@ function App() {
         aantal_koppen:(isCilinderkopKlustype(worDraft.klustype)||isZuigerKlustype(worDraft.klustype)||isDrijfstangKlustype(worDraft.klustype)||String(worDraft.klustype).startsWith("brandstof_pomp"))?(Number(worDraft.aantal)||1):1, werkbeschrijving:worDraft.werkbeschrijving, rapport_type:kt?.rapport_type||worDraft.klustype||"generiek"
       })});
       if(isCilinderkopKlustype(worDraft.klustype)){
-        const blanks=Array.from({length:Number(worDraft.aantal)||1},(_,i)=>makeCilinderkop(i+1));
+        const blanks=Array.from({length:Number(worDraft.aantal)||1},(_,i)=>makeCylinderHeadLimits(i+1,worDraft.motortype));
         await sb("cilinderkop_rapporten",{method:"POST",body:JSON.stringify(blanks.map(k=>kopToRow(k,createdWO.id)))});
       }
       if(isZuigerKlustype(worDraft.klustype)){
