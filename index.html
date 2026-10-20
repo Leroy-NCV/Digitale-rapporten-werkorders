@@ -156,6 +156,56 @@ const CYLINDER_HEAD_PARTS = ["Inlet valves","Exhaust valves","Valve guides","Val
 function makeCylinderHeadParts(){
   return CYLINDER_HEAD_PARTS.map((name,i)=>({id:"part_"+(i+1),name,qty:1,beforeStatus:"",afterStatus:"",remark:"",photosBefore:[],photosAfter:[]}));
 }
+const NON_YANMAR_LAYOUTS={
+"W20":[["Valve stem",["I","II","III"]],["Valve disc",["Y","Z"]],["Valve guide",["IV","V"]]],
+"W32":[["Valve stem",["I","II","III"]],["Valve disc",["Y","Z"]],["Valve guide",["IV","V"]]],
+"VASA32":[["Valve stem",["I","II","III"]],["Valve disc",["Y","Z"]],["Valve guide",["IV","V"]]],
+"W38A":[["Valve stem",["I","II","III"]],["Valve disc",["A","B"]],["Valve guide",["IV","V"]]],
+"W46":[["Valve stem",["I","II","III"]],["Valve disc",["Y","Z"]],["Valve guide",["IV","V"]]],
+"MAK":[["Valve stem",["I","II","III"]],["Valve disc",["Y","Z"]],["Valve guide",["IV","V"]]],
+"HIMSEN":[["Valve stem",["A","B"]],["Valve disc",["C","E"]],["Valve guide",["T","M","B"]]],
+"STX":[["Valve spindle",["H1","Runout"]],["Valve guide",["PS upper","PS center","PS lower","FA upper","FA center","FA lower"]]]
+};
+function nonYanmarLayout(model){
+ const v=String(model||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+ if(v.includes("HIMSEN")||/^H(17|21|25)/.test(v))return NON_YANMAR_LAYOUTS.HIMSEN;
+ if(v.includes("MAK"))return NON_YANMAR_LAYOUTS.MAK;
+ if(v.includes("STX")||v.includes("2738"))return NON_YANMAR_LAYOUTS.STX;
+ if(v.includes("W6L38A"))return NON_YANMAR_LAYOUTS.W38A;
+ return NON_YANMAR_LAYOUTS[v]||NON_YANMAR_LAYOUTS[v.replace(/^WARTSILA/,"")]||null;
+}
+function NonYanmarDetailedMeasurements({kop,model,phase,onUpdate,readonly=false}){
+ const layout=nonYanmarLayout(model);
+ if(!layout)return null;
+ const stored=kop?.assembly?.[0]?.sourceMeasurements||{};
+ const groups=[...layout,["Inlet valve seat & bore",["Sealing D2","Runout","Bore Ød","Height H"]],["Exhaust valve seat & pocket",["Sealing D3","Runout","ØA","ØB","ØC","ØD","ØE"]]];
+ const positions=["S1","S2","E1","E2"];
+ const td={border:"1px solid #bbb",padding:5,fontSize:11};
+ function oneCell(key){
+  const value=stored[key]?.measured||"";
+  return readonly?React.createElement("span",null,value||"—"):React.createElement("input",{type:"text",value,onChange:e=>onUpdate(key,{measured:e.target.value}),style:{width:"100%",minWidth:65,boxSizing:"border-box",padding:5}});
+ }
+ function oneGroup(group,gi){
+  const name=group[0],dims=group[1];
+  const applicable=gi===layout.length?positions.slice(0,2):gi===layout.length+1?positions.slice(2):positions;
+  const rows=applicable.map(pos=>React.createElement("tr",{key:pos},
+   React.createElement("td",{style:td},pos),
+   ...dims.map(dim=>React.createElement("td",{key:dim,style:td},oneCell("detail_"+phase+"_"+gi+"_"+pos+"_"+dim)))
+  ));
+  return React.createElement("div",{key:name,style:{overflowX:"auto",marginBottom:12,pageBreakInside:"avoid"}},
+   React.createElement("strong",null,name),
+   React.createElement("table",{style:{borderCollapse:"collapse",width:"100%",minWidth:100+dims.length*85,marginTop:5}},
+    React.createElement("thead",null,React.createElement("tr",null,React.createElement("th",{style:td},"Valve"),...dims.map(dim=>React.createElement("th",{key:dim,style:td},dim)))),
+    React.createElement("tbody",null,...rows)
+   )
+  );
+ }
+ return React.createElement("section",{style:{margin:"15px 0",padding:10,border:"1px solid #ddd"}},
+  React.createElement("h3",{style:{fontSize:14}},"Manufacturer Measurement Protocol — "+model+" ("+phase.toUpperCase()+")"),
+  React.createElement("p",{style:{fontSize:11}},"Enter actual measured dimensions. S1/S2 = inlet, E1/E2 = exhaust. Limit values and assessments are in Source Specifications. Unmatched dimensions are not automatically approved or rejected."),
+  ...groups.map(oneGroup)
+ );
+}
 function NonYanmarMeasurements({kop,model,phase,onUpdate,readonly=false}) {
  const fields=cylinderHeadSourceSpecification(model);
  if(!fields)return null;
@@ -822,6 +872,7 @@ function CustomerCylinderHeadReport(props){
             ))
           ))
         )),
+        isNonYanmar&&React.createElement(NonYanmarDetailedMeasurements,{kop:k,model:werkorder.motortype,phase,readonly:true}),
         isNonYanmar&&cylinderHeadSourceSpecification(werkorder.motortype)&&React.createElement("section",{style:{margin:"3mm 0",pageBreakInside:"avoid"}},
           React.createElement("strong",{style:{fontSize:9}},"Engine-Specific Measurements — "+werkorder.motortype+" ("+phase.toUpperCase()+")"),
           React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:8}},React.createElement("tbody",null,
@@ -2594,10 +2645,10 @@ function App() {
  React.createElement("p",{style:{fontSize:12,margin:"0 0 8px"}},"Reference values extracted from the supplied engine report. Different measurement systems (Y/Z/A/H1) are NOT interchangeable with Yanmar Q/R. Check maker documentation before accepting/rejecting a part."),
  React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
  ...cylinderHeadSourceSpecification(activeWerkorder.motortype).map(([name,value])=>React.createElement("tr",{key:name},React.createElement("td",{style:{padding:5,borderBottom:"1px solid #ddd",width:"46%"}},name),React.createElement("td",{style:{padding:5,borderBottom:"1px solid #ddd",fontWeight:600}},value)))
- ))),React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:20}},false&&React.createElement("div",{style:{padding:16,background:"#fff5e8",borderRadius:6,fontWeight:700}},"AFTER is locked until customer approval and required parts receipt are confirmed."),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Dismantling & Inspection"),React.createElement(ChecklistTable,{rows:kop.disassembly,onChange:(i,v)=>updateRow("disassembly",i,v)}),React.createElement("div",{style:{fontWeight:700,margin:"18px 0 6px"}},"Seat ring"),React.createElement(SeatRingTable,{rows:kop.seatRing,onChange:(i,v)=>updateRow("seatRing",i,v)})),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Valve Inspection & Measurements"),activeWerkorder.klustype==="cilinderkop_overhaul_niet_yanmar"&&React.createElement(NonYanmarMeasurements,{kop,model:activeWerkorder.motortype,phase:"before",onUpdate:(key,v)=>{const first=kop.assembly[0];updateRow("assembly",0,{...first,sourceMeasurements:{...(first.sourceMeasurements||{}),[key]:v}});}}),React.createElement(ValveTable,{rows:kop.valve,onChange:(i,v)=>updateRow("valve",i,v)}),React.createElement(ToleranceTable,{title:"Valve stem",rows:kop.valveStem,onChange:(i,v)=>updateRow("valveStem",i,v)}),React.createElement(ToleranceTable,{title:"Valve guide",rows:kop.valveGuide,onChange:(i,v)=>updateRow("valveGuide",i,v)}),React.createElement(ChecklistTable,{rows:kop.valveChecks,onChange:(i,v)=>updateRow("valveChecks",i,v)}),kopPhotoEditor("before")),activePage!==3&&React.createElement("div",{style:{overflowX:"auto",marginTop:24}},
+ ))),React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:20}},false&&React.createElement("div",{style:{padding:16,background:"#fff5e8",borderRadius:6,fontWeight:700}},"AFTER is locked until customer approval and required parts receipt are confirmed."),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Dismantling & Inspection"),React.createElement(ChecklistTable,{rows:kop.disassembly,onChange:(i,v)=>updateRow("disassembly",i,v)}),React.createElement("div",{style:{fontWeight:700,margin:"18px 0 6px"}},"Seat ring"),React.createElement(SeatRingTable,{rows:kop.seatRing,onChange:(i,v)=>updateRow("seatRing",i,v)})),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Valve Inspection & Measurements"),activeWerkorder.klustype==="cilinderkop_overhaul_niet_yanmar"&&React.createElement(NonYanmarDetailedMeasurements,{kop,model:activeWerkorder.motortype,phase:activePage===3?"after":"before",onUpdate:(key,v)=>{const first=kop.assembly[0];updateRow("assembly",0,{...first,sourceMeasurements:{...(first.sourceMeasurements||{}),[key]:v}});}}),activeWerkorder.klustype==="cilinderkop_overhaul_niet_yanmar"&&React.createElement(NonYanmarMeasurements,{kop,model:activeWerkorder.motortype,phase:"before",onUpdate:(key,v)=>{const first=kop.assembly[0];updateRow("assembly",0,{...first,sourceMeasurements:{...(first.sourceMeasurements||{}),[key]:v}});}}),React.createElement(ValveTable,{rows:kop.valve,onChange:(i,v)=>updateRow("valve",i,v)}),React.createElement(ToleranceTable,{title:"Valve stem",rows:kop.valveStem,onChange:(i,v)=>updateRow("valveStem",i,v)}),React.createElement(ToleranceTable,{title:"Valve guide",rows:kop.valveGuide,onChange:(i,v)=>updateRow("valveGuide",i,v)}),React.createElement(ChecklistTable,{rows:kop.valveChecks,onChange:(i,v)=>updateRow("valveChecks",i,v)}),kopPhotoEditor("before")),activePage!==3&&React.createElement("div",{style:{overflowX:"auto",marginTop:24}},
  React.createElement("h2",{style:{fontSize:15}},"Inspection Matrix — BEFORE"),
  React.createElement("div",{style:{minWidth:880}},React.createElement(KopMatrixTable,{data:makeKopCustomerPhase(koppen,"before",kopKlantData.before),heads:koppen,phase:"before",editable:true,onCellChange:(section,row,headIndex,value)=>{const p=makeKopCustomerPhase(koppen,"before",kopKlantData.before);const arr=[...(p.matrix?.[section]?.[row]||[])];arr[headIndex]=value;updateKopCustomer({...kopKlantData,before:{...p,matrix:{...p.matrix,[section]:{...p.matrix[section],[row]:arr}}}});}}))
- ),activePage===3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Assembly & Testing"),activeWerkorder.klustype==="cilinderkop_overhaul_niet_yanmar"&&React.createElement(NonYanmarMeasurements,{kop,model:activeWerkorder.motortype,phase:"after",onUpdate:(key,v)=>{const first=kop.assembly[0];updateRow("assembly",0,{...first,sourceMeasurements:{...(first.sourceMeasurements||{}),[key]:v}});}}),React.createElement(ChecklistTable,{rows:kop.assembly,onChange:(i,v)=>updateRow("assembly",i,v)}),
+ ),activePage===3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Assembly & Testing"),activeWerkorder.klustype==="cilinderkop_overhaul_niet_yanmar"&&React.createElement(NonYanmarDetailedMeasurements,{kop,model:activeWerkorder.motortype,phase:activePage===3?"after":"before",onUpdate:(key,v)=>{const first=kop.assembly[0];updateRow("assembly",0,{...first,sourceMeasurements:{...(first.sourceMeasurements||{}),[key]:v}});}}),activeWerkorder.klustype==="cilinderkop_overhaul_niet_yanmar"&&React.createElement(NonYanmarMeasurements,{kop,model:activeWerkorder.motortype,phase:"after",onUpdate:(key,v)=>{const first=kop.assembly[0];updateRow("assembly",0,{...first,sourceMeasurements:{...(first.sourceMeasurements||{}),[key]:v}});}}),React.createElement(ChecklistTable,{rows:kop.assembly,onChange:(i,v)=>updateRow("assembly",i,v)}),
 React.createElement("div",{style:{overflowX:"auto",marginTop:20}},React.createElement("h3",null,"AFTER — Completed Work Matrix"),React.createElement("div",{style:{minWidth:880}},React.createElement(KopMatrixTable,{data:makeKopCustomerPhase(koppen,"after",kopKlantData.after),heads:koppen,phase:"after",editable:true,onCellChange:(section,row,headIndex,value)=>{const p=makeKopCustomerPhase(koppen,"after",kopKlantData.after);const arr=[...(p.matrix?.[section]?.[row]||[])];arr[headIndex]=value;updateKopCustomer({...kopKlantData,after:{...p,matrix:{...p.matrix,[section]:{...p.matrix[section],[row]:arr}}}});}}))),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr",gap:14,marginTop:18}},React.createElement(Field,{label:"Additional information"},React.createElement("textarea",{rows:3,value:kop.aanvullendeInfo,onChange:e=>updateKop(activeKop,{aanvullendeInfo:e.target.value}),style:{...inputStyle,resize:"vertical"}}))))))),null);
   }
   return React.createElement("div",{style:{fontFamily:"Arial,sans-serif",padding:24,color:"#1f231c"}},
