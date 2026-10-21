@@ -94,8 +94,11 @@ function cylinderHeadLimitProfile(motortype){
 }
 function isWartsilaW32(m){return /^(?:WARTSILA)?W32$/.test(String(m||"").toUpperCase().replace(/[^A-Z0-9]/g,""));}
 function makerSeatRunoutLimit(model,seatId){
+ const key=String(model||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+ // MaK M25 and MaK 43 runout limit confirmed by workshop.
+ if(/^(?:MAK)?(?:M25|25|M43|43)$/.test(key))return 0.02;
  const entries=cylinderHeadSourceSpecification(model);
- if(!entries||!/^(?:WARTSILA)?(?:W20|W32|VASA32)$/.test(String(model||"").toUpperCase().replace(/[^A-Z0-9]/g,"")))return "";
+ if(!entries||!/^(?:WARTSILA)?(?:W20|W32|VASA32)$/.test(key))return "";
  const inlet=String(seatId||"").startsWith("S");
  const item=entries.find(([name,value])=>new RegExp(inlet?"inlet":"exhaust","i").test(name)&&/runout\s+max\s+([\d.]+)\s*mm/i.test(value));
  const match=item&&item[1].match(/runout\s+max\s+([\d.]+)\s*mm/i);
