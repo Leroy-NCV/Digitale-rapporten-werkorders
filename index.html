@@ -195,14 +195,20 @@ function NonYanmarDetailedMeasurements({kop,model,phase,onUpdate,readonly=false}
  function oneGroup(group,gi){
   const name=group[0],dims=group[1];
   const applicable=gi===layout.length?positions.slice(0,2):gi===layout.length+1?positions.slice(2):positions;
+  const options=/valve stem|valve spindle/i.test(name)?["","OK","NOT OK"]:/valve disc/i.test(name)?["","OK - To be ground","NOT OK - To be renewed"]:["","OK","NOT OK","To be repaired","To be renewed","N/A"];
   const rows=applicable.map(pos=>React.createElement("tr",{key:pos},
    React.createElement("td",{style:td},pos),
-   ...dims.map(dim=>React.createElement("td",{key:dim,style:td},oneCell("detail_"+phase+"_"+gi+"_"+pos+"_"+dim)))
+   ...dims.map(dim=>React.createElement("td",{key:dim,style:td},oneCell("detail_"+phase+"_"+gi+"_"+pos+"_"+dim))),
+   React.createElement("td",{style:td},readonly?(stored["condition_"+phase+"_"+gi+"_"+pos]?.measured||"—"):React.createElement("select",{
+    value:stored["condition_"+phase+"_"+gi+"_"+pos]?.measured||"",
+    onChange:e=>onUpdate("condition_"+phase+"_"+gi+"_"+pos,{measured:e.target.value}),
+    style:{width:"100%",minWidth:155,padding:6,border:"1px solid #bbb",borderRadius:3}
+   },...options.map(o=>React.createElement("option",{key:o,value:o},o||"— Select —"))))
   ));
   return React.createElement("div",{key:name,style:{overflowX:"auto",marginBottom:12,pageBreakInside:"avoid"}},
    React.createElement("strong",null,name),
-   React.createElement("table",{style:{borderCollapse:"collapse",width:"100%",minWidth:100+dims.length*85,marginTop:5}},
-    React.createElement("thead",null,React.createElement("tr",null,React.createElement("th",{style:td},"Valve"),...dims.map(dim=>React.createElement("th",{key:dim,style:td},dim)))),
+   React.createElement("table",{style:{borderCollapse:"collapse",width:"100%",minWidth:250+dims.length*85,marginTop:5}},
+    React.createElement("thead",null,React.createElement("tr",null,React.createElement("th",{style:td},"Valve"),...dims.map(dim=>React.createElement("th",{key:dim,style:td},dim)),React.createElement("th",{style:td},"Condition"))),
     React.createElement("tbody",null,...rows)
    )
   );
