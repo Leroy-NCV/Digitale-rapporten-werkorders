@@ -189,6 +189,30 @@ function OriginalMak25InletDrawing({model,phase}){
  React.createElement("figcaption",{style:{fontSize:12,fontWeight:700,marginBottom:7}},"Original MaK M25 drawing — inlet valve seat ring and seat bore"),
  React.createElement("img",{src:"assets/mak25-inlet-original.svg",alt:"Original inlet valve seat section from supplied MaK M25 report",style:{display:"block",maxWidth:"100%",maxHeight:180,objectFit:"contain"}}));
 }
+function W38SeatBoreMeasurements({kop,phase,onUpdate,readonly=false}){
+ const stored=kop?.assembly?.[0]?.sourceMeasurements||{};
+ const specs=[["S1","Inlet inner bore",140.03],["S2","Inlet inner bore",140.03],["E1","Exhaust inner bore",125.03],["E1","Exhaust outer bore",144.03],["E2","Exhaust inner bore",125.03],["E2","Exhaust outer bore",144.03]];
+ const cell={border:"1px solid #ccc",padding:6,fontSize:12};
+ return React.createElement("section",{style:{margin:"14px 0",pageBreakInside:"avoid"}},
+  React.createElement("h4",null,"W38A / W6L38A — valve seat bores in cylinder head"),
+  React.createElement("p",{style:{fontSize:12}},"Maximum bore diameters (mm); a reading above the maximum is NOT OK. Exhaust inner and outer bores are measured separately."),
+  React.createElement("table",{style:{width:"100%",borderCollapse:"collapse"}},
+   React.createElement("thead",null,React.createElement("tr",null,...["Seat","Measurement","Measured (mm)","Max (mm)","Assessment"].map(x=>React.createElement("th",{key:x,style:cell},x)))),
+   React.createElement("tbody",null,...specs.map(([pos,label,max])=>{
+    const key="w38_seat_"+phase+"_"+pos+"_"+label.replace(/[^a-z]+/gi,"_");
+    const value=stored[key]?.measured||"";
+    const n=Number(String(value).replace(",","."));
+    const status=!String(value).trim()||!Number.isFinite(n)?"—":n>max?"NOT OK":"OK";
+    return React.createElement("tr",{key},
+     React.createElement("td",{style:cell},pos),React.createElement("td",{style:cell},label),
+     React.createElement("td",{style:cell},readonly?value||"—":React.createElement("input",{type:"number",step:"0.001",value,onChange:e=>onUpdate(key,{measured:e.target.value}),style:{width:"100%",minWidth:90,padding:5,boxSizing:"border-box"}})),
+     React.createElement("td",{style:cell},max.toFixed(3)),
+     React.createElement("td",{style:cell,fontWeight:700,color:status==="NOT OK"?"#9b1c1c":"inherit"},status)
+    );
+   }))
+  )
+ );
+}
 function NonYanmarDetailedMeasurements({kop,model,phase,onUpdate,readonly=false}){
  const layout=nonYanmarLayout(model);
  if(!layout)return null;
@@ -225,7 +249,8 @@ function NonYanmarDetailedMeasurements({kop,model,phase,onUpdate,readonly=false}
   React.createElement("h3",{style:{fontSize:14}},"Manufacturer Measurement Protocol — "+model+" ("+phase.toUpperCase()+")"),
   React.createElement("p",{style:{fontSize:11}},"Enter actual measured dimensions. S1/S2 = inlet, E1/E2 = exhaust. Limit values and assessments are in Source Specifications. Unmatched dimensions are not automatically approved or rejected."),
   React.createElement(OriginalMak25InletDrawing,{model,phase}),
-  ...groups.map(oneGroup)
+  ...groups.map(oneGroup),
+  /^(?:WARTSILA)?(?:W38A|W6L38A)$/.test(String(model||"").toUpperCase().replace(/[^A-Z0-9]/g,""))?React.createElement(W38SeatBoreMeasurements,{kop,phase,onUpdate,readonly}):null
  );
 }
 function nonYanmarThreshold(label,spec){
