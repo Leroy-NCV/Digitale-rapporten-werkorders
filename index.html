@@ -185,7 +185,7 @@ function NonYanmarDetailedMeasurements({kop,model,phase,onUpdate,readonly=false}
  const layout=nonYanmarLayout(model);
  if(!layout)return null;
  const stored=kop?.assembly?.[0]?.sourceMeasurements||{};
- const groups=[...layout,["Inlet valve seat & bore",["Sealing D2","Runout","Bore Ød","Height H"]],["Exhaust valve seat & pocket",["Sealing D3","Runout","ØA","ØB","ØC","ØD","ØE"]]];
+ const groups=[...layout,["Inlet pockets",["Bore Ød","Height H"]],["Exhaust pockets",["ØA","ØB","ØC","ØD","ØE"]]];
  const positions=["S1","S2","E1","E2"];
  const td={border:"1px solid #bbb",padding:5,fontSize:11};
  function oneCell(key){
