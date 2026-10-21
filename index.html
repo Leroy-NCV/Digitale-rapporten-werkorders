@@ -1749,7 +1749,18 @@ function App() {
     if(/\bmak\b/.test(words))return !/\bmak\s*(?:25|32|43)(?!\d)/.test(words);
     return /\b(?:caterpillar|cat|abc|bergen\s*diesel|cummins|deutz|deuts|jenbacher|mitsubishi|mitsubushi|mtu|sulzer|volvo|swd|stork)\b|\bman\s*high\s*speed\b/.test(words);
   };
-  const availableMotorsForReport = (items,code) => isSelectedMotorReport(code)?items.filter(t=>!excludedMotorBrand(typeof t==="string"?t:(t?.naam||t?.engine_type||t?.label||""))):items;
+  const isNonYanmarCylinderHeadMotor = value => {
+    const name=String(value||"").toLowerCase().trim();
+    const compact=name.replace(/[^a-z0-9]/g,"");
+    return /himsen|hyundai|\\bmak\\b|\\bman\\b|manb&w|manbw|\\bmwm\\b|wartsila|wärtsilä|wã¤rtsilã¤|\\bvasa\\b/i.test(name)
+      || /^(?:mak|man|mwm|himsen|wartsila)/.test(compact)
+      || /(?:^|[^a-z0-9])l\\s*(?:27\\s*[\\/-]\\s*38|32\\s*[\\/-]\\s*40)(?!\\d)/i.test(name)
+      || /^(?:l2738|l3240)$/.test(compact);
+  };
+  const availableMotorsForReport = (items,code) => isSelectedMotorReport(code)?items.filter(t=>{
+    const name=typeof t==="string"?t:(t?.naam||t?.engine_type||t?.label||"");
+    return !excludedMotorBrand(name) && (code!=="cilinderkop"||!isNonYanmarCylinderHeadMotor(name));
+  }):items;
 
   const engineTypeOptions = Array.from(new Set([
     ...zuigerTemplates.map(t=>t?.naam),
