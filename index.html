@@ -174,6 +174,13 @@ function nonYanmarLayout(model){
  if(v.includes("W6L38A"))return NON_YANMAR_LAYOUTS.W38A;
  return NON_YANMAR_LAYOUTS[v]||NON_YANMAR_LAYOUTS[v.replace(/^WARTSILA/,"")]||null;
 }
+function OriginalMak25InletDrawing({model,phase}){
+ const key=String(model||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+ if(phase!=="before"||!["MAKM25","MAK25","M25"].includes(key))return null;
+ return React.createElement("figure",{style:{margin:"10px 0 16px",padding:"9px",border:"1px solid #ddd",pageBreakInside:"avoid"}},
+ React.createElement("figcaption",{style:{fontSize:12,fontWeight:700,marginBottom:7}},"Original MaK M25 drawing — inlet valve seat ring and seat bore"),
+ React.createElement("img",{src:"assets/mak25-inlet-original.svg",alt:"Original inlet valve seat section from supplied MaK M25 report",style:{display:"block",maxWidth:"100%",maxHeight:180,objectFit:"contain"}}));
+}
 function NonYanmarDetailedMeasurements({kop,model,phase,onUpdate,readonly=false}){
  const layout=nonYanmarLayout(model);
  if(!layout)return null;
@@ -203,6 +210,7 @@ function NonYanmarDetailedMeasurements({kop,model,phase,onUpdate,readonly=false}
  return React.createElement("section",{style:{margin:"15px 0",padding:10,border:"1px solid #ddd"}},
   React.createElement("h3",{style:{fontSize:14}},"Manufacturer Measurement Protocol — "+model+" ("+phase.toUpperCase()+")"),
   React.createElement("p",{style:{fontSize:11}},"Enter actual measured dimensions. S1/S2 = inlet, E1/E2 = exhaust. Limit values and assessments are in Source Specifications. Unmatched dimensions are not automatically approved or rejected."),
+  React.createElement(OriginalMak25InletDrawing,{model,phase}),
   ...groups.map(oneGroup)
  );
 }
