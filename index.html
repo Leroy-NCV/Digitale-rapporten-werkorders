@@ -214,23 +214,49 @@ function NonYanmarDetailedMeasurements({kop,model,phase,onUpdate,readonly=false}
   ...groups.map(oneGroup)
  );
 }
-function NonYanmarMeasurements({kop,model,phase,onUpdate,readonly=false}) {
- const fields=cylinderHeadSourceSpecification(model);
- if(!fields)return null;
- const values=kop?.assembly?.[0]?.sourceMeasurements||{};
- return React.createElement("section",{style:{margin:"18px 0",padding:12,border:"1px solid #dfe1d8",borderRadius:6}},
- React.createElement("h3",{style:{fontSize:15}},"Engine-Specific Measurements — "+model+" ("+phase.toUpperCase()+")"),
- React.createElement("p",{style:{fontSize:12}},"Values and test limits are taken from the supplied source report. Enter measurements only in the matching measurement fields. Blank or nonnumeric references are not automatic rejection limits."),
- React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
- React.createElement("thead",null,React.createElement("tr",null,...["Component / Measurement","Maker Specification","Measured","Assessment"].map(h=>React.createElement("th",{key:h,style:{textAlign:"left",padding:6,borderBottom:"1px solid #bbb"}},h)))),
- React.createElement("tbody",null,...fields.map(([label,limit],i)=>{
- const key=phase+"_"+i, item=values[key]||{};
- return React.createElement("tr",{key,style:{borderBottom:"1px solid #ddd"}},
- React.createElement("td",{style:{padding:6}},label),
- React.createElement("td",{style:{padding:6}},limit),
- React.createElement("td",{style:{padding:6}},readonly?(item.measured||"—"):React.createElement("input",{type:"text",value:item.measured||"",placeholder:"Measured (mm)",onChange:e=>onUpdate(key,{...item,measured:e.target.value}),style:{...inputStyle,maxWidth:135,width:"100%"}})),
- React.createElement("td",{style:{padding:6}},readonly?(item.result||"—"):React.createElement("select",{value:item.result||"",onChange:e=>onUpdate(key,{...item,result:e.target.value}),style:{...inputStyle,width:"100%"}},...["","OK","NOT OK","RENEWED","GRINDED","REPAIRED","N/A"].map(v=>React.createElement("option",{key:v,value:v},v||"—"))))
- );}))));
+function nonYanmarThreshold(label,spec){
+  const name=String(label||"").toLowerCase(),src=String(spec||"").toLowerCase();
+  if(/verify|depends|no wear limit|not specified|no numeric|consult/.test(src))return null;
+  if(/\b(?:max|reject above)\s+[\d.]+\s*\/\s*[\d.]+/.test(src))return null;
+  let match=src.match(/(?:reject above|(?:^|[;\s])max(?:imum)?(?:\s+diameter)?|limit clearance|clearance limit)\s*:?\s*(\d+(?:\.\d+)?)/);
+  if(match)return {value:Number(match[1]),direction:"max"};
+  match=src.match(/(?:reject below|(?:^|[;\s])min(?:imum)?)\s*:?\s*(\d+(?:\.\d+)?)/);
+  if(match)return {value:Number(match[1]),direction:"min"};
+  match=src.match(/(?:wear\/repair limit|wear limit)\s*:?\s*(\d+(?:\.\d+)?)/);
+  if(match&&/clearance|guide pin|stem\/guide/.test(name))return {value:Number(match[1]),direction:"max"};
+  if(match&&/valve face|stem diameter/.test(name))return {value:Number(match[1]),direction:"min"};
+  return null;
+}
+function nonYanmarAssessment(measured,label,spec){
+  if(measured===null||measured===undefined||String(measured).trim()==="")return "";
+  const rule=nonYanmarThreshold(label,spec);
+  if(!rule)return "NOT EVALUATED";
+  const value=Number(String(measured).replace(",","."));
+  if(!Number.isFinite(value))return "NOT EVALUATED";
+  return (rule.direction==="max"?value>rule.value:value<rule.value)?"NOT OK":"OK";
+}
+function NonYanmarMeasurements({kop,model,phase,onUpdate,readonly=false}){
+  const fields=cylinderHeadSourceSpecification(model);
+  if(!fields)return null;
+  const values=kop?.assembly?.[0]?.sourceMeasurements||{};
+  const cell={padding:6,borderBottom:"1px solid #ddd",fontSize:12};
+  return React.createElement("section",{style:{margin:"18px 0",padding:12,border:"1px solid #dfe1d8",borderRadius:6}},
+    React.createElement("h3",{style:{fontSize:15}},"Engine-Specific Measurements — "+model+" ("+phase.toUpperCase()+")"),
+    React.createElement("p",{style:{fontSize:12}},"Limits come from the supplied engine report. Only unambiguous rejection limits are assessed automatically."),
+    React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
+      React.createElement("thead",null,React.createElement("tr",null,
+        ...["Component / Measurement","Maker Specification","Measured","Assessment"].map(h=>React.createElement("th",{key:h,style:{...cell,textAlign:"left"}},h)))),
+      React.createElement("tbody",null,...fields.map(([label,spec],i)=>{
+        const key=phase+"_"+i,item=values[key]||{},status=nonYanmarAssessment(item.measured,label,spec);
+        return React.createElement("tr",{key},
+          React.createElement("td",{style:cell},label),
+          React.createElement("td",{style:cell},spec),
+          React.createElement("td",{style:cell},readonly?(item.measured||"—"):React.createElement("input",{type:"text",value:item.measured||"",placeholder:"Measured (mm)",onChange:e=>onUpdate(key,{...item,measured:e.target.value}),style:{...inputStyle,maxWidth:135,width:"100%"}})),
+          React.createElement("td",{style:{...cell,color:status==="NOT OK"?"#b52626":status==="OK"?"#237340":"#777",fontWeight:700}},status||"—")
+        );
+      }))
+    )
+  );
 }
 function makeCilinderkop(nummer) {
   return {
@@ -886,7 +912,7 @@ function CustomerCylinderHeadReport(props){
           React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:8}},React.createElement("tbody",null,
            ...cylinderHeadSourceSpecification(werkorder.motortype).map(([name,spec],i)=>{const value=k.assembly?.[0]?.sourceMeasurements?.[phase+"_"+i]||{};return React.createElement("tr",{key:i},
             React.createElement("td",{style:cell},name),React.createElement("td",{style:cell},spec),
-            React.createElement("td",{style:cell},value.measured||"—"),React.createElement("td",{style:cell},value.result||"—"));})
+            React.createElement("td",{style:cell},value.measured||"—"),React.createElement("td",{style:cell},nonYanmarAssessment(value.measured,name,spec)||"—"));})
           ))
         ),
         phase==="after"&&React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:8}},React.createElement("tbody",null,
