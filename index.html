@@ -1772,6 +1772,7 @@ function App() {
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const saveTimer = useRef(null);
+  const werkopdrachtVerwijderen = useRef(false);
   const [woDraft, setWoDraft] = useState({ orderNummer: "", schipKlant: "", datum: new Date().toISOString().slice(0,10) });
   const [huidigeWerkopdracht, setHuidigeWerkopdracht] = useState(null);
   const [toegevoegdeWerkorders, setToegevoegdeWerkorders] = useState([]);
@@ -2230,18 +2231,32 @@ function App() {
   async function terugsturen(){ try{await sb(`werkorders?id=eq.${activeWerkorder.id}`,{method:"PATCH",body:JSON.stringify({status:"teruggestuurd",opmerking_controle:terugOpmerking}),prefer:"return=minimal"});setView("overzicht");setActiveWerkorder(null);}catch(e){setLoadError(e.message)} }
   async function verwijderWerkopdracht(wop){
     if(!heeftVolledigeRechten(monteurNaam)){setLoadError("Alleen Leroy, Daan, Brito of Frank Verschaick kan werkopdrachten verwijderen.");return;}
+    if(werkopdrachtVerwijderen.current) return;
+    werkopdrachtVerwijderen.current=true;
+    setLoadError("");
+    let stap="werkorders ophalen";
+    let verwijderingGestart=false;
     try{
       const ids=(await sb(`werkorders?werkopdracht_id=eq.${wop.id}&select=id`))||[];
+      // Sequentieel stoppen bij de eerste fout; nooit ouders verwijderen na een rapportfout.
+      // Losse REST-verzoeken vormen geen transactie: eerdere deletes zijn niet terug te draaien.
       for(const x of ids){
-        await sb(`cilinderkop_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{});
-        await sb(`zuiger_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{});
-        await sb(`drijfstang_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{});
-        await sb(`krukas_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{});
-        await sb(`component_rapporten?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"}).catch(()=>{});
+        for(const tabel of ["cilinderkop_rapporten","zuiger_rapporten","drijfstang_rapporten","krukas_rapporten","component_rapporten"]){
+          stap=`${tabel} verwijderen voor werkorder ${x.id}`;
+          verwijderingGestart=true;
+          await sb(`${tabel}?werkorder_id=eq.${x.id}`,{method:"DELETE",prefer:"return=minimal"});
+        }
       }
+      stap="werkorders verwijderen";
+      verwijderingGestart=true;
       await sb(`werkorders?werkopdracht_id=eq.${wop.id}`,{method:"DELETE",prefer:"return=minimal"});
+      stap="werkopdracht verwijderen";
       await sb(`werkopdrachten?id=eq.${wop.id}`,{method:"DELETE",prefer:"return=minimal"}); loadOverzicht();
-    }catch(e){setLoadError(e.message)}
+    }catch(e){
+      setLoadError(`Verwijderen van werkopdracht gestopt bij ${stap}: ${e.message}${verwijderingGestart?" Mogelijk zijn al gegevens verwijderd; controleer de werkopdracht voordat je opnieuw probeert.":""}`);
+    }finally{
+      werkopdrachtVerwijderen.current=false;
+    }
   }
   async function voegKlustypeToe(){
     if(!nieuwKlustype.label.trim())return;
