@@ -214,6 +214,45 @@ function W38SeatBoreMeasurements({kop,phase,onUpdate,readonly=false}){
   )
  );
 }
+function NonYanmarSeatBoreLimits({kop,model,phase,onUpdate,readonly=false}){
+ const norm=String(model||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+ const isW20=/^(?:WARTSILA)?W20$/.test(norm);
+ const isSTX=norm.includes("STX")&&norm.includes("2738");
+ if(!isW20&&!isSTX)return null;
+ const stored=kop?.assembly?.[0]?.sourceMeasurements||{};
+ const specs=isW20?[
+  ["S1","D1 — inlet seat ring",78.00,null],["S2","D1 — inlet seat ring",78.00,null],
+  ["S1","D2 — inlet cylinder head bore",78.019,78.019],["S2","D2 — inlet cylinder head bore",78.019,78.019],
+  ["E1","D3 — exhaust seat ring",68.80,null],["E2","D3 — exhaust seat ring",68.80,null],
+  ["E1","D4 — exhaust inner head bore",67.019,67.019],["E2","D4 — exhaust inner head bore",67.019,67.019],
+  ["E1","D5 — exhaust outer head bore",78.019,78.019],["E2","D5 — exhaust outer head bore",78.019,78.019]
+ ]:[
+  ["S1","Inlet pocket — standard machining",88.635,88.635],["S2","Inlet pocket — standard machining",88.635,88.635],
+  ["E1","Exhaust pocket — standard machining",102.522,102.522],["E2","Exhaust pocket — standard machining",102.522,102.522]
+ ];
+ const td={border:"1px solid #ccc",padding:6,fontSize:11};
+ return React.createElement("section",{style:{margin:"12px 0",pageBreakInside:"avoid"}},
+  React.createElement("h4",null,isW20?"W20 — seat rings and cylinder head bores":"STX 27/38 — standard-machining seat pockets"),
+  React.createElement("p",{style:{fontSize:11}},isW20?
+   "D1 and D3 are supplied reference dimensions, not rejection limits. D2, D4 and D5 show upper bore limits. No automatic acceptance below these maxima without checking the complete manufacturer tolerances.":
+   "The following limits apply to standard machining only; +1 mm and +2 mm oversize pockets require their separate manufacturer limits. Measurements do not establish fit or suitability on their own."),
+  React.createElement("table",{style:{width:"100%",borderCollapse:"collapse"}},
+   React.createElement("thead",null,React.createElement("tr",null,...["Valve","Dimension","Measured (mm)","Reference / max (mm)","Assessment"].map(h=>React.createElement("th",{key:h,style:td},h)))),
+   React.createElement("tbody",null,...specs.map(([pos,label,ref,max])=>{
+    const key=(isW20?"w20_":"stx_")+"seat_"+phase+"_"+pos+"_"+label.replace(/[^a-z0-9]+/gi,"_");
+    const value=stored[key]?.measured??"";
+    const n=Number(String(value).replace(",","."));
+    const status=!String(value).trim()||!Number.isFinite(n)?"—":max===null?"REFERENCE ONLY":n>max?"NOT OK":"WITHIN MAX";
+    return React.createElement("tr",{key},
+     React.createElement("td",{style:td},pos),React.createElement("td",{style:td},label),
+     React.createElement("td",{style:td},readonly?String(value||"—"):React.createElement("input",{type:"number",step:"0.001",value,onChange:e=>onUpdate(key,{measured:e.target.value}),style:{width:"100%",minWidth:78,padding:5,boxSizing:"border-box"}})),
+     React.createElement("td",{style:td},ref.toFixed(3)+(max===null?" (ref)":" (max)")),
+     React.createElement("td",{style:{...td,fontWeight:700,color:status==="NOT OK"?"#9b1c1c":"inherit"}},status)
+    );
+   }))
+  )
+ );
+}
 function NonYanmarDetailedMeasurements({kop,model,phase,onUpdate,readonly=false}){
  const layout=nonYanmarLayout(model);
  if(!layout)return null;
@@ -251,6 +290,7 @@ function NonYanmarDetailedMeasurements({kop,model,phase,onUpdate,readonly=false}
   React.createElement("p",{style:{fontSize:11}},"Enter actual measured dimensions. S1/S2 = inlet, E1/E2 = exhaust. Limit values and assessments are in Source Specifications. Unmatched dimensions are not automatically approved or rejected."),
   React.createElement(OriginalMak25InletDrawing,{model,phase}),
   ...groups.map(oneGroup),
+  React.createElement(NonYanmarSeatBoreLimits,{kop,model,phase,onUpdate,readonly}),
   /^(?:WARTSILA)?(?:W38A|W6L38A)$/.test(String(model||"").toUpperCase().replace(/[^A-Z0-9]/g,""))?React.createElement(W38SeatBoreMeasurements,{kop,phase,onUpdate,readonly}):null
  );
 }
