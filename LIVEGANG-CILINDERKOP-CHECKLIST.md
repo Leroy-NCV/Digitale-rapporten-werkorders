@@ -17,3 +17,11 @@
 - [ ] Akkoord van eigenaar voor productie/livegang.
 
 **Status:** technisch deels bijgewerkt; nog NIET als productiegereed afgetekend.
+
+## Controle 27 oktober 2026 — laatste uitvoeringsronde
+- [x] W20-tekeningplaatsen in de rapportcode toegevoegd; tonen alleen in BEFORE-protocol.
+- [ ] Drie originele PNG-bestanden daadwerkelijk naar `assets/w20-valve-dimensions.png`, `assets/w20-seat-rings-d1-d3.png`, en `assets/w20-seat-bores-d2-d4-d5.png` uploaden. De PNG-bestanden zijn in een ZIP aangeleverd in ChatGPT maar staan **nog niet in de GitHub repository**. Totdat ze zijn geupload worden ze niet weergegeven.
+- [ ] Pagina in echte browser controleren. Publieke GitHub Pages URL kon vanuit deze omgeving niet worden geopend.
+- [ ] PDF-export en opslaan/heropenen testen in browser.
+- [ ] W38 / STX technisch tekenen/specs extern laten aftekenen.
+**Geen livegangvrijgave afgegeven.**
