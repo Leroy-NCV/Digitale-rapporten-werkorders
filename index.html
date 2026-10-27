@@ -246,7 +246,8 @@ function NonYanmarSeatBoreLimits({kop,model,phase,onUpdate,readonly=false}){
     const key=(isW20?"w20_":"stx_")+"seat_"+phase+"_"+pos+"_"+label.replace(/[^a-z0-9]+/gi,"_");
     const value=stored[key]?.measured??"";
     const n=Number(String(value).replace(",","."));
-    const status=!String(value).trim()||!Number.isFinite(n)?"—":max===null?"REFERENCE ONLY":n>max?"NOT OK":"WITHIN MAX";
+    const w20Lower=isW20&&max!==null?(label.includes("D4")?67.000:78.000):null;
+    const status=!String(value).trim()||!Number.isFinite(n)?"—":max===null?"REFERENCE ONLY":n>max||(w20Lower!==null&&n<w20Lower)?"NOT OK":isW20?"WITHIN BORE RANGE":"WITHIN MAX";
     return React.createElement("tr",{key},
      React.createElement("td",{style:td},pos),React.createElement("td",{style:td},label),
      React.createElement("td",{style:td},readonly?String(value||"—"):React.createElement("input",{type:"number",step:"0.001",value,onChange:e=>onUpdate(key,{measured:e.target.value}),style:{width:"100%",minWidth:78,padding:5,boxSizing:"border-box"}})),
@@ -269,7 +270,7 @@ function W20OriginalDrawingReferences({model,phase}){
   React.createElement("h4",null,"W20 — technical drawing references"),
   ...drawings.map(([title,src])=>React.createElement("figure",{key:src,style:{margin:"6px 0 13px",pageBreakInside:"avoid"}},
    React.createElement("figcaption",{style:{fontSize:11,fontWeight:600,marginBottom:5}},title),
-   React.createElement("img",{src,alt:title,style:{maxWidth:"100%",maxHeight:240,objectFit:"contain",display:"block"},onError:e=>{e.currentTarget.style.display="none";}})
+   React.createElement("img",{src,alt:title,style:{maxWidth:"100%",maxHeight:240,objectFit:"contain",display:"block"},onError:e=>{e.currentTarget.style.display="none";if(e.currentTarget.nextSibling)e.currentTarget.nextSibling.style.display="block";}}),React.createElement("span",{style:{display:"none",fontSize:11,color:"#9b1c1c"}},"Original drawing not available in repository — not yet approved for release.")
   )),
   React.createElement("p",{style:{fontSize:10}},"Drawing reference: section mark disappearance during machining is a recommendation to replace the seat ring. D1 = 78.00 mm; D3 = 68.80 mm.")
  );
