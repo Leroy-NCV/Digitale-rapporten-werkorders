@@ -228,14 +228,18 @@ function NonYanmarSeatBoreLimits({kop,model,phase,onUpdate,readonly=false}){
   ["E1","D5 — exhaust outer head bore",78.019,78.019],["E2","D5 — exhaust outer head bore",78.019,78.019]
  ]:[
   ["S1","Inlet pocket — standard machining",88.635,88.635],["S2","Inlet pocket — standard machining",88.635,88.635],
-  ["E1","Exhaust pocket — standard machining",102.522,102.522],["E2","Exhaust pocket — standard machining",102.522,102.522]
+  ["E1","Exhaust pocket — standard machining",102.522,102.522],["E2","Exhaust pocket — standard machining",102.522,102.522],
+  ["S1","Inlet pocket — oversize +1 mm",89.635,89.635],["S2","Inlet pocket — oversize +1 mm",89.635,89.635],
+  ["E1","Exhaust pocket — oversize +1 mm",103.522,103.522],["E2","Exhaust pocket — oversize +1 mm",103.522,103.522],
+  ["S1","Inlet pocket — oversize +2 mm",90.635,90.635],["S2","Inlet pocket — oversize +2 mm",90.635,90.635],
+  ["E1","Exhaust pocket — oversize +2 mm",104.522,104.522],["E2","Exhaust pocket — oversize +2 mm",104.522,104.522]
  ];
  const td={border:"1px solid #ccc",padding:6,fontSize:11};
  return React.createElement("section",{style:{margin:"12px 0",pageBreakInside:"avoid"}},
-  React.createElement("h4",null,isW20?"W20 — seat rings and cylinder head bores":"STX 27/38 — standard-machining seat pockets"),
+  React.createElement("h4",null,isW20?"W20 — seat rings and cylinder head bores":"STX 27/38 — standard and oversize seat pockets"),
   React.createElement("p",{style:{fontSize:11}},isW20?
    "D1 and D3 are supplied reference dimensions, not rejection limits. D2, D4 and D5 show upper bore limits. No automatic acceptance below these maxima without checking the complete manufacturer tolerances.":
-   "The following limits apply to standard machining only; +1 mm and +2 mm oversize pockets require their separate manufacturer limits. Measurements do not establish fit or suitability on their own."),
+   "Use only the applicable standard, +1 mm or +2 mm pocket measurement for the installed seat ring. Values are upper limits from the source specification; machining suitability requires separate dimensional verification."),
   React.createElement("table",{style:{width:"100%",borderCollapse:"collapse"}},
    React.createElement("thead",null,React.createElement("tr",null,...["Valve","Dimension","Measured (mm)","Reference / max (mm)","Assessment"].map(h=>React.createElement("th",{key:h,style:td},h)))),
    React.createElement("tbody",null,...specs.map(([pos,label,ref,max])=>{
