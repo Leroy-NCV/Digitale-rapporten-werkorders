@@ -25,3 +25,12 @@
 - [ ] PDF-export en opslaan/heropenen testen in browser.
 - [ ] W38 / STX technisch tekenen/specs extern laten aftekenen.
 **Geen livegangvrijgave afgegeven.**
+
+## Afrondingscontrole 27 oktober 2026
+- [x] W20 D2/D4/D5 bovengrens én ondergrens in interactieve meetcontrole opgenomen. Ondergrenzen D2/D5 = 78.000 mm, D4 = 67.000 mm.
+- [x] Bij ontbrekende W20 afbeelding expliciete foutmelding toegevoegd (in plaats van de afbeelding stil te verbergen).
+- [ ] Drie PNG's werkelijk naar de repository uploaden. Het originele ZIP-pakket bestaat in de sessie, maar de GitHub-connector kan geen lokale binaire bestanden lezen; verzending van deze beelden is niet uitgevoerd.
+- [ ] Live GitHub Pages-test. De URL was vanuit de beschikbare webomgeving niet te openen.
+- [ ] PDF visueel testen en werkorder opslaan/heropenen in een browser.
+- [ ] Technisch akkoord W38/STX bij eigenaar verkrijgen.
+Geen productievrijgave tot deze punten zijn aangetoond.
