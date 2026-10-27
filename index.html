@@ -257,6 +257,23 @@ function NonYanmarSeatBoreLimits({kop,model,phase,onUpdate,readonly=false}){
   )
  );
 }
+function W20OriginalDrawingReferences({model,phase}){
+ const norm=String(model||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+ if(phase!=="before"||!(/^(?:WARTSILA)?W20$/.test(norm)))return null;
+ const drawings=[
+  ["Valve dimensions — original manufacturer illustration","assets/w20-valve-dimensions.png"],
+  ["Inlet and exhaust seat ring details — D1 / D3","assets/w20-seat-rings-d1-d3.png"],
+  ["Cylinder head seat bores — D2 / D4 / D5","assets/w20-seat-bores-d2-d4-d5.png"]
+ ];
+ return React.createElement("section",{style:{margin:"12px 0",pageBreakInside:"avoid"}},
+  React.createElement("h4",null,"W20 — technical drawing references"),
+  ...drawings.map(([title,src])=>React.createElement("figure",{key:src,style:{margin:"6px 0 13px",pageBreakInside:"avoid"}},
+   React.createElement("figcaption",{style:{fontSize:11,fontWeight:600,marginBottom:5}},title),
+   React.createElement("img",{src,alt:title,style:{maxWidth:"100%",maxHeight:240,objectFit:"contain",display:"block"},onError:e=>{e.currentTarget.style.display="none";}})
+  )),
+  React.createElement("p",{style:{fontSize:10}},"Drawing reference: section mark disappearance during machining is a recommendation to replace the seat ring. D1 = 78.00 mm; D3 = 68.80 mm.")
+ );
+}
 function NonYanmarDetailedMeasurements({kop,model,phase,onUpdate,readonly=false}){
  const layout=nonYanmarLayout(model);
  if(!layout)return null;
@@ -293,6 +310,7 @@ function NonYanmarDetailedMeasurements({kop,model,phase,onUpdate,readonly=false}
   React.createElement("h3",{style:{fontSize:14}},"Manufacturer Measurement Protocol — "+model+" ("+phase.toUpperCase()+")"),
   React.createElement("p",{style:{fontSize:11}},"Enter actual measured dimensions. S1/S2 = inlet, E1/E2 = exhaust. Limit values and assessments are in Source Specifications. Unmatched dimensions are not automatically approved or rejected."),
   React.createElement(OriginalMak25InletDrawing,{model,phase}),
+  React.createElement(W20OriginalDrawingReferences,{model,phase}),
   ...groups.map(oneGroup),
   React.createElement(NonYanmarSeatBoreLimits,{kop,model,phase,onUpdate,readonly}),
   /^(?:WARTSILA)?(?:W38A|W6L38A)$/.test(String(model||"").toUpperCase().replace(/[^A-Z0-9]/g,""))?React.createElement(W38SeatBoreMeasurements,{kop,phase,onUpdate,readonly}):null
