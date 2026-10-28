@@ -1059,7 +1059,7 @@ function CustomerCylinderHeadReport(props){
     isNonYanmar&&React.createElement("div",{style:{fontSize:10,marginBottom:10}},"Engine-specific measurements and limits are included below; see manufacturer/source report for applicability."),
     React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginBottom:"3mm"}},React.createElement("tbody",null,
       React.createElement("tr",null,React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Vessel / Customer"),React.createElement("td",{style:cell},werkorder.werkopdracht&&werkorder.werkopdracht.schip_klant||""),React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Date"),React.createElement("td",{style:cell},werkorder.werkopdracht&&werkorder.werkopdracht.datum||"")),
-      React.createElement("tr",null,React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"O/ref"),React.createElement("td",{style:cell},(werkorder.werkopdracht&&werkorder.werkopdracht.order_nummer||"")+" ("+phase+")"),React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Engine type"),React.createElement("td",{style:cell},werkorder.motortype==="-"?"":werkorder.motortype)),
+      React.createElement("tr",null,React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"O/ref"),React.createElement("td",{style:cell},(werkorder.werkopdracht&&werkorder.werkopdracht.order_nummer||"")+" ("+phase+")"),React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Engine type"),React.createElement("td",{style:cell},werkorder.motortype==="-"?"":isYanmarEY18(werkorder.motortype)?"EY18":werkorder.motortype)),
       React.createElement("tr",null,React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Technician"),React.createElement("td",{style:cell},werkorderMonteursTekst(werkorder)||""),React.createElement("td",{style:Object.assign({},cell,{fontWeight:700})},"Subject"),React.createElement("td",{style:cell},"Cylinder head Assy, "+String(koppen.length).padStart(2,"0")+" pc."))
     )),
     React.createElement(KopMatrixTable,{data:p,heads:koppen,phase:phase,editable:false}),
@@ -1075,7 +1075,7 @@ function CustomerCylinderHeadReport(props){
               React.createElement("td",{style:cell},row.result||((row.measuredQ!==undefined||row.measuredR!==undefined)?"Q: "+(row.measuredQ||"—")+", R: "+(row.measuredR||"—"):(row.measured??"—"))),
               React.createElement("td",{style:cell},isYanmarEY18(werkorder.motortype)&&phase==="before"&&(
  (row.measuredQ!==undefined&&row.measuredR!==undefined)
- ? (row.measuredQ===""||row.measuredR===""?"Result: —":(isRejected(row.measuredQ,row.limitQ,"min")===true||isRejected(row.measuredR,row.limitR,"min")===true?"Result: Rejected":"Result: OK"))
+ ? (row.measuredQ===""||row.measuredR===""?"Result: —":(isRejected(row.measuredQ,row.limitQ,"min")===null||isRejected(row.measuredR,row.limitR,"min")===null?"Result: N/A":isRejected(row.measuredQ,row.limitQ,"min")===true||isRejected(row.measuredR,row.limitR,"min")===true?"Result: Rejected":"Result: OK"))
  : (row.measured!==undefined&&row.limit!==undefined&&row.nominal!==undefined)
  ? (row.measured===""?"Result: —":row.nominal===""?"Result: N/A":(isRejected(Number(row.measured)-Number(row.nominal),row.limit,row.direction)?"Result: Rejected":"Result: OK"))
  : (row.measured!==undefined&&row.limit!==undefined)
