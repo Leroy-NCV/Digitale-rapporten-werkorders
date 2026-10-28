@@ -1073,7 +1073,15 @@ function CustomerCylinderHeadReport(props){
             ...(Array.isArray(rows)?rows:[]).map((row,i)=>React.createElement("tr",{key:i},
               React.createElement("td",{style:cell},row.label||row.id||""),
               React.createElement("td",{style:cell},row.result||((row.measuredQ!==undefined||row.measuredR!==undefined)?"Q: "+(row.measuredQ||"—")+", R: "+(row.measuredR||"—"):(row.measured??"—"))),
-              React.createElement("td",{style:cell},row.remarks||((row.limitQ!==undefined||row.limitR!==undefined)?"Limits Q/R: "+(row.limitQ??"")+" / "+(row.limitR??""):row.limit!==undefined?"Limit: "+row.limit:""))
+              React.createElement("td",{style:cell},isYanmarEY18(werkorder.motortype)&&phase==="before"&&(
+ (row.measuredQ!==undefined&&row.measuredR!==undefined)
+ ? (row.measuredQ===""||row.measuredR===""?"Result: —":(isRejected(row.measuredQ,row.limitQ,"min")===true||isRejected(row.measuredR,row.limitR,"min")===true?"Result: Rejected":"Result: OK"))
+ : (row.measured!==undefined&&row.limit!==undefined&&row.nominal!==undefined)
+ ? (row.measured===""?"Result: —":row.nominal===""?"Result: N/A":(isRejected(Number(row.measured)-Number(row.nominal),row.limit,row.direction)?"Result: Rejected":"Result: OK"))
+ : (row.measured!==undefined&&row.limit!==undefined)
+ ? (row.measured===""?"Result: —":(isRejected(row.measured,row.limit,row.direction)?"Result: Rejected":"Result: OK"))
+ : (row.remarks||"")
+ : row.remarks||((row.limitQ!==undefined||row.limitR!==undefined)?"Limits Q/R: "+(row.limitQ??"")+" / "+(row.limitR??""):row.limit!==undefined?"Limit: "+row.limit:""))
             ))
           ))
         )),
