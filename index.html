@@ -89,7 +89,8 @@ const DISASSEMBLY_CHECKLIST = [
 const CYLINDER_HEAD_LIMIT_PROFILES = {"6EY18ALW":{"sQ":4.3,"sR":5.4,"eQ":4.3,"eR":5.4,"sNom":14,"sLimit":-0.32,"eNom":14,"eLimit":-0.35,"sGuideLimit":0.26,"eGuideLimit":0.28},"6EY22LW":{"sQ":5,"sR":7.9,"eQ":5,"eR":7.9,"sNom":16,"sLimit":-0.32,"eNom":16,"eLimit":-0.35},"6N18L-EV":{"sQ":4.3,"sR":5.4,"eQ":4.3,"eR":5.4,"sNom":14,"sLimit":-0.26,"eNom":14,"eLimit":-0.28},"T260":{"sQ":4.2,"sR":9.8,"eQ":3.8,"eR":8.5,"sNom":19,"sLimit":-0.4,"eNom":19,"eLimit":-0.4},"8N21AL-GV":{"sQ":4,"sR":8,"eQ":4.5,"eR":7,"sNom":14,"sLimit":-0.32,"eNom":14,"eLimit":-0.32},"Z280":{"sQ":3.8,"sR":10.2,"eQ":3.5,"eR":9.9,"sNom":21,"sLimit":null,"eNom":21,"eLimit":null},"6N165L-SN":{"sQ":2.7,"sR":5.6,"eQ":1.6,"eR":6.1,"sNom":12,"sLimit":-0.18,"eNom":12,"eLimit":-0.18},"M200L-EN":{"sQ":3,"sR":8,"eQ":3.4,"eR":6.5,"sNom":14,"sLimit":-0.3,"eNom":14,"eLimit":-0.3},"M220L-SN":{"sQ":3.7,"sR":8,"eQ":3.2,"eR":8.1,"sNom":16,"sLimit":-0.28,"eNom":16,"eLimit":-0.37},"6N260L-UN":{"sQ":7,"sR":7.7,"eQ":4,"eR":10,"sNom":19,"sLimit":-0.4,"eNom":19,"eLimit":-0.4},"6N280L-EV":{"sQ":7.5,"sR":7.2,"eQ":4.5,"eR":9.3,"sNom":21,"sLimit":-0.4,"eNom":21,"eLimit":-0.4},"6N330":{"sQ":9,"sR":13.8,"eQ":5,"eR":12.8,"sNom":24,"sLimit":-0.4,"eNom":24,"eLimit":-0.4},"T240L-ET":{"sQ":3.8,"sR":9.6,"eQ":3.5,"eR":10,"sNom":16,"sLimit":-0.4,"eNom":16,"eLimit":-0.4},"6EY26L":{"sQ":7.1,"sR":7,"eQ":4,"eR":10.9,"sNom":19,"sLimit":-0.32,"eNom":19,"eLimit":-0.35}};
 function cylinderHeadLimitProfile(motortype){
  const key=String(motortype||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
- const match=Object.entries(CYLINDER_HEAD_LIMIT_PROFILES).find(([model])=>key===model.toUpperCase().replace(/[^A-Z0-9]/g,"")||key==="YANMAR"+model.toUpperCase().replace(/[^A-Z0-9]/g,""));
+ const lookup=(key==="EY18"||key==="YANMAREY18"||key==="6EY18"||key==="YANMAR6EY18")?"6EY18ALW":key;
+ const match=Object.entries(CYLINDER_HEAD_LIMIT_PROFILES).find(([model])=>lookup===model.toUpperCase().replace(/[^A-Z0-9]/g,"")||lookup==="YANMAR"+model.toUpperCase().replace(/[^A-Z0-9]/g,""));
  return match?match[1]:null;
 }
 function isWartsilaW32(m){return /^(?:WARTSILA)?W32$/.test(String(m||"").toUpperCase().replace(/[^A-Z0-9]/g,""));}
@@ -97,7 +98,7 @@ function makerSeatDiameterLimit(model,seatId){
  const key=String(model||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
  const inlet=String(seatId||"").startsWith("S");
  const limits={W32:[113,110],WARTSILAW32:[113,110],VASA32:[109,108],W20:[52,48],WARTSILAW20:[52,48],W38A:[130,130],W6L38A:[130,130],WARTSILAW38A:[130,130],WARTSILAW6L38A:[130,130]};
- if(key==="6EY18ALW"||key==="YANMAR6EY18ALW")return 58;
+ if(/^(?:YANMAR)?(?:6)?EY18(?:ALW)?$/.test(key))return 58;
  return limits[key]?(inlet?limits[key][0]:limits[key][1]):"";
 }
 function hasSeatDiameterLimit(model){return makerSeatDiameterLimit(model,"S1")!=="";}
