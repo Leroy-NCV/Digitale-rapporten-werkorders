@@ -1050,6 +1050,42 @@ function KopMatrixTable(props){
   );
 }
 
+function EY18ApprovedInspection({kop}){
+ const positions=["S1","S2","E1","E2"];
+ const c={padding:"5px 7px",borderBottom:"1px solid #ccd7df",fontSize:9};
+ const head={fontSize:13,color:"#203c56",margin:"12px 0 6px"};
+ const val=v=>v===undefined||v===null||v===""?"—":String(v);
+ const result=(m,lim,dir)=>{const x=isRejected(m,lim,dir);return x===null?"—":x?"Rejected":"OK";};
+ const table=(headers,rows)=>React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginBottom:"12px"}},
+  React.createElement("thead",null,React.createElement("tr",{style:{background:"#e5edf3"}},...headers.map((h,i)=>React.createElement("th",{key:i,style:{...c,textAlign:"left",borderBottom:"1px solid #24415b"}},h)))),
+  React.createElement("tbody",null,...rows.map((cells,i)=>React.createElement("tr",{key:i,style:{background:i%2?"#f5f7f9":"white"}},...cells.map((x,j)=>React.createElement("td",{key:j,style:c},x))))));
+ const title=t=>React.createElement("h3",{style:head},t);
+ const by=(rows,id)=>(rows||[]).find(r=>r.id===id)||{};
+ const saved=kop.assembly?.[0]?.sourceMeasurements||{};
+ const stored=k=>saved[k]?.measured??"";
+ const pocket=k=>stored("ey18_before_"+k);
+ const pairResult=(a,b)=>{if(a===""||b==="")return "—";const na=Number(a),nb=Number(b);if(!Number.isFinite(na)||!Number.isFinite(nb))return "N/A";return [[59,67],[59.5,67.5],[60,68]].some(([x,y])=>na>=x&&na<=x+.019&&nb>=y&&nb<=y+.019)?"OK":"Rejected";};
+ const block=(...items)=>React.createElement("section",{style:{pageBreakInside:"avoid",marginBottom:15}},...items);
+ return React.createElement("div",{style:{fontFamily:"Arial,sans-serif",color:"#1e3448"}},
+  React.createElement("h2",{style:{fontSize:16,margin:"10px 0 4px"}},"Cylinder Head Inspection Report"),
+  React.createElement("div",{style:{fontSize:10,marginBottom:12}},"YANMAR EY18"),
+  block(title("Seat ring - diameter ØD"),
+   React.createElement(EY18Diagram,{name:"seat",readonly:true}),
+   table(["Position","Maximum ØD (mm)","Measured ØD (mm)","Result"],positions.map(p=>{const r=by(kop.seatRing,p);return [p,"58.00",val(r.measured),result(r.measured,58,"max")]}))),
+  block(title("Valves - dimensions Q - R - S"),
+   React.createElement(EY18Diagram,{name:"valves",readonly:true}),
+   table(["Position","Q limit (mm)","Q measured (mm)","R limit (mm)","R measured (mm)","Result"],positions.map(p=>{const r=by(kop.valve,p);const a=isRejected(r.measuredQ,4.3,"min"),b=isRejected(r.measuredR,5.4,"min");return [p,"4.30",val(r.measuredQ),"5.40",val(r.measuredR),a===null||b===null?"—":a||b?"Rejected":"OK"]}))),
+  block(title("Valve stems"),React.createElement(EY18Diagram,{name:"stem",readonly:true}),
+   table(["Position","Nominal","Wear deviation","Min. ØD (mm)","Measured","Result"],positions.map(p=>{const r=by(kop.valveStem,p);const minimum=p.startsWith("S")?13.68:13.65;return [p,"14.00",p.startsWith("S")?"-0.32":"-0.35",minimum.toFixed(2),val(r.measured),result(r.measured,minimum,"min")]}))),
+  block(title("Valve guides - T / M / B"),React.createElement(EY18Diagram,{name:"guide",readonly:true}),
+   table(["Position","Deviation limit","T measured","M measured","B measured","Result"],positions.map(p=>[p,p.startsWith("S")?"+0.26":"+0.28",val(stored("ey18_guide_"+p+"_T")),val(stored("ey18_guide_"+p+"_M")),val(stored("ey18_guide_"+p+"_B")),"N/A"]))),
+  block(title("Inlet valve seat pocket - S1 / S2"),React.createElement(EY18Diagram,{name:"pocket",readonly:true}),
+   table(["Position","Measured diameter a (mm)","Measured diameter b (mm)","Result"],["S1","S2"].map(p=>[p,val(pocket(p+"_inlet_a")),val(pocket(p+"_inlet_b")),"N/A"]))),
+  block(title("Exhaust valve seat pocket - E1 / E2"),
+   table(["Version","Pocket a limit (mm)","Pocket b limit (mm)"],[["Standard","59.000 - 59.019","67.000 - 67.019"],["+0.5 mm oversize","59.500 - 59.519","67.500 - 67.519"],["+1.0 mm oversize","60.000 - 60.019","68.000 - 68.019"]]),
+   table(["Position","Measured diameter a (mm)","Measured diameter b (mm)","Result"],["E1","E2"].map(p=>[p,val(pocket(p+"_exhaust_a")),val(pocket(p+"_exhaust_b")),pairResult(pocket(p+"_exhaust_a"),pocket(p+"_exhaust_b"))])))
+ );
+}
 function CustomerCylinderHeadReport(props){
   const werkorder=props.werkorder,koppen=props.koppen,data=props.data;
   const phase=data&&data.activePhase==="after"?"after":"before";
@@ -1073,8 +1109,8 @@ function CustomerCylinderHeadReport(props){
       React.createElement("h2",{style:{fontSize:12}},phase==="before"?"BEFORE — Workshop Inspection & Measurements":"AFTER — Assembly & Testing"),
       ...koppen.map(k=>React.createElement("div",{key:k.nummer,style:{marginBottom:"6mm"}},
         React.createElement("h3",{style:{fontSize:10}},"Cylinder head No."+k.nummer),
-        isYanmarEY18(werkorder.motortype)&&phase==="before"&&React.createElement("div",{style:{pageBreakInside:"avoid"}},React.createElement(EY18Diagram,{name:"seat",readonly:true}),React.createElement(EY18Diagram,{name:"valves",readonly:true}),React.createElement(EY18Diagram,{name:"stem",readonly:true})),
-        ...(phase==="before"?[["Dismantling & Inspection",k.disassembly],[isNonYanmar&&hasSeatDiameterLimit(werkorder.motortype)?"Seat ring sealing surface diameter measurements":"Seat ring measurements",isNonYanmar?k.seatRing.map(row=>({...row,limit:makerSeatDiameterLimit(werkorder.motortype,row.id),direction:"max"})):k.seatRing],["Valve measurements",k.valve],["Valve stems",k.valveStem],...(isYanmarEY18(werkorder.motortype)?[]:[["Valve guides",k.valveGuide]]),["Valve checks",k.valveChecks]]:[["Assembly checklist",k.assembly]]).map(([title,rows])=>React.createElement("div",{key:title,style:{marginBottom:"3mm",pageBreakInside:"avoid"}},
+        isYanmarEY18(werkorder.motortype)&&phase==="before"&&React.createElement(EY18ApprovedInspection,{kop:k}),
+        ...(phase==="before"?[["Dismantling & Inspection",k.disassembly],[isNonYanmar&&hasSeatDiameterLimit(werkorder.motortype)?"Seat ring sealing surface diameter measurements":"Seat ring measurements",isNonYanmar?k.seatRing.map(row=>({...row,limit:makerSeatDiameterLimit(werkorder.motortype,row.id),direction:"max"})):k.seatRing],["Valve measurements",k.valve],["Valve stems",k.valveStem],...(isYanmarEY18(werkorder.motortype)?[]:[["Valve guides",k.valveGuide]]),["Valve checks",k.valveChecks]]:[["Assembly checklist",k.assembly]]).filter(([title])=>!isYanmarEY18(werkorder.motortype)||phase!=="before"||title==="Dismantling & Inspection"||title==="Valve checks").map(([title,rows])=>React.createElement("div",{key:title,style:{marginBottom:"3mm",pageBreakInside:"avoid"}},
           React.createElement("strong",{style:{fontSize:8.5}},title),
           React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:8}},React.createElement("tbody",null,
             ...(Array.isArray(rows)?rows:[]).map((row,i)=>React.createElement("tr",{key:i},
@@ -1092,7 +1128,7 @@ function CustomerCylinderHeadReport(props){
             ))
           ))
         )),
-        isNonYanmar&&React.createElement(NonYanmarDetailedMeasurements,{kop:k,model:werkorder.motortype,phase,readonly:true}),React.createElement(EY18ValveGuideMeasurements,{kop:k,model:werkorder.motortype,phase,readonly:true}),React.createElement(YanmarEY18PocketMeasurements,{kop:k,model:werkorder.motortype,phase,readonly:true}),
+        isNonYanmar&&React.createElement(NonYanmarDetailedMeasurements,{kop:k,model:werkorder.motortype,phase,readonly:true}),
         isNonYanmar&&cylinderHeadSourceSpecification(werkorder.motortype)&&React.createElement("section",{style:{margin:"3mm 0",pageBreakInside:"avoid"}},
           React.createElement("strong",{style:{fontSize:9}},"Engine-Specific Measurements — "+werkorder.motortype+" ("+phase.toUpperCase()+")"),
           React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:8}},React.createElement("tbody",null,
