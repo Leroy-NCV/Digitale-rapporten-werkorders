@@ -1081,7 +1081,7 @@ function EY18ApprovedInspection({kop}){
  if(!Array.isArray(pages)||pages.length!==3)return React.createElement("p",{role:"alert"},"EY18 report template could not load. Reload the application before exporting.");
  return React.createElement("div",{className:"ey18-approved-inspection"},...pages.map((template,index)=>{
   const svg=template.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g,(_,key)=>escapeXML(fields[key]??"—"));
-  return React.createElement("section",{key:index,style:{pageBreakBefore:"always",pageBreakInside:"avoid",breakInside:"avoid",margin:0,padding:0,lineHeight:0}},
+  return React.createElement("section",{key:index,style:{pageBreakBefore:index===0?"auto":"always",pageBreakInside:"avoid",breakInside:"avoid",margin:0,padding:0,lineHeight:0}},
    React.createElement("img",{src:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg),alt:"EY18 inspection measurements — cylinder head "+val(kop.nummer)+", page "+(index+1)+" of 3",style:{display:"block",width:"100%",height:"auto",margin:0,padding:0}}));
  }));
 }
