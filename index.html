@@ -15,6 +15,7 @@
 </head>
 <body>
 <div id="root"><div style="font-family:Arial,sans-serif;padding:24px;color:#1f231c">Applicatie laden...</div></div>
+<script src="./assets/ey18-approved-report.js"></script>
 <script src="./assets/governor-parts-source.js"></script>
 <script>
 window.addEventListener("error",function(e){
@@ -1052,39 +1053,37 @@ function KopMatrixTable(props){
 
 function EY18ApprovedInspection({kop}){
  const positions=["S1","S2","E1","E2"];
- const c={padding:"5px 7px",borderBottom:"1px solid #ccd7df",fontSize:9};
- const head={fontSize:13,color:"#203c56",margin:"12px 0 6px"};
- const val=v=>v===undefined||v===null||v===""?"—":String(v);
- const result=(m,lim,dir)=>{const x=isRejected(m,lim,dir);return x===null?"—":x?"Rejected":"OK";};
- const table=(headers,rows)=>React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",marginBottom:"12px"}},
-  React.createElement("thead",null,React.createElement("tr",{style:{background:"#e5edf3"}},...headers.map((h,i)=>React.createElement("th",{key:i,style:{...c,textAlign:"left",borderBottom:"1px solid #24415b"}},h)))),
-  React.createElement("tbody",null,...rows.map((cells,i)=>React.createElement("tr",{key:i,style:{background:i%2?"#f5f7f9":"white"}},...cells.map((x,j)=>React.createElement("td",{key:j,style:c},x))))));
- const title=t=>React.createElement("h3",{style:head},t);
+ const fields={head:kop.nummer??""};
  const by=(rows,id)=>(rows||[]).find(r=>r.id===id)||{};
  const saved=kop.assembly?.[0]?.sourceMeasurements||{};
  const stored=k=>saved[k]?.measured??"";
- const pocket=k=>stored("ey18_before_"+k);
- const pairResult=(a,b)=>{if(a===""||b==="")return "—";const na=Number(a),nb=Number(b);if(!Number.isFinite(na)||!Number.isFinite(nb))return "N/A";return [[59,67],[59.5,67.5],[60,68]].some(([x,y])=>na>=x&&na<=x+.019&&nb>=y&&nb<=y+.019)?"OK":"Rejected";};
- const block=(...items)=>React.createElement("section",{style:{pageBreakInside:"avoid",marginBottom:15}},...items);
- return React.createElement("div",{style:{fontFamily:"Arial,sans-serif",color:"#1e3448"}},
-  React.createElement("h2",{style:{fontSize:16,margin:"10px 0 4px"}},"Cylinder Head Inspection Report"),
-  React.createElement("div",{style:{fontSize:10,marginBottom:12}},"YANMAR EY18"),
-  block(title("Seat ring - diameter ØD"),
-   React.createElement(EY18Diagram,{name:"seat",readonly:true}),
-   table(["Position","Maximum ØD (mm)","Measured ØD (mm)","Result"],positions.map(p=>{const r=by(kop.seatRing,p);return [p,"58.00",val(r.measured),result(r.measured,58,"max")]}))),
-  block(title("Valves - dimensions Q - R - S"),
-   React.createElement(EY18Diagram,{name:"valves",readonly:true}),
-   table(["Position","Q limit (mm)","Q measured (mm)","R limit (mm)","R measured (mm)","Result"],positions.map(p=>{const r=by(kop.valve,p);const a=isRejected(r.measuredQ,4.3,"min"),b=isRejected(r.measuredR,5.4,"min");return [p,"4.30",val(r.measuredQ),"5.40",val(r.measuredR),a===null||b===null?"—":a||b?"Rejected":"OK"]}))),
-  block(title("Valve stems"),React.createElement(EY18Diagram,{name:"stem",readonly:true}),
-   table(["Position","Nominal","Wear deviation","Min. ØD (mm)","Measured","Result"],positions.map(p=>{const r=by(kop.valveStem,p);const minimum=p.startsWith("S")?13.68:13.65;return [p,"14.00",p.startsWith("S")?"-0.32":"-0.35",minimum.toFixed(2),val(r.measured),result(r.measured,minimum,"min")]}))),
-  block(title("Valve guides - T / M / B"),React.createElement(EY18Diagram,{name:"guide",readonly:true}),
-   table(["Position","Deviation limit","T measured","M measured","B measured","Result"],positions.map(p=>[p,p.startsWith("S")?"+0.26":"+0.28",val(stored("ey18_guide_"+p+"_T")),val(stored("ey18_guide_"+p+"_M")),val(stored("ey18_guide_"+p+"_B")),"N/A"]))),
-  block(title("Inlet valve seat pocket - S1 / S2"),React.createElement(EY18Diagram,{name:"pocket",readonly:true}),
-   table(["Position","Measured diameter a (mm)","Measured diameter b (mm)","Result"],["S1","S2"].map(p=>[p,val(pocket(p+"_inlet_a")),val(pocket(p+"_inlet_b")),"N/A"]))),
-  block(title("Exhaust valve seat pocket - E1 / E2"),
-   table(["Version","Pocket a limit (mm)","Pocket b limit (mm)"],[["Standard","59.000 - 59.019","67.000 - 67.019"],["+0.5 mm oversize","59.500 - 59.519","67.500 - 67.519"],["+1.0 mm oversize","60.000 - 60.019","68.000 - 68.019"]]),
-   table(["Position","Measured diameter a (mm)","Measured diameter b (mm)","Result"],["E1","E2"].map(p=>[p,val(pocket(p+"_exhaust_a")),val(pocket(p+"_exhaust_b")),pairResult(pocket(p+"_exhaust_a"),pocket(p+"_exhaust_b"))])))
- );
+ const val=v=>v===undefined||v===null||v===""?"—":String(v);
+ const result=(m,limit,direction)=>{const rejected=isRejected(m,limit,direction);return rejected===null?"—":rejected?"Rejected":"OK";};
+ for(const pos of positions){
+  const seat=by(kop.seatRing,pos),valve=by(kop.valve,pos),stem=by(kop.valveStem,pos);
+  fields["seat_"+pos]=val(seat.measured);
+  fields["seat_result_"+pos]=result(seat.measured,58,"max");
+  fields["valve_Q_"+pos]=val(valve.measuredQ);
+  fields["valve_R_"+pos]=val(valve.measuredR);
+  const q=isRejected(valve.measuredQ,4.3,"min"),r=isRejected(valve.measuredR,5.4,"min");
+  fields["valve_result_"+pos]=q===null||r===null?"—":q||r?"Rejected":"OK";
+  fields["stem_"+pos]=val(stem.measured);
+  fields["stem_result_"+pos]=result(stem.measured,pos.startsWith("S")?13.68:13.65,"min");
+  for(const point of ["T","M","B"])fields["guide_"+point+"_"+pos]=val(stored("ey18_guide_"+pos+"_"+point));
+  const kind=pos.startsWith("S")?"inlet":"exhaust";
+  const a=stored("ey18_before_"+pos+"_"+kind+"_a"),b=stored("ey18_before_"+pos+"_"+kind+"_b");
+  fields["pocket_"+kind+"_a_"+pos]=val(a);
+  fields["pocket_"+kind+"_b_"+pos]=val(b);
+  if(kind==="exhaust")fields["pocket_result_"+pos]=a===""||b===""?"—":!Number.isFinite(Number(a))||!Number.isFinite(Number(b))?"N/A":[[59,67],[59.5,67.5],[60,68]].some(([x,y])=>Number(a)>=x&&Number(a)<=x+.019&&Number(b)>=y&&Number(b)<=y+.019)?"OK":"Rejected";
+ }
+ const escapeXML=value=>String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c]));
+ const pages=window.EY18_APPROVED_REPORT_PAGES;
+ if(!Array.isArray(pages)||pages.length!==3)return React.createElement("p",{role:"alert"},"EY18 report template could not load. Reload the application before exporting.");
+ return React.createElement("div",{className:"ey18-approved-inspection"},...pages.map((template,index)=>{
+  const svg=template.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g,(_,key)=>escapeXML(fields[key]??"—"));
+  return React.createElement("section",{key:index,style:{pageBreakBefore:"always",pageBreakInside:"avoid",breakInside:"avoid",margin:0,padding:0,lineHeight:0}},
+   React.createElement("img",{src:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg),alt:"EY18 inspection measurements — cylinder head "+val(kop.nummer)+", page "+(index+1)+" of 3",style:{display:"block",width:"100%",height:"auto",margin:0,padding:0}}));
+ }));
 }
 function CustomerCylinderHeadReport(props){
   const werkorder=props.werkorder,koppen=props.koppen,data=props.data;
