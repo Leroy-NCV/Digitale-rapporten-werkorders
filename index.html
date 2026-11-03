@@ -303,7 +303,7 @@ function isYanmarEY18(model){
 function EY18Diagram({name,readonly=false}){
  const drawings={seat:"ey18-seat-ring.svg",valves:"ey18-valve-qr-original.png",stem:"ey18-valve-stem-original.png",guide:"ey18-valve-guide-original.png",pocket:"ey18-valve-pocket.svg"};
  const filename=drawings[name];if(!filename)return null;
- return React.createElement("img",{src:"assets/"+filename,alt:"EY18 "+name+" technical measurement drawing",style:{display:"block",margin:"5px 0 10px",width:"auto",height:"auto",maxWidth:name==="pocket"?"100%":name==="stem"||name==="guide"?"340px":"200px",maxHeight:readonly?"30mm":"135px",objectFit:"contain",objectPosition:"left",pageBreakInside:"avoid"}});
+ return React.createElement("img",{src:"assets/"+filename,alt:"EY18 "+name+" technical measurement drawing",style:{display:"block",margin:"5px 0 10px",width:"auto",height:"auto",maxWidth:name==="pocket"?"100%":name==="stem"||name==="guide"?"340px":"200px",maxHeight:readonly?"30mm":"135px",objectFit:"contain",objectPosition:"left",filter:["valves","stem","guide"].includes(name)?"invert(1)":"none",pageBreakInside:"avoid"}});
 }
 function YanmarEY18PocketMeasurements({kop,model,phase="before",onUpdate,readonly=false}){
  if(!isYanmarEY18(model)||phase!=="before")return null;
