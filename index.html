@@ -301,9 +301,9 @@ function isYanmarEY18(model){
  return /^(?:YANMAR)?(?:6)?EY18(?:ALW)?$/.test(key);
 }
 function EY18Diagram({name,readonly=false}){
- const drawings={seat:"ey18-seat-ring.svg",valves:"ey18-valve-qr-original.png",stem:"ey18-valve-stem-original.png",guide:"ey18-valve-guide-original.png",pocket:"ey18-valve-pocket.svg"};
+ const drawings={seat:"ey18-seat-ring.svg",valves:"ey18-valve-qr-original.png",stem:"ey18-valve-stem-original.png",guide:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAANoAAABmAQAAAACFbrJ4AAABOUlEQVR42u2VsU7DMBRFr19byoBEJgYW+IT+QfJJ/QBEMnTgr/CAxEYXdjJ0QCxEtEJUFF+G5IVEsRsGhkoki59zdJ8t6/oaJJmy+j61eCJJK9jzDfDfQqdF8QNvQlIXbHphxaXcnarpbFyOzpCcA2s2YK4mHZFcW9kAEnnbHkGem/Moq4oFgAkkAkxgR5nkAC51eqxFgq7G6M6WJAnEJFPu/MeXAABGpWDbUmaDwQZ4gHCxD57VcFtfwrdNp+10jnZU9Kz54oHUy3zugXUE0NdWL77xQVuNKw80GgHXvzy+aqUxTu6AOkIGg/XBQKS+lpF6SzIORWrejNRClfckXSIJwDyU8a1no8gafiBkDLiiI7oC8A6ZeB0EAI89D50hP+q37EsLQzKHAJjOOqqHvzj4pPN7sObhwm/z3daBQdYKAAAAAABJRU5ErkJggg==",pocket:"ey18-valve-pocket.svg"};
  const filename=drawings[name];if(!filename)return null;
- return React.createElement("img",{src:"assets/"+filename,alt:"EY18 "+name+" technical measurement drawing",style:{display:"block",margin:"5px 0 10px",width:"auto",height:"auto",maxWidth:name==="pocket"?"100%":name==="stem"||name==="guide"?"340px":"200px",maxHeight:readonly?"30mm":"135px",objectFit:"contain",objectPosition:"left",filter:["valves","stem","guide"].includes(name)?"invert(1)":"none",pageBreakInside:"avoid"}});
+ return React.createElement("img",{src:filename.startsWith("data:")?filename:"assets/"+filename,alt:"EY18 "+name+" technical measurement drawing",style:{display:"block",margin:"5px 0 10px",width:"auto",height:"auto",maxWidth:name==="pocket"?"100%":name==="stem"||name==="guide"?"340px":"200px",maxHeight:readonly?"30mm":"135px",objectFit:"contain",objectPosition:"left",filter:["valves","stem"].includes(name)?"invert(1)":"none",pageBreakInside:"avoid"}});
 }
 function YanmarEY18PocketMeasurements({kop,model,phase="before",onUpdate,readonly=false}){
  if(!isYanmarEY18(model)||phase!=="before")return null;
