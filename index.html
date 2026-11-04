@@ -311,28 +311,65 @@ function EY18Diagram({name,readonly=false}){
  if(!originals[name])return null;
  return React.createElement("img",{src:originals[name],alt:"EY18 "+name+" original technical measurement drawing",style});
 }
+// Yanmar Service News 08-2-G-10-013-L rev.3, revised 2022-06-08, table 1.
+// Values are transcribed literally, including EY26 +0.5 pocket b = 105.0.
+const YANMAR_EXHAUST_POCKET_PROFILES = [
+ {id:"ey18",label:"6EY18",aTolerance:.019,bTolerance:.019,variants:[["Standard",59,67,"146673-11090"],["+0.5 mm oversize",59.5,67.5,"146673-11530"],["+1.0 mm oversize",60,68,"146673-11540"]]},
+ {id:"ey22",label:"6EY22",aTolerance:.019,bTolerance:.019,variants:[["Standard",71,80,"150633-11090"],["+0.5 mm oversize",71.5,80.5,"150633-11580"],["+1.0 mm oversize",72,81,"150633-11590"]]},
+ {id:"ey26",label:"6/8EY26",aTolerance:.022,bTolerance:.022,variants:[["Standard",87,100,"151695-11090"],["+0.5 mm oversize",87.5,105,"151694-11880"],["+1.0 mm oversize",88,101,"151694-11890"]]},
+ {id:"ey33",label:"6/8EY33",aTolerance:.022,bTolerance:.025,variants:[["Standard",106,126,"132673-11140"],["+0.5 mm oversize",106.5,126.5,"132673-11700"],["+1.0 mm oversize",107,127,"132673-11710"]]},
+ {id:"n18",label:"6N18",aTolerance:.019,bTolerance:.019,variants:[["Standard",59,67,"146673-11090"],["+0.5 mm oversize",59.5,67.5,"146673-11530"],["+1.0 mm oversize",60,68,"146673-11540"]]},
+ {id:"n21",label:"6/8N21",aTolerance:.019,bTolerance:.019,variants:[["Standard",67,78,"147673-11090"],["+0.5 mm oversize",67.5,78.5,"147673-11180"],["+1.0 mm oversize",68,79,"147673-11190"]]},
+ {id:"n260",label:"6N250 / 6N260",aTolerance:.019,bTolerance:.019,variants:[["Standard",88,101,"151605-11090"],["+0.5 mm oversize",88.5,101.5,"151605-11880"],["+1.0 mm oversize",89,102,"151605-11890"]]},
+ {id:"n280",label:"6N270 / 6/8N280",aTolerance:.022,bTolerance:.022,variants:[["Standard",95,109,"153605-11090"],["+0.5 mm oversize",95.5,109.5,"153605-11880"],["+1.0 mm oversize",96,110,"153605-11890"]]},
+ {id:"n330",label:"6/8N330",aTolerance:.022,bTolerance:.025,variants:[["Standard",112,128,"132654-11092"],["+0.5 mm oversize",112.5,128.5,"132654-11922"],["+1.0 mm oversize",113,129,"132654-11932"],["+3.0 mm oversize",115,131,"132654-11940"]]},
+ {id:"m200-141646",label:"M200 — 141646 series",aTolerance:.019,bTolerance:.019,variants:[["Standard",63,78,"141646-11095"],["+0.5 mm oversize",63.5,78.5,"141646-11840"],["+1.0 mm oversize",64,79,"141646-11850"]]},
+ {id:"m200-t220-150673",label:"M200 / T220 — 150673 series",aTolerance:.019,bTolerance:.019,variants:[["Standard",73,85,"150673-11093"],["+0.5 mm oversize",73.5,85.5,"150673-11200"],["+1.0 mm oversize",74,86,"150673-11210"]]}
+];
+function yanmarPocketProfileOptions(model){
+ const key=String(model||"").toUpperCase().replace(/[^A-Z0-9]/g,"").replace(/^YANMAR/,"");
+ const mappings=[[/^(?:6)?EY18(?:ALW)?$/,"ey18"],[/^(?:6)?EY22(?:LW)?$/,"ey22"],[/^(?:6|8)?EY26(?:L|LW)?$/,"ey26"],[/^(?:6|8)?EY33(?:L|LW)?$/,"ey33"],[/^(?:6)?N18(?:LEV)?$/,"n18"],[/^(?:6|8)?N21(?:ALGV|ALDV)?$/,"n21"],[/^6N(?:250|260)(?:LUN)?$/,"n260"],[/^(?:6N270|[68]N280)(?:LEV)?$/,"n280"],[/^(?:6|8)?N330(?:LGV)?$/,"n330"],[/^T220$/,"m200-t220-150673"]];
+ if(/^M200(?:LEN)?$/.test(key))return YANMAR_EXHAUST_POCKET_PROFILES.filter(p=>p.id.startsWith("m200"));
+ const id=mappings.find(([pattern])=>pattern.test(key))?.[1];
+ return id?YANMAR_EXHAUST_POCKET_PROFILES.filter(p=>p.id===id):[];
+}
+function yanmarPocketProfile(kop,model){
+ const options=yanmarPocketProfileOptions(model);
+ if(options.length===1)return options[0];
+ const selected=kop?.assembly?.[0]?.sourceMeasurements?.yanmar_pocket_series?.measured;
+ return options.find(p=>p.id===selected)||null;
+}
+function yanmarPocketResult(a,b,profile){
+ if(a==null||b==null||String(a).trim()===""||String(b).trim()==="")return "—";
+ if(!profile)return "N/A";
+ const x=Number(String(a).replace(",",".")),y=Number(String(b).replace(",","."));
+ if(!Number.isFinite(x)||!Number.isFinite(y))return "N/A";
+ return profile.variants.some(([,pa,pb])=>x>=pa-.000001&&x<=pa+profile.aTolerance+.000001&&y>=pb-.000001&&y<=pb+profile.bTolerance+.000001)?"OK":"Rejected";
+}
 function YanmarEY18PocketMeasurements({kop,model,phase="before",onUpdate,readonly=false}){
- if(!isYanmarEY18(model)||phase!=="before")return null;
+ const options=yanmarPocketProfileOptions(model);
+ if(!options.length||phase!=="before")return null;
+ const profile=yanmarPocketProfile(kop,model);
  const values=kop?.assembly?.[0]?.sourceMeasurements||{};
- const variants=[["Standard",59,67],["+0.5 mm oversize",59.5,67.5],["+1.0 mm oversize",60,68]];
+ // Preserve the existing EY18 storage keys and saved measurements.
+ const prefix=isYanmarEY18(model)?"ey18_"+phase+"_":"yanmar_pocket_"+phase+"_";
+ const get=k=>values[prefix+k]?.measured??"";
  const style={borderBottom:"1px solid #d2dae1",padding:"6px",fontSize:readonly?9:12,textAlign:"left"};
- const read=v=>{if(v===null||v===undefined||String(v).trim()==="")return null;const n=Number(String(v).replace(",","."));return Number.isFinite(n)?n:null;};
- const get=k=>values["ey18_"+phase+"_"+k]?.measured??"";
- const field=(k)=>{const v=get(k);return readonly?React.createElement("span",null,v===""?"—":v):React.createElement("input",{type:"number",step:"0.001",value:v,onChange:e=>onUpdate("ey18_"+phase+"_"+k,{measured:e.target.value}),style:{width:90,maxWidth:"100%",boxSizing:"border-box",padding:5}});};
- const result=(a,b)=>{
-  const na=read(get(a)),nb=read(get(b));if(na===null||nb===null)return "—";
-  return variants.some(([,x,y])=>na>=x-0.000001&&na<=x+0.019001&&nb>=y-0.000001&&nb<=y+0.019001)?"OK":"Rejected";
- };
- const row=(cells,key)=>React.createElement("tr",{key},...cells.map((c,i)=>React.createElement("td",{key:i,style:style},c)));
+ const field=k=>{const value=get(k);return readonly?React.createElement("span",null,value===""?"—":value):React.createElement("input",{type:"number",step:"0.001",value,onChange:e=>onUpdate(prefix+k,{measured:e.target.value}),style:{width:90,maxWidth:"100%",boxSizing:"border-box",padding:5}});};
+ const row=(cells,key)=>React.createElement("tr",{key},...cells.map((c,i)=>React.createElement("td",{key:i,style},c)));
  const table=(headers,rows)=>React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",margin:"6px 0 12px"}},React.createElement("thead",null,row(headers.map(h=>React.createElement("b",null,h)),"header")),React.createElement("tbody",null,...rows));
- const heading=(name)=>React.createElement("h4",{style:{fontSize:readonly?11:15,margin:"12px 0 6px",color:"#24394b"}},name);
+ const heading=text=>React.createElement("h4",{style:{fontSize:readonly?11:15,margin:"12px 0 6px",color:"#24394b"}},text);
+ const range=(n,t)=>n.toFixed(3)+" - "+(n+t).toFixed(3);
  return React.createElement("section",{style:{margin:"12px 0",pageBreakInside:"avoid"}},
-  
-  heading("Inlet valve seat pocket - S1 / S2"),React.createElement(EY18Diagram,{name:"pocket",readonly}),
-  table(["Position","Measured Øa (mm)","Measured Øb (mm)","Result"],["S1","S2"].map(p=>row([p,field(p+"_inlet_a"),field(p+"_inlet_b"),"N/A"],p))),
+  isYanmarEY18(model)&&React.createElement(React.Fragment,null,
+   heading("Inlet valve seat pocket - S1 / S2"),React.createElement(EY18Diagram,{name:"pocket",readonly}),
+   table(["Position","Measured Øa (mm)","Measured Øb (mm)","Result"],["S1","S2"].map(p=>row([p,field(p+"_inlet_a"),field(p+"_inlet_b"),"N/A"],p)))),
   heading("Exhaust valve seat pocket - E1 / E2"),
-  table(["Version","Pocket Øa limit (mm)","Pocket Øb limit (mm)"],variants.map(([name,a,b])=>row([name,a.toFixed(3)+" - "+(a+0.019).toFixed(3),b.toFixed(3)+" - "+(b+0.019).toFixed(3)],name))),
-  table(["Position","Measured Øa (mm)","Measured Øb (mm)","Result"],["E1","E2"].map(p=>row([p,field(p+"_exhaust_a"),field(p+"_exhaust_b"),result(p+"_exhaust_a",p+"_exhaust_b")],p)))
+  !isYanmarEY18(model)&&React.createElement(EY18Diagram,{name:"pocket",readonly}),
+  options.length>1&&(readonly?React.createElement("div",{style:{fontSize:10}},"Seat series: ",profile?.label||"Not selected"):React.createElement("label",null,"Valve seat series ",React.createElement("select",{value:profile?.id||"",onChange:e=>onUpdate("yanmar_pocket_series",{measured:e.target.value}),style:{padding:6,maxWidth:"100%"}},React.createElement("option",{value:""},"Select by valve seat part number"),...options.map(p=>React.createElement("option",{key:p.id,value:p.id},p.label+" ("+p.variants[0][3]+")"))))),
+  profile?table(["Version","Part no.","Pocket Øa limit (mm)","Pocket Øb limit (mm)"],profile.variants.map(([label,a,b,part])=>row([label,part,range(a,profile.aTolerance),range(b,profile.bTolerance)],part))):React.createElement("p",{style:{fontSize:12}},"Select the valve seat series to display the pocket limits."),
+  table(["Position","Measured Øa (mm)","Measured Øb (mm)","Result"],["E1","E2"].map(p=>row([p,field(p+"_exhaust_a"),field(p+"_exhaust_b"),yanmarPocketResult(get(p+"_exhaust_a"),get(p+"_exhaust_b"),profile)],p))),
+  React.createElement("div",{style:{fontSize:readonly?7.5:10,color:"#666"}},"Source: Yanmar Service News 08-2-G-10-013-L rev.3, 2022-06-08, table 1. Pocket dimensions a / b; lower tolerance 0.")
  );
 }
 function EY18ValveGuideMeasurements({kop,model,phase="before",onUpdate,readonly=false}){
@@ -1082,7 +1119,7 @@ function EY18ApprovedInspection({kop}){
   const a=stored("ey18_before_"+pos+"_"+kind+"_a"),b=stored("ey18_before_"+pos+"_"+kind+"_b");
   fields["pocket_"+kind+"_a_"+pos]=val(a);
   fields["pocket_"+kind+"_b_"+pos]=val(b);
-  if(kind==="exhaust")fields["pocket_result_"+pos]=a===""||b===""?"—":!Number.isFinite(Number(a))||!Number.isFinite(Number(b))?"N/A":[[59,67],[59.5,67.5],[60,68]].some(([x,y])=>Number(a)>=x&&Number(a)<=x+.019&&Number(b)>=y&&Number(b)<=y+.019)?"OK":"Rejected";
+  if(kind==="exhaust")fields["pocket_result_"+pos]=yanmarPocketResult(a,b,yanmarPocketProfile(kop,"EY18"));
  }
  const escapeXML=value=>String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c]));
  const pages=window.EY18_APPROVED_REPORT_PAGES;
@@ -1127,6 +1164,7 @@ function CustomerCylinderHeadReport(props){
             ))
           ))
         )),
+        !isNonYanmar&&!isYanmarEY18(werkorder.motortype)&&React.createElement(YanmarEY18PocketMeasurements,{kop:k,model:werkorder.motortype,phase,readonly:true}),
         isNonYanmar&&React.createElement(NonYanmarDetailedMeasurements,{kop:k,model:werkorder.motortype,phase,readonly:true}),
         isNonYanmar&&cylinderHeadSourceSpecification(werkorder.motortype)&&React.createElement("section",{style:{margin:"3mm 0",pageBreakInside:"avoid"}},
           React.createElement("strong",{style:{fontSize:9}},"Engine-Specific Measurements — "+werkorder.motortype+" ("+phase.toUpperCase()+")"),
