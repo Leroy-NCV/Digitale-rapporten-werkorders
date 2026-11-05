@@ -122,7 +122,6 @@ const DISASSEMBLY_CHECKLIST = [
   "Cylinder head and parts washed",
   "Ultrasonically cleaned",
   "Pressure tested",
-  "Polished",
   "Dye penetrant test on combustion surface",
   "Visual inspection of cylinder head",
   "Visual inspection of seat ring"
@@ -673,8 +672,9 @@ function RejectBadge({ rejected }) {
     rejected ? "NOT OK" : "OK"
   );
 }
+function isVisibleCylinderHeadChecklistRow(row) { return englishLabel(row.label)!=="Polished"; }
 function ChecklistTable({ rows, onChange }) {
-  return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, rows.map((row, i) => /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, rows.map((row, i) => !isVisibleCylinderHeadChecklistRow(row)?null:/* @__PURE__ */ React.createElement(
     "div",
     {
       key: i,
@@ -1199,7 +1199,7 @@ function makeKopCustomerPhase(koppen,phase,existing){
   const matrix=mergeKopMatrix(suggestedKopMatrix(koppen,phase),existing&&existing.matrix);
   const sug=suggestedKopTexts(koppen,matrix,phase);
   const keys=["landing","findings","penetrant","landingSurfaces","valves","seats","cwConnection","guides","rotators"];
-  const sections={}; keys.forEach(k=>sections[k]=(existing&&existing.sections&&existing.sections[k])||sug[k]||"");
+  const sections={}; keys.forEach(k=>sections[k]=existing?.sections?.[k]??sug[k]??"");
   return {matrix,actions:Object.assign({dyeCheck:"",pressureTest:"",painted:"",safetyValves:"",sealLips:""},existing&&existing.actions||{}),sections,parts:Array.isArray(existing&&existing.parts)?existing.parts:[],partsText:existing&&existing.partsText||"",photos:existing&&existing.photos&&typeof existing.photos==="object"?existing.photos:{},updatedAt:new Date().toISOString()};
 }
 
@@ -1230,7 +1230,7 @@ function kopOptions(section,phase){
 
 function KopMatrixTable(props){
   const data=props.data,heads=props.heads,phase=props.phase,onCellChange=props.onCellChange,editable=props.editable!==false;
-  const cell={border:"1px solid #7f8790",padding:"4px 3px",fontSize:8,textAlign:"center"};
+  const cell={border:"1px solid #7f8790",padding:"4px 3px",fontSize:8,textAlign:"center",overflowWrap:"anywhere"};
   const head=Object.assign({},cell,{fontWeight:700,background:"#eef1f3"});
   const sections=[
     ["Valves","valves",["Valve E1","Valve E2","Valve S1","Valve S2"],["E1","E2","S1","S2"]],
@@ -1241,9 +1241,9 @@ function KopMatrixTable(props){
     ["CW. Chamber condition","cwChamber",["Chamber"],["Chamber"]],
     ["Threaded inserts required","heliCoils",["Qty."],["Qty"]]
   ];
-  return React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"}},
+  return React.createElement("table",{style:{width:"100%",maxWidth:"100%",borderCollapse:"collapse",tableLayout:"fixed"}},
     React.createElement("thead",null,React.createElement("tr",null,
-      React.createElement("th",{style:Object.assign({},head,{textAlign:"left",width:"26mm"})},""),
+      React.createElement("th",{style:Object.assign({},head,{textAlign:"left",width:editable?"12%":"26mm"})},""),
       ...heads.map((h,i)=>React.createElement("th",{key:i,style:head},"No."+h.nummer))
     )),
     React.createElement("tbody",null,...sections.flatMap(item=>{
@@ -1255,8 +1255,8 @@ function KopMatrixTable(props){
           ...heads.map((h,hi)=>{
             const value=data&&data.matrix&&data.matrix[section]&&data.matrix[section][row]&&data.matrix[section][row][hi]!==undefined?data.matrix[section][row][hi]:"";
             if(!editable) return React.createElement("td",{key:hi,style:cell},value);
-            if(section==="heliCoils") return React.createElement("td",{key:hi,style:Object.assign({},cell,{padding:2})},React.createElement("input",{type:"number",min:0,value:value,onChange:e=>onCellChange(section,row,hi,e.target.value),style:{width:"100%",boxSizing:"border-box",border:0,textAlign:"center",fontSize:11,padding:5}}));
-            return React.createElement("td",{key:hi,style:Object.assign({},cell,{padding:1})},React.createElement("select",{value:value,onChange:e=>onCellChange(section,row,hi,e.target.value),style:{width:"100%",border:0,background:"#fff",fontSize:9,padding:4}},kopOptions(section,phase).map(o=>React.createElement(EnglishOption,{key:o,value:o},o||"—"))));
+            if(section==="heliCoils") return React.createElement("td",{key:hi,style:Object.assign({},cell,{padding:2})},React.createElement("input",{type:"number",min:0,value:value,onChange:e=>onCellChange(section,row,hi,e.target.value),style:{width:"100%",minWidth:0,maxWidth:"100%",boxSizing:"border-box",border:0,textAlign:"center",fontSize:11,padding:5}}));
+            return React.createElement("td",{key:hi,style:Object.assign({},cell,{padding:1})},React.createElement("select",{value:value,onChange:e=>onCellChange(section,row,hi,e.target.value),title:value||"Select result",style:{width:"100%",minWidth:0,maxWidth:"100%",boxSizing:"border-box",border:0,background:"#fff",fontSize:9,padding:4}},kopOptions(section,phase).map(o=>React.createElement(EnglishOption,{key:o,value:o},o||"—"))));
           })
         ))
       ];
@@ -1442,7 +1442,7 @@ function CustomerCylinderHeadReport(props){
         ...(phase==="before"?[["Dismantling & Inspection",k.disassembly],[isNonYanmar&&hasSeatDiameterLimit(werkorder.motortype)?"Seat ring sealing surface diameter measurements":"Seat ring measurements",isNonYanmar?k.seatRing.map(row=>({...row,limit:makerSeatDiameterLimit(werkorder.motortype,row.id),direction:"max"})):k.seatRing],["Valve measurements",k.valve],["Valve stems",k.valveStem],...(sharedYanmar?[]:[["Valve guides",k.valveGuide]]),["Valve checks",k.valveChecks]]:[["Assembly checklist",k.assembly]]).filter(([title])=>!sharedYanmar||phase!=="before"||title==="Dismantling & Inspection"||title==="Valve checks").map(([title,rows])=>React.createElement("div",{key:title,style:{marginBottom:"3mm",pageBreakInside:"avoid"}},
           React.createElement("strong",{style:{fontSize:8.5}},title),
           React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:8}},React.createElement("tbody",null,
-            ...(Array.isArray(rows)?rows:[]).map((row,i)=>React.createElement("tr",{key:i},
+            ...(Array.isArray(rows)?rows:[]).filter(isVisibleCylinderHeadChecklistRow).map((row,i)=>React.createElement("tr",{key:i},
               React.createElement("td",{style:cell},englishLabel(row.label||row.id||"")),
               React.createElement("td",{style:cell},englishChoice(row.result)||((row.measuredQ!==undefined||row.measuredR!==undefined)?"Q: "+(row.measuredQ||"—")+", R: "+(row.measuredR||"—"):(row.measured??"—"))),
               React.createElement("td",{style:cell},row.remarks||((row.limitQ!==undefined||row.limitR!==undefined)?(row.directionR==="max"?"Limits Q min / R max: ":"Limits Q/R: ")+(row.limitQ??"")+" / "+(row.limitR??""):row.limit!==undefined?"Limit: "+row.limit+(title==="Seat ring measurements"&&row.nominal!==""&&row.nominal!=null?" | STD: "+Number(row.nominal).toFixed(2)+" mm"+(row.measurementLabel?" | "+row.measurementLabel:""):"")+((title==="Valve guides"||title==="Valve stems")&&cylinderReportReference(row)?" | "+cylinderReportReference(row):""):""))
@@ -2705,6 +2705,7 @@ function App() {
       React.createElement("p",{style:{fontSize:12}},"Add photos by subject, with the cylinder head number and a caption. They will appear under the same subject in the PDF report."),
       ...categories.map(([key,label])=>React.createElement("div",{key,style:{margin:"12px 0",padding:10,background:"#f8f8f5",borderRadius:5}},
         React.createElement("strong",null,label),
+        phase==="before"&&React.createElement("label",{style:{display:"block",marginTop:8}},"Findings",React.createElement("textarea",{value:p.sections?.[key]??"","aria-label":label+" — Findings",placeholder:"Enter inspection findings (include cylinder head number where relevant)",rows:3,onChange:e=>updateKopCustomer({...kopKlantData,[phase]:{...p,sections:{...p.sections,[key]:e.target.value}}}),style:{...inputStyle,display:"block",width:"100%",boxSizing:"border-box",marginTop:4,resize:"vertical"}})),
         React.createElement("label",{style:{display:"block",margin:"8px 0",cursor:"pointer",textDecoration:"underline"}},"+ Add photos",React.createElement("input",{type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:async e=>{const files=[...e.target.files];for(const f of files)await addKopInspectionPhoto(phase,key,f);e.target.value="";}})),
         ...(p.photos?.[key]||[]).map((photo,i)=>React.createElement("div",{key:i,style:{display:"flex",gap:10,marginBottom:10,alignItems:"flex-start"}},
           React.createElement("img",{src:photo.src,style:{width:105,height:95,objectFit:"cover"}}),
@@ -3264,9 +3265,9 @@ function App() {
  ...cylinderHeadSourceSpecification(activeWerkorder.motortype).map(([name,value])=>React.createElement("tr",{key:name},React.createElement("td",{style:{padding:5,borderBottom:"1px solid #ddd",width:"46%"}},name),React.createElement("td",{style:{padding:5,borderBottom:"1px solid #ddd",fontWeight:600}},value)))
  ))),React.createElement("div",{style:{background:"#fff",border:`1px solid ${palette.line}`,borderRadius:8,padding:20}},false&&React.createElement("div",{style:{padding:16,background:"#fff5e8",borderRadius:6,fontWeight:700}},"AFTER is locked until customer approval and required parts receipt are confirmed."),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Dismantling & Inspection"),React.createElement(ChecklistTable,{rows:kop.disassembly,onChange:(i,v)=>updateRow("disassembly",i,v)}),React.createElement("div",{style:{fontWeight:700,margin:"18px 0 6px"}},(activeWerkorder.klustype==="cilinderkop"&&isYanmarCylinderHead(activeWerkorder.motortype))?"Seat Ring - Diameter ØD (Ø = diameter)":"Seat ring"),(activeWerkorder.klustype==="cilinderkop_overhaul_niet_yanmar"&&isW38SeatSurface(activeWerkorder.motortype)?React.createElement("p",{style:{fontSize:12}},"W38A valve seat sealing surface — nominal Ø128.00 mm; maximum Ø130.00 mm (S1, S2, E1, E2). Seat bore/recess measurements are listed separately."):null),(activeWerkorder.klustype==="cilinderkop"&&isYanmarCylinderHead(activeWerkorder.motortype))&&React.createElement(EY18Diagram,{name:"seat"}),React.createElement(SeatRingTable,{rows:activeWerkorder.klustype==="cilinderkop_overhaul_niet_yanmar"?kop.seatRing.map(row=>({...row,limit:makerSeatDiameterLimit(activeWerkorder.motortype,row.id),direction:"max"})):kop.seatRing,runout:false,diameter:hasSeatDiameterLimit(activeWerkorder.motortype),onChange:(i,v)=>updateRow("seatRing",i,v)})),activePage!==3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Valve Inspection & Measurements"),activeWerkorder.klustype==="cilinderkop_overhaul_niet_yanmar"&&React.createElement(NonYanmarDetailedMeasurements,{kop,model:activeWerkorder.motortype,phase:activePage===3?"after":"before",onUpdate:(key,v)=>{const first=kop.assembly[0];updateRow("assembly",0,{...first,sourceMeasurements:{...(first.sourceMeasurements||{}),[key]:v}});}}),activeWerkorder.klustype==="cilinderkop_overhaul_niet_yanmar"&&React.createElement(NonYanmarMeasurements,{kop,model:activeWerkorder.motortype,phase:"before",onUpdate:(key,v)=>{const first=kop.assembly[0];updateRow("assembly",0,{...first,sourceMeasurements:{...(first.sourceMeasurements||{}),[key]:v}});}}),(activeWerkorder.klustype==="cilinderkop"&&isYanmarCylinderHead(activeWerkorder.motortype))&&React.createElement(EY18Diagram,{name:"valves"}),React.createElement(ValveTable,{rows:kop.valve,onChange:(i,v)=>updateRow("valve",i,v)}),(activeWerkorder.klustype==="cilinderkop"&&isYanmarCylinderHead(activeWerkorder.motortype))&&React.createElement(EY18Diagram,{name:"stem"}),(activeWerkorder.klustype==="cilinderkop"&&isYanmarCylinderHead(activeWerkorder.motortype))?React.createElement(YanmarValveStemTable,{rows:kop.valveStem,onChange:(i,v)=>updateRow("valveStem",i,v)}):React.createElement(ToleranceTable,{title:"Valve stem",rows:kop.valveStem,onChange:(i,v)=>updateRow("valveStem",i,v)}),(activeWerkorder.klustype==="cilinderkop"&&isYanmarCylinderHead(activeWerkorder.motortype))?React.createElement(YanmarValveGuideMeasurements,{kop,model:activeWerkorder.motortype,phase:"before",onUpdate:(key,v)=>{const first=kop.assembly[0];updateRow("assembly",0,{...first,sourceMeasurements:{...(first.sourceMeasurements||{}),[key]:v}});}}):React.createElement(ToleranceTable,{title:"Valve guide",rows:kop.valveGuide,onChange:(i,v)=>updateRow("valveGuide",i,v)}),React.createElement(YanmarEY18PocketMeasurements,{kop,model:activeWerkorder.motortype,phase:"before",onUpdate:(key,v)=>{const first=kop.assembly[0];updateRow("assembly",0,{...first,sourceMeasurements:{...(first.sourceMeasurements||{}),[key]:v}});}}),React.createElement(ChecklistTable,{rows:kop.valveChecks,onChange:(i,v)=>updateRow("valveChecks",i,v)}),kopPhotoEditor("before")),activePage!==3&&React.createElement("div",{style:{overflowX:"auto",marginTop:24}},
  React.createElement("h2",{style:{fontSize:15}},"Inspection Matrix — BEFORE"),
- React.createElement("div",{style:{minWidth:880}},React.createElement(KopMatrixTable,{data:makeKopCustomerPhase(koppen,"before",kopKlantData.before),heads:koppen,phase:"before",editable:true,onCellChange:(section,row,headIndex,value)=>{const p=makeKopCustomerPhase(koppen,"before",kopKlantData.before);const arr=[...(p.matrix?.[section]?.[row]||[])];arr[headIndex]=value;updateKopCustomer({...kopKlantData,before:{...p,matrix:{...p.matrix,[section]:{...p.matrix[section],[row]:arr}}}});}}))
+ React.createElement("div",{style:{width:"100%",minWidth:0,maxWidth:"100%"}},React.createElement(KopMatrixTable,{data:makeKopCustomerPhase(koppen,"before",kopKlantData.before),heads:koppen,phase:"before",editable:true,onCellChange:(section,row,headIndex,value)=>{const p=makeKopCustomerPhase(koppen,"before",kopKlantData.before);const arr=[...(p.matrix?.[section]?.[row]||[])];arr[headIndex]=value;updateKopCustomer({...kopKlantData,before:{...p,matrix:{...p.matrix,[section]:{...p.matrix[section],[row]:arr}}}});}}))
  ),activePage===3&&React.createElement(React.Fragment,null,React.createElement("h2",{style:{fontSize:15}},"Assembly & Testing"),activeWerkorder.klustype==="cilinderkop_overhaul_niet_yanmar"&&React.createElement(NonYanmarDetailedMeasurements,{kop,model:activeWerkorder.motortype,phase:activePage===3?"after":"before",onUpdate:(key,v)=>{const first=kop.assembly[0];updateRow("assembly",0,{...first,sourceMeasurements:{...(first.sourceMeasurements||{}),[key]:v}});}}),activeWerkorder.klustype==="cilinderkop_overhaul_niet_yanmar"&&React.createElement(NonYanmarMeasurements,{kop,model:activeWerkorder.motortype,phase:"after",onUpdate:(key,v)=>{const first=kop.assembly[0];updateRow("assembly",0,{...first,sourceMeasurements:{...(first.sourceMeasurements||{}),[key]:v}});}}),React.createElement(ChecklistTable,{rows:kop.assembly,onChange:(i,v)=>updateRow("assembly",i,v)}),
-React.createElement("div",{style:{overflowX:"auto",marginTop:20}},React.createElement("h3",null,"AFTER — Completed Work Matrix"),React.createElement("div",{style:{minWidth:880}},React.createElement(KopMatrixTable,{data:makeKopCustomerPhase(koppen,"after",kopKlantData.after),heads:koppen,phase:"after",editable:true,onCellChange:(section,row,headIndex,value)=>{const p=makeKopCustomerPhase(koppen,"after",kopKlantData.after);const arr=[...(p.matrix?.[section]?.[row]||[])];arr[headIndex]=value;updateKopCustomer({...kopKlantData,after:{...p,matrix:{...p.matrix,[section]:{...p.matrix[section],[row]:arr}}}});}}))),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr",gap:14,marginTop:18}},React.createElement(Field,{label:"Additional information"},React.createElement("textarea",{rows:3,value:kop.aanvullendeInfo,onChange:e=>updateKop(activeKop,{aanvullendeInfo:e.target.value}),style:{...inputStyle,resize:"vertical"}}))))))),null);
+React.createElement("div",{style:{overflowX:"auto",marginTop:20}},React.createElement("h3",null,"AFTER — Completed Work Matrix"),React.createElement("div",{style:{width:"100%",minWidth:0,maxWidth:"100%"}},React.createElement(KopMatrixTable,{data:makeKopCustomerPhase(koppen,"after",kopKlantData.after),heads:koppen,phase:"after",editable:true,onCellChange:(section,row,headIndex,value)=>{const p=makeKopCustomerPhase(koppen,"after",kopKlantData.after);const arr=[...(p.matrix?.[section]?.[row]||[])];arr[headIndex]=value;updateKopCustomer({...kopKlantData,after:{...p,matrix:{...p.matrix,[section]:{...p.matrix[section],[row]:arr}}}});}}))),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr",gap:14,marginTop:18}},React.createElement(Field,{label:"Additional information"},React.createElement("textarea",{rows:3,value:kop.aanvullendeInfo,onChange:e=>updateKop(activeKop,{aanvullendeInfo:e.target.value}),style:{...inputStyle,resize:"vertical"}}))))))),null);
   }
   return React.createElement("div",{style:{fontFamily:"Arial,sans-serif",padding:24,color:"#1f231c"}},
     React.createElement("h2",null,"Work Orders"),
@@ -3321,6 +3322,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 </script>
 </body>
 </html>
+
 
 
 
