@@ -1388,23 +1388,28 @@ async function waitForCylinderReportImages(element){
  }));
  if(document.fonts?.ready)await document.fonts.ready;
 }
-async function createCylinderReportPdf(element,settings){
+function cylinderReportPdfChunks(element){
  const measurements=element.querySelector(".cylinder-head-measurements");
- if(!measurements||!element.querySelector(".yanmar-approved-inspection"))return window.html2pdf().set(settings).from(element).toPdf().get("pdf");
- // Render each head separately: six heads otherwise produce one very tall canvas.
- const shell=()=>{const node=element.cloneNode(false);node.removeAttribute("id");return node;};
+ if(!measurements)return [element];
+ // Export containers wrap the actual report. Only split direct children of that report.
+ const report=measurements.parentElement;
+ const shell=()=>{const node=report.cloneNode(false);node.removeAttribute("id");return node;};
  const chunks=[],header=shell();
- for(const node of element.children){if(node===measurements)break;header.appendChild(node.cloneNode(true));}
- chunks.push(header);
+ for(const node of report.children){if(node===measurements)break;header.appendChild(node.cloneNode(true));}
+ if(header.children.length)chunks.push(header);
  for(const head of measurements.querySelectorAll(":scope > .cylinder-head-measurements-item")){
-  const chunk=shell(),title=measurements.querySelector(":scope > h2");
-  if(title)chunk.appendChild(title.cloneNode(true));
-  chunk.appendChild(head.cloneNode(true));chunks.push(chunk);
+  const chunk=shell(),copy=head.cloneNode(true);
+  copy.style.pageBreakBefore="auto";copy.style.breakBefore="auto";
+  chunk.appendChild(copy);chunks.push(chunk);
  }
  let after=false;
  const tail=shell();
- for(const node of element.children){if(after)tail.appendChild(node.cloneNode(true));if(node===measurements)after=true;}
+ for(const node of report.children){if(after)tail.appendChild(node.cloneNode(true));if(node===measurements)after=true;}
  if(tail.children.length){if(tail.firstElementChild)tail.firstElementChild.style.pageBreakBefore="auto";chunks.push(tail);}
+ return chunks;
+}
+async function createCylinderReportPdf(element,settings){
+ const chunks=cylinderReportPdfChunks(element);
  let pdf=null;
  for(const chunk of chunks){
   if(pdf)pdf.addPage();
@@ -1435,11 +1440,12 @@ function CustomerCylinderHeadReport(props){
     )),
     React.createElement(KopMatrixTable,{data:p,heads:koppen,phase:phase,editable:false}),
     React.createElement("div",{className:"cylinder-head-measurements",style:{pageBreakBefore:"always",marginTop:"4mm"}},
-      React.createElement("h2",{style:{fontSize:12}},phase==="before"?"BEFORE — Workshop Inspection & Measurements":"AFTER — Assembly & Testing"),
-      ...koppen.map(k=>React.createElement("div",{key:k.nummer,className:"cylinder-head-measurements-item",style:{marginBottom:"6mm"}},
-        React.createElement("h3",{style:{fontSize:10}},"Cylinder head No."+k.nummer),
-        sharedYanmar&&phase==="before"&&React.createElement(YanmarApprovedInspection,{kop:k,model:werkorder.motortype}),
-        ...(phase==="before"?[["Dismantling & Inspection",k.disassembly],[isNonYanmar&&hasSeatDiameterLimit(werkorder.motortype)?"Seat ring sealing surface diameter measurements":"Seat ring measurements",isNonYanmar?k.seatRing.map(row=>({...row,limit:makerSeatDiameterLimit(werkorder.motortype,row.id),direction:"max"})):k.seatRing],["Valve measurements",k.valve],["Valve stems",k.valveStem],...(sharedYanmar?[]:[["Valve guides",k.valveGuide]]),["Valve checks",k.valveChecks]]:[["Assembly checklist",k.assembly]]).filter(([title])=>!sharedYanmar||phase!=="before"||title==="Dismantling & Inspection"||title==="Valve checks").map(([title,rows])=>React.createElement("div",{key:title,style:{marginBottom:"3mm",pageBreakInside:"avoid"}},
+      React.createElement("h2",{style:{fontSize:12}},phase==="before"?"BEFORE — Workshop Inspection & Measurements":"AFTER — Assembly, Testing & Inspection Measurements"),
+      ...koppen.map(k=>React.createElement("div",{key:k.nummer,className:"cylinder-head-measurements-item",style:{marginBottom:"6mm",pageBreakBefore:"always",breakBefore:"page"}},
+        React.createElement("h3",{style:{fontSize:10,margin:"0 0 2mm",pageBreakAfter:"avoid"}},"Cylinder head No."+k.nummer),
+        phase==="after"&&React.createElement("p",{style:{fontSize:9,margin:"0 0 2mm"}},"Inspection measurements below are the stored workshop inspection record; they are not a new AFTER measurement."),
+        sharedYanmar&&React.createElement(YanmarApprovedInspection,{kop:k,model:werkorder.motortype}),
+        ...(phase==="before"?[["Dismantling & Inspection",k.disassembly],[isNonYanmar&&hasSeatDiameterLimit(werkorder.motortype)?"Seat ring sealing surface diameter measurements":"Seat ring measurements",isNonYanmar?k.seatRing.map(row=>({...row,limit:makerSeatDiameterLimit(werkorder.motortype,row.id),direction:"max"})):k.seatRing],["Valve measurements",k.valve],["Valve stems",k.valveStem],...(sharedYanmar?[]:[["Valve guides",k.valveGuide]]),["Valve checks",k.valveChecks]]:[["Assembly checklist",k.assembly],["Seat ring measurements",isNonYanmar?k.seatRing.map(row=>({...row,limit:makerSeatDiameterLimit(werkorder.motortype,row.id),direction:"max"})):k.seatRing],["Valve measurements",k.valve],["Valve stems",k.valveStem],["Valve guides",k.valveGuide]]).filter(([title])=>!sharedYanmar||title==="Dismantling & Inspection"||title==="Valve checks"||title==="Assembly checklist").map(([title,rows])=>React.createElement("div",{key:title,style:{marginBottom:"3mm",pageBreakInside:"avoid"}},
           React.createElement("strong",{style:{fontSize:8.5}},title),
           React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:8}},React.createElement("tbody",null,
             ...(Array.isArray(rows)?rows:[]).filter(isVisibleCylinderHeadChecklistRow).map((row,i)=>React.createElement("tr",{key:i},
@@ -1451,13 +1457,14 @@ function CustomerCylinderHeadReport(props){
         )),
         !isNonYanmar&&!sharedYanmar&&React.createElement(YanmarEY18PocketMeasurements,{kop:k,model:werkorder.motortype,phase,readonly:true}),
         isNonYanmar&&React.createElement(NonYanmarDetailedMeasurements,{kop:k,model:werkorder.motortype,phase,readonly:true}),
+        isNonYanmar&&phase==="after"&&React.createElement(NonYanmarDetailedMeasurements,{kop:k,model:werkorder.motortype,phase:"before",readonly:true}),
         isNonYanmar&&cylinderHeadSourceSpecification(werkorder.motortype)&&React.createElement("section",{style:{margin:"3mm 0",pageBreakInside:"avoid"}},
           React.createElement("strong",{style:{fontSize:9}},"Engine-Specific Measurements — "+werkorder.motortype+" ("+phase.toUpperCase()+")"),
           React.createElement(NonYanmarSourceReview,{model:werkorder.motortype,readonly:true}),
           React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:8}},React.createElement("tbody",null,
-           ...cylinderHeadSourceSpecification(werkorder.motortype).map(([name,spec],i)=>{const value=k.assembly?.[0]?.sourceMeasurements?.[phase+"_"+i]||{};return React.createElement("tr",{key:i},
-            React.createElement("td",{style:cell},name),React.createElement("td",{style:cell},spec),
-            React.createElement("td",{style:cell},value.measured||"—"),React.createElement("td",{style:cell},nonYanmarAssessment(value.measured,name,spec)||"—"));})
+           ...(phase==="after"?["before","after"]:["before"]).flatMap(measurementPhase=>cylinderHeadSourceSpecification(werkorder.motortype).map(([name,spec],i)=>{const value=k.assembly?.[0]?.sourceMeasurements?.[measurementPhase+"_"+i]||{};return React.createElement("tr",{key:measurementPhase+"_"+i},
+            React.createElement("td",{style:cell},measurementPhase.toUpperCase()+" — "+name),React.createElement("td",{style:cell},spec),
+            React.createElement("td",{style:cell},value.measured||"—"),React.createElement("td",{style:cell},nonYanmarAssessment(value.measured,name,spec)||"—"));}))
           ))
         ),
         phase==="after"&&React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:8}},React.createElement("tbody",null,
