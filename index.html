@@ -780,6 +780,13 @@ const CONTROLE_RECHTEN = ["Wesley","Milan","Richard"];
 const WERKPLAATS_MONTEURS = ["Marvin","George","Niek","Gino","Pawel","Max","Jonathan","Dani","Lee","Sebastiaan","Jervin","Rinze","Peter","Tycho","Bradley","Milan","Wesley","Richard","Cor","Negasi","Frank"];
 const MONTEURS = Array.from(new Set([...CONTROLE_RECHTEN,...WERKPLAATS_MONTEURS]));
 const GEBRUIKERS = Array.from(new Set([...VOLLEDIGE_RECHTEN,...MONTEURS]));
+function normaliseTechnicianName(value){return String(value||"").normalize("NFKC").replace(/\s+/g," ").trim();}
+function mergeTechnicianNames(extra=[]){
+ const result=[],seen=new Set();
+ for(const raw of [...MONTEURS,...extra]){const name=normaliseTechnicianName(raw),key=name.toLocaleLowerCase("en");if(name&&!seen.has(key)){seen.add(key);result.push(name);}}
+ return result;
+}
+function cachedTechnicianNames(){try{const list=JSON.parse(lsGet("wo_extra_technicians","[]"));return Array.isArray(list)?list.filter(n=>typeof n==="string"):[];}catch{return [];}}
 function normaliseerRechtenNaam(naam){ return naam==="Frank van Schaick"?"Frank Verschaick":naam; }
 function heeftVolledigeRechten(naam){ return VOLLEDIGE_RECHTEN.includes(normaliseerRechtenNaam(naam)); }
 function heeftControleRechten(naam){ return CONTROLE_RECHTEN.includes(naam); }
@@ -1413,7 +1420,20 @@ function cylinderReportPdfChunks(element){
  for(const node of report.children){if(node===measurements)break;header.appendChild(node.cloneNode(true));}
  if(header.children.length)chunks.push(header);
  for(const head of measurements.querySelectorAll(":scope > .cylinder-head-measurements-item")){
+  const approved=head.querySelector(".yanmar-approved-inspection");
+  if(approved){
+   // Each original measurement sheet is already a complete page. Render it alone,
+   // without html2pdf's CSS padding algorithm or a multi-page canvas.
+   for(const sheet of approved.querySelectorAll(".yanmar-measurement-page")){
+    const chunk=shell(),copy=sheet.cloneNode(true);
+    copy.style.pageBreakBefore="auto";copy.style.breakBefore="auto";
+    chunk.setAttribute("data-pdf-fixed-page","true");
+    const heading=head.querySelector("h3");if(heading)chunk.appendChild(heading.cloneNode(true));
+    chunk.appendChild(copy);chunks.push(chunk);
+   }
+  }
   const chunk=shell(),copy=head.cloneNode(true);
+  const duplicate=copy.querySelector(".yanmar-approved-inspection");if(duplicate)duplicate.remove();
   copy.style.pageBreakBefore="auto";copy.style.breakBefore="auto";
   chunk.appendChild(copy);chunks.push(chunk);
  }
@@ -1428,7 +1448,8 @@ async function createCylinderReportPdf(element,settings){
  let pdf=null;
  for(const chunk of chunks){
   if(pdf)pdf.addPage();
-  const worker=window.html2pdf().set({...settings,enableLinks:false,...(pdf?{pdf}:{})}).from(chunk).toPdf();
+  const fixedPage=chunk.getAttribute("data-pdf-fixed-page")==="true";
+  const worker=window.html2pdf().set({...settings,enableLinks:false,...(fixedPage?{pagebreak:{mode:[]}}:{}),...(pdf?{pdf}:{})}).from(chunk).toPdf();
   pdf=await worker.get("pdf");
  }
  return pdf;
@@ -2278,12 +2299,20 @@ function lsSet(key, value) {
   }
 }
 function App() {
+  const [extraTechnicians,setExtraTechnicians]=useState(cachedTechnicianNames);
+  const [showAddTechnician,setShowAddTechnician]=useState(false);
+  const [newTechnicianName,setNewTechnicianName]=useState("");
+  const [savingTechnician,setSavingTechnician]=useState(false);
+  const [technicianError,setTechnicianError]=useState("");
+  const [technicianNotice,setTechnicianNotice]=useState("");
+  const allTechnicians=mergeTechnicianNames(extraTechnicians);
+  const allUsers=Array.from(new Set([...VOLLEDIGE_RECHTEN,...allTechnicians]));
   const [mode, setMode] = useState(() => {
     const saved=lsGet("wo_mode","kantoor");
     return ["kantoor","controle","monteur"].includes(saved)?saved:"kantoor";
   });
   const [monteurNaam, setMonteurNaam] = useState(() => lsGet("wo_monteur_naam", ""));
-  const [isLoggedIn, setIsLoggedIn] = useState(() => lsGet("wo_logged_in","")==="1" && GEBRUIKERS.includes(lsGet("wo_monteur_naam","")));
+  const [isLoggedIn, setIsLoggedIn] = useState(() => lsGet("wo_logged_in","")==="1" && [...GEBRUIKERS,...cachedTechnicianNames()].includes(lsGet("wo_monteur_naam","")));
   const [loginNaam, setLoginNaam] = useState("");
   const [loginCode, setLoginCode] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -2467,10 +2496,30 @@ function App() {
   useEffect(()=>lsSet("wo_mode", mode),[mode]);
   useEffect(()=>lsSet("wo_monteur_naam", monteurNaam),[monteurNaam]);
   useEffect(()=>lsSet("wo_logged_in", isLoggedIn?"1":"0"),[isLoggedIn]);
-  useEffect(()=>{ loadKlustypen(); loadZuigerTemplates(); loadDrijfstangTemplates(); loadKrukasTemplates(); loadPartsTemplates(); },[]);
+  useEffect(()=>{ loadTechnicians(); loadKlustypen(); loadZuigerTemplates(); loadDrijfstangTemplates(); loadKrukasTemplates(); loadPartsTemplates(); },[]);
   useEffect(()=>{ if(isLoggedIn && monteurNaam && !toegestaneModi(monteurNaam).includes(mode)){ setMode(toegestaneModi(monteurNaam)[0]||"monteur"); } },[isLoggedIn,monteurNaam,mode]);
   useEffect(()=>{ if(view!=="overzicht") return; mode==="monteur"?loadMonteurLijst():loadOverzicht(); },[view,mode,monteurNaam]);
 
+  async function loadTechnicians(){
+    try{const rows=await sb("technicians?select=name&order=name.asc");const names=(rows||[]).map(r=>r.name);setExtraTechnicians(names);lsSet("wo_extra_technicians",JSON.stringify(names));setTechnicianError("");return names;}
+    catch(e){setTechnicianError("Could not load the shared technician list. "+e.message);return null;}
+  }
+  useEffect(()=>{const refresh=()=>loadTechnicians();window.addEventListener("focus",refresh);return()=>window.removeEventListener("focus",refresh);},[]);
+  async function addTechnician(){
+    if(mode!=="controle"||!magToewijzen(monteurNaam)||savingTechnician)return;
+    const name=normaliseTechnicianName(newTechnicianName);
+    setTechnicianError("");setTechnicianNotice("");
+    if(name.length<2||name.length>80||/[\u0000-\u001f\u007f]/.test(name)){setTechnicianError("Enter a technician name of 2 to 80 characters.");return;}
+    if(allUsers.some(n=>n.toLocaleLowerCase("en")===name.toLocaleLowerCase("en"))){setTechnicianError("This name already exists. Select the existing technician above.");return;}
+    setSavingTechnician(true);
+    try{
+      const rows=await sb("technicians",{method:"POST",body:JSON.stringify({name}),prefer:"return=representation"});
+      const saved=rows?.[0]?.name;if(!saved)throw new Error("No saved technician was returned. Reload the list before trying again.");
+      const names=mergeTechnicianNames([...extraTechnicians,saved]);setExtraTechnicians(names);lsSet("wo_extra_technicians",JSON.stringify(names));
+      setNewTechnicianName("");setShowAddTechnician(false);setTechnicianNotice(saved+" added. Select the name above to assign this technician.");
+    }catch(e){setTechnicianError(/409|23505/.test(e.message)?"This name was already added. The list has been refreshed.":"Could not add technician. "+e.message);if(/409|23505/.test(e.message))loadTechnicians();}
+    finally{setSavingTechnician(false);}
+  }
   async function loadKlustypen(){
     try{
       const rows=await sb("klustypen?select=*&actief=eq.true&order=label.asc");
@@ -2801,7 +2850,7 @@ function App() {
   function countRejected(kop){let n=0;const deviation=r=>r.measured===""||r.measured==null||r.nominal===""||r.nominal==null?"":Number((parseFloat(r.measured)-Number(r.nominal)).toFixed(6));kop.seatRing.forEach(r=>{if(isRejected(r.measured,r.limit,r.direction))n++});kop.valve.forEach(r=>{if(isRejected(r.measuredQ,r.limitQ,r.directionQ||r.direction)||isRejected(r.measuredR,r.limitR,r.directionR||r.direction))n++});kop.valveStem.forEach(r=>{if(yanmarStemRejected(r)===true)n++});kop.valveGuide.forEach(r=>{if(yanmarGuideResult(kop,r)==="Rejected")n++});return n;}
 
   function login(){
-    const naam=GEBRUIKERS.find(n=>n.toLowerCase()===String(loginNaam||"").trim().toLowerCase());
+    const naam=allUsers.find(n=>n.toLowerCase()===String(loginNaam||"").trim().toLowerCase());
     if(!naam){ setLoginError("Select a valid name."); return; }
     if(String(loginCode)!=="0000"){ setLoginError("Incorrect access code."); return; }
     setMonteurNaam(naam); setIsLoggedIn(true); setLoginError(""); setLoginCode("");
@@ -2820,9 +2869,10 @@ function App() {
     React.createElement("div",{style:{width:"100%",maxWidth:390,background:"#fff",border:`1px solid ${palette.line}`,borderRadius:10,padding:24,boxShadow:"0 12px 30px rgba(0,0,0,.08)"}},
       React.createElement("h1",{style:{margin:"0 0 6px",fontSize:22}},"Nicoverken Work Orders"),
       React.createElement("div",{style:{fontSize:13,color:"#666",marginBottom:18}},"Sign in with your name and access code."),
-      React.createElement(Field,{label:"Name"},React.createElement("select",{value:loginNaam,onChange:e=>setLoginNaam(e.target.value),style:{...inputStyle,width:"100%",boxSizing:"border-box"}},React.createElement(EnglishOption,{value:""},"Select your name..."),...GEBRUIKERS.map(n=>React.createElement(EnglishOption,{key:n,value:n},n)))),
+      React.createElement(Field,{label:"Name"},React.createElement("select",{value:loginNaam,onChange:e=>setLoginNaam(e.target.value),style:{...inputStyle,width:"100%",boxSizing:"border-box"}},React.createElement(EnglishOption,{value:""},"Select your name..."),...allUsers.map(n=>React.createElement(EnglishOption,{key:n,value:n},n)))),
       React.createElement("div",{style:{height:12}}),
       React.createElement(Field,{label:"Access code"},React.createElement(TextInput,{type:"password",inputMode:"numeric",value:loginCode,onChange:e=>setLoginCode(e.target.value),onKeyDown:e=>{if(e.key==="Enter")login();},placeholder:"0000",style:{width:"100%",boxSizing:"border-box"}})),
+      technicianError&&React.createElement("div",{role:"alert",style:{fontSize:12,marginTop:8,color:"#a42b24"}},technicianError),
       loginError&&React.createElement("div",{style:{marginTop:10,color:"#b5362a",fontSize:12,fontWeight:700}},loginError),
       React.createElement("button",{onClick:login,disabled:!loginNaam||!loginCode,style:{marginTop:16,width:"100%",padding:"11px 14px",border:0,borderRadius:6,background:palette.accent,color:"#fff",fontWeight:800,cursor:"pointer"}},"Sign in")
     )
@@ -2936,7 +2986,11 @@ function App() {
 
   if(view==="werkorder"&&activeWerkorder){
     if(changingYanmarEngine)return React.createElement("div",{role:"status",style:{padding:32,fontSize:16,background:palette.bg,minHeight:"100vh"}},"Linking the report to the selected Yanmar engine type…");
-    const header=React.createElement("div",{style:{background:"#fff",borderBottom:`1px solid ${palette.line}`,padding:"14px 20px"}},React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:16,alignItems:"center",fontSize:13}},React.createElement("span",null,React.createElement("b",null,"Order "),activeWerkorder.werkopdracht?.order_nummer),React.createElement("span",null,React.createElement("b",null,"Vessel "),activeWerkorder.werkopdracht?.schip_klant),React.createElement("span",null,React.createElement("b",null,"Job type "),getKlustypeNaam(activeWerkorder.klustype)),React.createElement("span",null,React.createElement("b",null,"Engine type "),activeWerkorder.klustype==="cilinderkop"?React.createElement("select",{value:canonicalYanmarCylinderHeadType(activeWerkorder.motortype),onChange:e=>changeYanmarCylinderHeadEngine(e.target.value),disabled:saving||!canManageCylinderReports,style:{...inputStyle,padding:"5px 7px",fontSize:13,minWidth:160},"aria-label":"Yanmar engine type"},React.createElement(EnglishOption,{value:""},"Select Yanmar engine type..."),...yanmarCylinderHeadTypes().map(name=>React.createElement(EnglishOption,{key:name,value:name},name))):activeWerkorder.motortype==="-"?"":activeWerkorder.motortype),React.createElement(StatusBadge,{status:activeWerkorder.status}),React.createElement("span",{style:{color:"#999"}},saving?"saving…":"saved"),(mode==="monteur"||mode==="kantoor")&&["open","teruggestuurd"].includes(activeWerkorder.status)&&btn(activeWerkorder.status==="teruggestuurd"?"Resubmit Report":"Submit Report",indienenTerControle,{marginLeft:"auto",background:palette.accent,color:"#fff",border:"none",fontWeight:800}),mode==="kantoor"&&activeWerkorder.status==="ter_controle"&&React.createElement(React.Fragment,null,React.createElement("input",{value:terugOpmerking,onChange:e=>setTerugOpmerking(e.target.value),placeholder:"Return comment",style:{...inputStyle,marginLeft:"auto",width:220}}),btn("Return for Revision",terugsturen,{color:"#d9483a"}),heeftVolledigeRechten(monteurNaam)&&btn("Approve",goedkeuren,{background:"#3f7a4f",color:"#fff",border:"none"})),btn("← Back",()=>{setView("overzicht");setActiveWerkorder(null)})),React.createElement("div",{style:{marginTop:10,maxWidth:900}},React.createElement(WorkOrderNextAction,{order:activeWerkorder}),mode==="controle"&&magToewijzen(monteurNaam)&&React.createElement("div",{style:{marginBottom:12,padding:10,border:`1px solid ${palette.line}`,borderRadius:6,background:"#fafaf7"}},React.createElement("div",{style:{fontSize:12,fontWeight:800,marginBottom:7}},"ASSIGN TECHNICIANS"),React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6}},...MONTEURS.map(n=>{const selected=assignedWorkOrderTechnicians(activeWerkorder).includes(n);return React.createElement("button",{type:"button",key:n,onClick:()=>toggleAssignedMonteur(n),style:{padding:"6px 9px",borderRadius:16,border:`1px solid ${selected?palette.accent:palette.line}`,background:selected?"#fbeee6":"#fff",cursor:"pointer",fontWeight:selected?700:500}},selected?"✓ "+n:n)})),React.createElement("div",{style:{fontSize:11,color:"#666",marginTop:7}},"Report history: ",werkorderMonteursTekst(activeWerkorder)||"no one yet")),React.createElement("div",{style:{fontSize:12,fontWeight:700,marginBottom:4}},"WORK DESCRIPTION"),mode==="kantoor"?React.createElement("textarea",{value:activeWerkorder.werkbeschrijving||"",onChange:e=>updateWerkbeschrijving(e.target.value),rows:3,style:{...inputStyle,width:"100%",boxSizing:"border-box"}}):React.createElement("div",{style:{padding:10,border:`1px solid ${palette.line}`,borderRadius:6,background:"#fbeee6",whiteSpace:"pre-wrap"}},activeWerkorder.werkbeschrijving||"No work description")),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"150px 1fr",gap:12,marginTop:12,maxWidth:760}},React.createElement(Field,{label:"Completed"},React.createElement("label",{style:{display:"flex",gap:8,alignItems:"center",padding:"10px 0"}},React.createElement("input",{type:"checkbox",checked:!!activeWerkorder.uitgevoerd,onChange:e=>updateWerkorderMeta({uitgevoerd:e.target.checked})}),"Work completed")),React.createElement(Field,{label:"Technician remarks"},React.createElement("textarea",{rows:2,value:activeWerkorder.monteur_opmerking||"",onChange:e=>updateWerkorderMeta({monteur_opmerking:e.target.value}),style:{...inputStyle,resize:"vertical"}}))),
+    const header=React.createElement("div",{style:{background:"#fff",borderBottom:`1px solid ${palette.line}`,padding:"14px 20px"}},React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:16,alignItems:"center",fontSize:13}},React.createElement("span",null,React.createElement("b",null,"Order "),activeWerkorder.werkopdracht?.order_nummer),React.createElement("span",null,React.createElement("b",null,"Vessel "),activeWerkorder.werkopdracht?.schip_klant),React.createElement("span",null,React.createElement("b",null,"Job type "),getKlustypeNaam(activeWerkorder.klustype)),React.createElement("span",null,React.createElement("b",null,"Engine type "),activeWerkorder.klustype==="cilinderkop"?React.createElement("select",{value:canonicalYanmarCylinderHeadType(activeWerkorder.motortype),onChange:e=>changeYanmarCylinderHeadEngine(e.target.value),disabled:saving||!canManageCylinderReports,style:{...inputStyle,padding:"5px 7px",fontSize:13,minWidth:160},"aria-label":"Yanmar engine type"},React.createElement(EnglishOption,{value:""},"Select Yanmar engine type..."),...yanmarCylinderHeadTypes().map(name=>React.createElement(EnglishOption,{key:name,value:name},name))):activeWerkorder.motortype==="-"?"":activeWerkorder.motortype),React.createElement(StatusBadge,{status:activeWerkorder.status}),React.createElement("span",{style:{color:"#999"}},saving?"saving…":"saved"),(mode==="monteur"||mode==="kantoor")&&["open","teruggestuurd"].includes(activeWerkorder.status)&&btn(activeWerkorder.status==="teruggestuurd"?"Resubmit Report":"Submit Report",indienenTerControle,{marginLeft:"auto",background:palette.accent,color:"#fff",border:"none",fontWeight:800}),mode==="kantoor"&&activeWerkorder.status==="ter_controle"&&React.createElement(React.Fragment,null,React.createElement("input",{value:terugOpmerking,onChange:e=>setTerugOpmerking(e.target.value),placeholder:"Return comment",style:{...inputStyle,marginLeft:"auto",width:220}}),btn("Return for Revision",terugsturen,{color:"#d9483a"}),heeftVolledigeRechten(monteurNaam)&&btn("Approve",goedkeuren,{background:"#3f7a4f",color:"#fff",border:"none"})),btn("← Back",()=>{setView("overzicht");setActiveWerkorder(null)})),React.createElement("div",{style:{marginTop:10,maxWidth:900}},React.createElement(WorkOrderNextAction,{order:activeWerkorder}),mode==="controle"&&magToewijzen(monteurNaam)&&React.createElement("div",{style:{marginBottom:12,padding:10,border:`1px solid ${palette.line}`,borderRadius:6,background:"#fafaf7"}},React.createElement("div",{style:{fontSize:12,fontWeight:800,marginBottom:7}},"ASSIGN TECHNICIANS"),React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:6}},...allTechnicians.map(n=>{const selected=assignedWorkOrderTechnicians(activeWerkorder).includes(n);return React.createElement("button",{type:"button",key:n,onClick:()=>toggleAssignedMonteur(n),style:{padding:"6px 9px",borderRadius:16,border:`1px solid ${selected?palette.accent:palette.line}`,background:selected?"#fbeee6":"#fff",cursor:"pointer",fontWeight:selected?700:500}},selected?"✓ "+n:n)})),React.createElement("div",{style:{fontSize:11,color:"#666",marginTop:7}},"Report history: ",werkorderMonteursTekst(activeWerkorder)||"no one yet"),
+React.createElement("button",{type:"button",onClick:()=>{setShowAddTechnician(v=>!v);setTechnicianError("");setTechnicianNotice("");},style:{marginTop:10,padding:"7px 10px",border:"1px solid #bbb",borderRadius:5,background:"#fff",cursor:"pointer"}},showAddTechnician?"Cancel":"+ Add technician"),
+showAddTechnician&&React.createElement("form",{onSubmit:e=>{e.preventDefault();addTechnician();},style:{display:"flex",gap:8,alignItems:"end",flexWrap:"wrap",marginTop:10}},React.createElement(Field,{label:"Technician name"},React.createElement("input",{value:newTechnicianName,onChange:e=>setNewTechnicianName(e.target.value),maxLength:80,disabled:savingTechnician,autoFocus:true,placeholder:"Full name",style:inputStyle})),React.createElement("button",{type:"submit",disabled:savingTechnician||!normaliseTechnicianName(newTechnicianName),style:{padding:10,border:0,borderRadius:5,background:palette.accent,color:"#fff"}},savingTechnician?"Saving…":"Save technician")),
+technicianError&&React.createElement("div",{role:"alert",style:{marginTop:8,color:"#a42b24",fontSize:12}},technicianError),
+technicianNotice&&React.createElement("div",{role:"status",style:{marginTop:8,color:"#237340",fontSize:12}},technicianNotice)),React.createElement("div",{style:{fontSize:12,fontWeight:700,marginBottom:4}},"WORK DESCRIPTION"),mode==="kantoor"?React.createElement("textarea",{value:activeWerkorder.werkbeschrijving||"",onChange:e=>updateWerkbeschrijving(e.target.value),rows:3,style:{...inputStyle,width:"100%",boxSizing:"border-box"}}):React.createElement("div",{style:{padding:10,border:`1px solid ${palette.line}`,borderRadius:6,background:"#fbeee6",whiteSpace:"pre-wrap"}},activeWerkorder.werkbeschrijving||"No work description")),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"150px 1fr",gap:12,marginTop:12,maxWidth:760}},React.createElement(Field,{label:"Completed"},React.createElement("label",{style:{display:"flex",gap:8,alignItems:"center",padding:"10px 0"}},React.createElement("input",{type:"checkbox",checked:!!activeWerkorder.uitgevoerd,onChange:e=>updateWerkorderMeta({uitgevoerd:e.target.checked})}),"Work completed")),React.createElement(Field,{label:"Technician remarks"},React.createElement("textarea",{rows:2,value:activeWerkorder.monteur_opmerking||"",onChange:e=>updateWerkorderMeta({monteur_opmerking:e.target.value}),style:{...inputStyle,resize:"vertical"}}))),
       (mode==="monteur"||mode==="kantoor")&&["open","teruggestuurd"].includes(activeWerkorder.status)&&React.createElement("button",{type:"button",onClick:indienenTerControle,style:{position:"fixed",right:20,bottom:20,zIndex:9999,padding:"14px 20px",border:0,borderRadius:7,background:palette.accent,color:"#fff",fontWeight:900,fontSize:15,boxShadow:"0 5px 18px rgba(0,0,0,.25)",cursor:"pointer"}},activeWerkorder.status==="teruggestuurd"?"Resubmit Report":"Submit Report")
     );
     const controleFeedback=activeWerkorder.opmerking_controle?React.createElement("div",{style:{maxWidth:1050,margin:"10px auto 0",padding:"11px 14px",borderRadius:7,border:`1px solid ${activeWerkorder.status==="teruggestuurd"?"#d9483a":palette.line}`,background:activeWerkorder.status==="teruggestuurd"?"#fff2ee":"#fafaf7",fontSize:13,lineHeight:1.45,color:palette.ink}},
