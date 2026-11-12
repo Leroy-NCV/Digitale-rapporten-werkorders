@@ -2309,6 +2309,11 @@ const TURBO_SOURCE_DRAWINGS={"clearance": "data:image/png;base64,iVBORw0KGgoAAAA
 
 // Combined turbo record. Measurements and conclusions are entered per job; source examples are never prefilled.
 function isTurboReport(code){return /^turbo(?:_|$)/.test(String(code||""));}
+const TURBO_TYPES=["IHI RH 133","IHI RH 163","IHI RH 183","IHI RH 203"];
+function canonicalTurboType(value){
+ const match=String(value||"").trim().match(/^IHI\s*RH\s*(133|163|183|203)(?:\s*Y)?$/i);
+ return match?"IHI RH "+match[1]:"";
+}
 const TURBO_INSPECTION_ITEMS=[
  ["landing","Landing / packaging"],["plate","Specification plate"],["heatShield","Heat shield"],["sealPlate","Seal plate CMP"],["bearings","Bearings"],["filter","Filter / silencer"],
  ["shaft","Rotor shaft"],["bearingHousing","Bearing housing"],["compressorHousing","Compressor housing"],["turbineHousing","Turbine housing"],["compressorWheel","Compressor impeller"],["turbineWheel","Turbine wheel"]
@@ -2331,13 +2336,13 @@ function TurboCombinedReport({report,werkorder={},onChange,readonly=false}){
  const saved=report?.data?.turboReport||{},latest=React.useRef({data:saved,onChange});latest.current={data:saved,onChange};
  const [photoError,setPhotoError]=React.useState("");
  if(!isTurboReport(report?.rapport_type||werkorder.klustype))return null;
- const d=saved,rh=d.model==="IHI RH133 Y",h=React.createElement;
- const value=path=>path.split('.').reduce((a,k)=>a?.[k],d)??"";
+ const d=saved,model=canonicalTurboType(d.model||werkorder.motortype),rh=model==="IHI RH 133",h=React.createElement;
+ const value=path=>path==="model"?model:(path.split('.').reduce((a,k)=>a?.[k],d)??"");
  const write=(path,v)=>{if(readonly)return;const next=turboPatch(latest.current.data,path,v);latest.current.data=next;latest.current.onChange?.({turboReport:next});};
  const control=(path,label,{multiline=false,options=null}={})=>{
   const v=value(path),style={...inputStyle,width:"100%",minWidth:0,boxSizing:"border-box",fontSize:12,padding:6};
   if(readonly)return h("span",{style:{display:"block",minHeight:12,whiteSpace:"pre-wrap",overflowWrap:"anywhere",fontWeight:400}},v===""?"—":String(v));
-  if(options)return h("select",{"aria-label":label,value:v,onChange:e=>write(path,e.target.value),style},...Array.from(new Set(["",...options,v])).map(x=>h("option",{key:x,value:x},x||"—")));
+  if(options)return h("select",{"aria-label":label,value:v,onChange:e=>write(path,e.target.value),style},...Array.from(new Set(["",...options,...(path==="model"?[]:[v])])).map(x=>h("option",{key:x,value:x},x||"—")));
   return h(multiline?"textarea":"input",{"aria-label":label,value:v,rows:multiline?3:undefined,onChange:e=>write(path,e.target.value),style:{...style,...(multiline?{resize:"vertical"}:{})}});
  };
  const field=(path,label,opts={})=>h("label",{key:path,style:{display:"flex",flexDirection:"column",gap:4,minWidth:0,fontSize:readonly?9:12,fontWeight:700}},label,control(path,label,opts));
@@ -2358,14 +2363,14 @@ function TurboCombinedReport({report,werkorder={},onChange,readonly=false}){
  };
  const statusOptions=["OK","NOT OK","REPAIR REQUIRED","RENEW","N.A."];
  const specifications=h(React.Fragment,null,
-  grid(field("model","Turbocharger template",{options:["IHI RH133 Y","Other / manual specifications"]}),field("serial","Turbocharger serial no."),field("turboSpec","Turbo specification code")),
+  grid(field("model","Turbocharger template",{options:TURBO_TYPES}),field("serial","Turbocharger serial no."),field("turboSpec","Turbo specification code")),
   grid(field("rotorSpec","Rotor specification code"),field("compressorSpec","Compressor wheel specification"),field("shaftNominal","Nominal shaft size (mm)")),
   grid(field("owner","Owner"),field("vessel","Vessel"),field("engineModel","Engine model")),
   grid(field("engineNo","Engine no."),field("operatingHours","Operating hours"),field("interval","Inspection interval",{options:["2400 hours","4800 hours"]})),
   grid(field("customerRef","Customer reference"),field("inspectionDate","Inspection date"),field("inspector","Inspected by")),
   grid(...["C","D","T","H"].map(x=>field("specCodes."+x,"Spec. code "+x))),
   field("manualSpecifications","Additional specifications / applicable source",{multiline:true}),
-  note(rh?"IHI RH133 references are transcribed from the supplied record sheets. Verify applicability against the turbo specification. Previously filled findings and results are not used as defaults.":"Select IHI RH133 Y to show its source references. For another turbocharger, enter the applicable specifications; RH133 limits are not applied."));
+  note(rh?"IHI RH133 references are transcribed from the supplied record sheets. Verify applicability against the turbo specification. Previously filled findings and results are not used as defaults.":"RH133 source limits are shown only for IHI RH 133. Enter the applicable specifications for the selected turbocharger type."));
  const clearanceRows=[
   ["Thrust clearance A",rh?"Standard 0.06–0.12 mm":"See applicable specification","thrust"],
   ["Radial clearance B",rh?"Standard 0.37–0.60 mm; allowable ≤ 0.67 mm":"See applicable specification","radial"]
@@ -2381,12 +2386,12 @@ function TurboCombinedReport({report,werkorder={},onChange,readonly=false}){
   heading("Turbine rotor shaft seal-ring groove width — mm"),table(["Source reference","Before cleaning","After machining"],[[rh?"Wear limit < 2.36 mm":"See applicable specification",control("groove.before","Groove width before cleaning (mm)"),control("groove.after","Groove width after machining (mm)")]]),
   image(TURBO_SOURCE_DRAWINGS.groove,"Original seal-ring groove wear-area reference",105),field("clearanceRemarks","Clearance findings / assessment",{multiline:true}));
  const shaft=h(React.Fragment,null,
-  image(TURBO_SOURCE_DRAWINGS.shaft,"Original IHI RH133 shaft measurement positions 1, 2, 3, 4, 5 and D",175),
+  rh?image(TURBO_SOURCE_DRAWINGS.shaft,"Original IHI RH133 shaft measurement positions 1, 2, 3, 4, 5 and D",175):null,
   grid(field("shaftBeforeDate","Shaft inspection date — before repair"),field("shaftAfterDate","Shaft inspection date — after repair"),field("shaftInspector","Shaft measured by")),
   note("Enter actual diameters and runout in mm. Source diameter references are shown below; no automatic acceptance is inferred. Position D applies to rotor specification T03111 only."),
   table(["Position","Source nominal / limit","Before repair (mm)","After repair (mm)","Runout (mm)","Remarks"],["1","2","3","4","5","D"].map(pos=>[pos,rh?TURBO_SHAFT_REFERENCES[pos]:"See specification",control("shaft."+pos+".before","Shaft "+pos+" before repair (mm)"),control("shaft."+pos+".after","Shaft "+pos+" after repair (mm)"),control("shaft."+pos+".runout","Shaft "+pos+" runout (mm)"),control("shaft."+pos+".remarks","Shaft "+pos+" remarks")])),
   field("shaftFindings","Work carried out & shaft findings",{multiline:true}),
-  note("Source note: the shaft sheet states nominal shaft 19.00 mm and positions 3 / 4 as 19.30 (+0 / −0.005) mm. Its filled −0.007 remark is not used as an acceptance rule. Confirm the applicable shaft specification."));
+  rh?note("Source note: the shaft sheet states nominal shaft 19.00 mm and positions 3 / 4 as 19.30 (+0 / −0.005) mm. Its filled −0.007 remark is not used as an acceptance rule. Confirm the applicable shaft specification."):null);
  const conditions=items=>h(React.Fragment,null,...items.map(([key,label])=>h("div",{key,style:{border:"1px solid #c6d3dd",padding:readonly?8:12,marginBottom:10,pageBreakInside:"avoid"}},
   h("h4",{style:{margin:"0 0 8px",fontSize:readonly?10:13}},label),
   grid(field("inspection."+key+".before",label+" — condition before",{options:statusOptions}),field("inspection."+key+".after",label+" — condition after",{options:statusOptions})),
@@ -2425,7 +2430,7 @@ function TurboCombinedReport({report,werkorder={},onChange,readonly=false}){
    for(let i=0;i<photos.length;i+=2)pages.push([label+" — photographs / evidence",h("div",null,...photos.slice(i,i+2).map((p,j)=>h("figure",{key:j,style:{margin:"8px 0 16px",pageBreakInside:"avoid"}},image(p.image,label+" photo "+(i+j+1),350),h("figcaption",{style:{fontSize:10,whiteSpace:"pre-wrap",overflowWrap:"anywhere"}},(i+j+1)+". "+(p.caption||label)))))]);
   }
  }
- const title=rh?"IHI RH133 — COMBINED TURBOCHARGER REPORT":"COMBINED TURBOCHARGER REPORT";
+ const title=(model?model+" — ":"")+"COMBINED TURBOCHARGER REPORT";
  const page=(item,i)=>h("section",{key:i,className:readonly?"turbo-report-page":"turbo-entry-section",style:readonly?{boxSizing:"border-box",minHeight:"270mm",width:"190mm",padding:"5mm",background:"#fff",display:"flex",flexDirection:"column",fontSize:10,lineHeight:1.35,pageBreakBefore:i?"always":"auto",marginBottom:12}:{marginTop:18,padding:14,border:"1px solid #b9cbd8",borderRadius:6}},
   readonly?h(React.Fragment,null,image(NICOVERKEN_HEADER_IMAGE,"Nicoverken Engine Repair",65),h("h1",{style:{fontSize:15,color:"#145891",textAlign:"center",margin:"10px 0"}},title),
    table(["Vessel / customer","Order no.","Serial no."],[[werkorder.werkopdracht?.schip_klant||d.vessel||d.owner||"—",werkorder.werkopdracht?.order_nummer||"—",d.serial||"—"]])):null,
@@ -3123,7 +3128,7 @@ function App() {
     const code=selected?.code||selected?.naam||"";
     const cylinderPreview=isCilinderkopKlustype(code);
     const nonYanmarPreview=code==="cilinderkop_overhaul_niet_yanmar";
-    const motoren=isTurboReport(code)?["IHI RH133 Y"]:nonYanmarPreview?Object.keys(CYLINDER_HEAD_SOURCE_REFERENCE):cylinderPreview?yanmarCylinderHeadTypes():Object.keys(motorToleranties).sort((a,b)=>a.localeCompare(b,"en",{numeric:true}));
+    const motoren=isTurboReport(code)?TURBO_TYPES:nonYanmarPreview?Object.keys(CYLINDER_HEAD_SOURCE_REFERENCE):cylinderPreview?yanmarCylinderHeadTypes():Object.keys(motorToleranties).sort((a,b)=>a.localeCompare(b,"en",{numeric:true}));
     const previewMotor=nonYanmarPreview?(nonYanmarSourceKey(rapportPreviewMotor)||motoren[0]):cylinderPreview?(canonicalYanmarCylinderHeadType(rapportPreviewMotor)||motoren[0]):(motoren.includes(rapportPreviewMotor)?rapportPreviewMotor:motoren[0]);
     const toleranties=motorToleranties[previewMotor]||{};
     const cylinderPreviewHeads=cylinderPreview?[makeCylinderHeadLimits(1,previewMotor)]:[];
@@ -3151,7 +3156,7 @@ function App() {
               React.createElement("div",{style:{fontSize:12,color:"#606660",marginBottom:12}},"Report code: ",code),
               React.createElement("div",{style:{display:"flex",gap:10,flexWrap:"wrap",alignItems:"end",padding:"12px",marginBottom:12,background:"#f3f5f1",border:"1px solid #d5d8ce",borderRadius:7}},
                 React.createElement("label",{style:{fontSize:12,fontWeight:700}},isTurboReport(code)?"Turbocharger template":"Engine type",React.createElement("select",{value:previewMotor,onChange:e=>setRapportPreviewMotor(e.target.value),style:{...inputStyle,display:"block",marginTop:5,minWidth:190}},...motoren.map(m=>React.createElement(EnglishOption,{key:m,value:m},m)))),
-                React.createElement("span",{style:{fontSize:11,color:"#666",maxWidth:310}},isTurboReport(code)?"Combined RH133 template: inspection, shaft measurements and dynamic balancing. No job results are prefilled.":"Engine data comes from previously supplied inspection reports. It has not been verified against manufacturer manuals.")
+                React.createElement("span",{style:{fontSize:11,color:"#666",maxWidth:310}},isTurboReport(code)?"Combined turbocharger report: inspection, shaft measurements and dynamic balancing. No job results are prefilled.":"Engine data comes from previously supplied inspection reports. It has not been verified against manufacturer manuals.")
               ),
               code==="smeer_olie_pomp"?React.createElement("div",{style:{marginBottom:16,padding:14,border:"1px solid #d5d8ce",borderRadius:7}},
                 React.createElement("h3",{style:{margin:"0 0 6px",fontSize:15}},"Tolerance overview – "+previewMotor),
@@ -3162,7 +3167,7 @@ function App() {
               ):null,
               pistonPreview?React.createElement("div",{style:{marginBottom:12}},React.createElement("label",{style:{fontSize:12,fontWeight:700}},"Engine type / piston template"),React.createElement("select",{value:pistonPreviewTemplate?.code||"",onChange:e=>setRapportPreviewPistonTemplate(e.target.value),style:{...inputStyle,display:"block",marginTop:5,maxWidth:"100%"}},...availableMotorsForReport(zuigerTemplates,"zuiger_voor").map(t=>React.createElement(EnglishOption,{value:t.code,key:t.code},t.naam))),React.createElement("p",{style:{fontSize:11,color:"#59615a"}},"Complete preview with six pistons; no measurements or work orders are saved.")):null,
               React.createElement("div",{style:{overflowX:"auto",padding:12,background:"#e5e5e5"}},
-                cylinderPreview?React.createElement(CustomerCylinderHeadReport,{werkorder:demo,koppen:cylinderPreviewHeads,data:normaliseKopCustomerData(cylinderPreviewHeads,{})}):pistonPreview?React.createElement(CustomerPistonReport,{werkorder:{...demo,motortype:pistonPreviewTemplate?.naam||""},rapporten:pistonPreviewReports,template:pistonPreviewTemplate}):React.createElement(CustomerGenericReport,{werkorder:demo,label:selected.label||selected.naam,componentRapport:{rapport_type:code,data:isTurboReport(code)?{turboReport:{model:"IHI RH133 Y"}}:code==="smeer_olie_pomp"?{loPump:{tolerantieMotortype:previewMotor}}:{}}})
+                cylinderPreview?React.createElement(CustomerCylinderHeadReport,{werkorder:demo,koppen:cylinderPreviewHeads,data:normaliseKopCustomerData(cylinderPreviewHeads,{})}):pistonPreview?React.createElement(CustomerPistonReport,{werkorder:{...demo,motortype:pistonPreviewTemplate?.naam||""},rapporten:pistonPreviewReports,template:pistonPreviewTemplate}):React.createElement(CustomerGenericReport,{werkorder:demo,label:selected.label||selected.naam,componentRapport:{rapport_type:code,data:isTurboReport(code)?{turboReport:{model:previewMotor}}:code==="smeer_olie_pomp"?{loPump:{tolerantieMotortype:previewMotor}}:{}}})
               ),
               !cylinderPreview&&!pistonPreview&&!isTurboReport(code)&&!["voeringen_voor","voeringen_na","smeer_olie_pomp"].includes(code)?React.createElement("p",{style:{fontSize:12,color:"#777"}},"This is the general customer view. Specific measurement forms are being integrated."):null
             ):React.createElement("p",null,"No report types have been loaded yet.")
@@ -3209,7 +3214,7 @@ function App() {
     )
   ),
   worDraft.rapportTemplateCode==="__manual__"&&React.createElement(Field,{label:"Manual engine type"},React.createElement(TextInput,{value:worDraft.motortype,onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),placeholder:"Enter engine type"}))
-):String(worDraft.klustype||"").startsWith("governor")?React.createElement(Field,{label:"Governor type"},React.createElement("select",{value:worDraft.motortype||"",onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),style:inputStyle},...["","RHD 6","RHD 10","NZ61"].map(t=>React.createElement(EnglishOption,{key:t,value:t},t||"— Select governor type —")))):React.createElement(Field,{label:"Engine type"},React.createElement(React.Fragment,null,
+):isTurboReport(worDraft.klustype)?React.createElement(Field,{label:"Turbocharger type"},React.createElement("select",{value:canonicalTurboType(worDraft.motortype),onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),style:inputStyle,"aria-label":"Turbocharger type"},React.createElement(EnglishOption,{value:""},"Select turbocharger type..."),...TURBO_TYPES.map(t=>React.createElement(EnglishOption,{key:t,value:t},t)))):String(worDraft.klustype||"").startsWith("governor")?React.createElement(Field,{label:"Governor type"},React.createElement("select",{value:worDraft.motortype||"",onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),style:inputStyle},...["","RHD 6","RHD 10","NZ61"].map(t=>React.createElement(EnglishOption,{key:t,value:t},t||"— Select governor type —")))):React.createElement(Field,{label:"Engine type"},React.createElement(React.Fragment,null,
   worDraft.klustype==="cilinderkop"?React.createElement("select",{value:canonicalYanmarCylinderHeadType(worDraft.motortype),onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),style:inputStyle,"aria-label":"Yanmar engine type"},React.createElement(EnglishOption,{value:""},"Select Yanmar engine type..."),...yanmarCylinderHeadTypes().map(name=>React.createElement(EnglishOption,{key:name,value:name},name))):React.createElement(React.Fragment,null,
   React.createElement("input",{list:"draft-engine-type-list",value:worDraft.motortype,onChange:e=>setWorDraft({...worDraft,motortype:e.target.value}),placeholder:"Select or enter engine type",style:inputStyle}),
   React.createElement("datalist",{id:"draft-engine-type-list"},...(worDraft.klustype==="cilinderkop_overhaul_niet_yanmar"?Object.keys(CYLINDER_HEAD_SOURCE_REFERENCE):availableMotorsForReport(engineTypeOptions,worDraft.klustype)).map(x=>React.createElement(EnglishOption,{key:x,value:x}))))
