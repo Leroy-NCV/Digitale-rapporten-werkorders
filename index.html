@@ -2318,6 +2318,13 @@ const TURBO_INSPECTION_ITEMS=[
  ["landing","Landing / packaging"],["plate","Specification plate"],["heatShield","Heat shield"],["sealPlate","Seal plate CMP"],["bearings","Bearings"],["filter","Filter / silencer"],
  ["shaft","Rotor shaft"],["bearingHousing","Bearing housing"],["compressorHousing","Compressor housing"],["turbineHousing","Turbine housing"],["compressorWheel","Compressor impeller"],["turbineWheel","Turbine wheel"]
 ];
+// Supplied workbook, Blad1: F25–F32, F37/F39/F41 and F46–F48. Standard ranges are not wear limits.
+const TURBO_CLEARANCE_REFERENCES={
+ "IHI RH 133":{thrust:"0.06–0.12",radial:"0.37–0.60",radialAllowable:"0.67",casing:"0.75 × 2 = 1.50",groove:"2.36"},
+ "IHI RH 163":{thrust:"0.06–0.12",radial:"0.45–0.60",radialAllowable:"0.80",casing:"0.70 × 2 = 1.40",groove:"2.36"},
+ "IHI RH 183":{thrust:"0.08–0.15",radial:"0.45–0.60",radialAllowable:"0.80",casing:"0.90 × 2 = 1.80",groove:"3.37"},
+ "IHI RH 203":{thrust:"0.08–0.15",radial:"0.45–0.60",radialAllowable:"0.80",casing:"0.90 × 2 = 1.80",groove:"3.37"}
+};
 const TURBO_SHAFT_REFERENCES={"1":"12.00 mm","2":"14.00 mm","3":"19.30 mm (+0 / −0.005)","4":"19.30 mm (+0 / −0.005)","5":"Max. 2.36 mm","D":"108.3 mm — rotor T03111 only"};
 const TURBO_SOURCE_FILES=["Record sheet IHI RH 133 TC (before).xlsx","IHI RH 133 Shaft inspection (before).doc","IHI RH 133 Dynamic Balancing report.doc"];
 function turboPatch(data,path,value){
@@ -2336,7 +2343,7 @@ function TurboCombinedReport({report,werkorder={},onChange,readonly=false}){
  const saved=report?.data?.turboReport||{},latest=React.useRef({data:saved,onChange});latest.current={data:saved,onChange};
  const [photoError,setPhotoError]=React.useState("");
  if(!isTurboReport(report?.rapport_type||werkorder.klustype))return null;
- const d=saved,model=canonicalTurboType(d.model||werkorder.motortype),rh=model==="IHI RH 133",h=React.createElement;
+ const d=saved,model=canonicalTurboType(d.model||werkorder.motortype),rh=model==="IHI RH 133",reference=TURBO_CLEARANCE_REFERENCES[model],h=React.createElement;
  const value=path=>path==="model"?model:(path.split('.').reduce((a,k)=>a?.[k],d)??"");
  const write=(path,v)=>{if(readonly)return;const next=turboPatch(latest.current.data,path,v);latest.current.data=next;latest.current.onChange?.({turboReport:next});};
  const control=(path,label,{multiline=false,options=null}={})=>{
@@ -2370,10 +2377,10 @@ function TurboCombinedReport({report,werkorder={},onChange,readonly=false}){
   grid(field("customerRef","Customer reference"),field("inspectionDate","Inspection date"),field("inspector","Inspected by")),
   grid(...["C","D","T","H"].map(x=>field("specCodes."+x,"Spec. code "+x))),
   field("manualSpecifications","Additional specifications / applicable source",{multiline:true}),
-  note(rh?"IHI RH133 references are transcribed from the supplied record sheets. Verify applicability against the turbo specification. Previously filled findings and results are not used as defaults.":"RH133 source limits are shown only for IHI RH 133. Enter the applicable specifications for the selected turbocharger type."));
+  note(reference?model+" clearance references are transcribed from the supplied turbocharger maintenance record sheet (Blad1). Standard clearances and allowable / wear limits are labelled separately. Verify applicability against the turbo specification. Previously filled findings and results are not used as defaults.":"Select the turbocharger type to show its clearance references."));
  const clearanceRows=[
-  ["Thrust clearance A",rh?"Standard 0.06–0.12 mm":"See applicable specification","thrust"],
-  ["Radial clearance B",rh?"Standard 0.37–0.60 mm; allowable ≤ 0.67 mm":"See applicable specification","radial"]
+  ["Thrust clearance A",reference?"Standard "+reference.thrust+" mm":"Select turbocharger type","thrust"],
+  ["Radial clearance B",reference?"Standard "+reference.radial+" mm; allowable ≤ "+reference.radialAllowable+" mm":"Select turbocharger type","radial"]
  ].map(([label,spec,key])=>[label,spec,control("clearance."+key+".before",label+" before disassembly (mm)"),control("clearance."+key+".after",label+" after disassembly (mm)")]);
  const casingRows=["r1","r2","r3","r4"].map(key=>[key.toUpperCase(),control("casing.before."+key,key.toUpperCase()+" before disassembly (mm)"),control("casing.after."+key,key.toUpperCase()+" after disassembly (mm)")]);
  const casingBefore=turboCasingResults(d.casing?.before),casingAfter=turboCasingResults(d.casing?.after);
@@ -2381,9 +2388,9 @@ function TurboCombinedReport({report,werkorder={},onChange,readonly=false}){
   grid(field("clearanceDate","Clearance measurement date"),field("clearanceInspector","Measured by")),
   heading("T/C clearances — mm"),image(TURBO_SOURCE_DRAWINGS.clearance,"Original IHI record-sheet clearance positions A and B",100),table(["Measurement","Source reference","Before disassembly","After disassembly"],clearanceRows),
   heading("Exhaust casing clearance — mm"),image(TURBO_SOURCE_DRAWINGS.casing,"Original record-sheet positions R1, R2, R3, R4",110),
-  note(rh?"RH133 source limit: 0.75 × 2 = 1.50 mm. The source records R1 + R3, R2 + R4 and the mean of the pair sums.":"Record the applicable casing clearance limit in specifications."),
+  note(reference?model+" source limit: "+reference.casing+" mm. The source records R1 + R3, R2 + R4 and the mean of the pair sums.":"Select the turbocharger type to show its casing clearance limit."),
   table(["Position","Before disassembly","After disassembly"],casingRows.concat([["R1 + R3",casingBefore.r13,casingAfter.r13],["R2 + R4",casingBefore.r24,casingAfter.r24],["Mean of pair sums",casingBefore.mean,casingAfter.mean]])),
-  heading("Turbine rotor shaft seal-ring groove width — mm"),table(["Source reference","Before cleaning","After machining"],[[rh?"Wear limit < 2.36 mm":"See applicable specification",control("groove.before","Groove width before cleaning (mm)"),control("groove.after","Groove width after machining (mm)")]]),
+  heading("Turbine rotor shaft seal-ring groove width — mm"),table(["Source reference","Before cleaning","After machining"],[[reference?"Wear limit < "+reference.groove+" mm":"Select turbocharger type",control("groove.before","Groove width before cleaning (mm)"),control("groove.after","Groove width after machining (mm)")]]),
   image(TURBO_SOURCE_DRAWINGS.groove,"Original seal-ring groove wear-area reference",105),field("clearanceRemarks","Clearance findings / assessment",{multiline:true}));
  const shaft=h(React.Fragment,null,
   rh?image(TURBO_SOURCE_DRAWINGS.shaft,"Original IHI RH133 shaft measurement positions 1, 2, 3, 4, 5 and D",175):null,
@@ -2391,7 +2398,7 @@ function TurboCombinedReport({report,werkorder={},onChange,readonly=false}){
   note("Enter actual diameters and runout in mm. Source diameter references are shown below; no automatic acceptance is inferred. Position D applies to rotor specification T03111 only."),
   table(["Position","Source nominal / limit","Before repair (mm)","After repair (mm)","Runout (mm)","Remarks"],["1","2","3","4","5","D"].map(pos=>[pos,rh?TURBO_SHAFT_REFERENCES[pos]:"See specification",control("shaft."+pos+".before","Shaft "+pos+" before repair (mm)"),control("shaft."+pos+".after","Shaft "+pos+" after repair (mm)"),control("shaft."+pos+".runout","Shaft "+pos+" runout (mm)"),control("shaft."+pos+".remarks","Shaft "+pos+" remarks")])),
   field("shaftFindings","Work carried out & shaft findings",{multiline:true}),
-  rh?note("Source note: the shaft sheet states nominal shaft 19.00 mm and positions 3 / 4 as 19.30 (+0 / −0.005) mm. Its filled −0.007 remark is not used as an acceptance rule. Confirm the applicable shaft specification."):null);
+  rh?note("Source note: the shaft sheet states nominal shaft 19.00 mm and positions 3 / 4 as 19.30 (+0 / −0.005) mm. Its filled −0.007 remark is not used as an acceptance rule. Confirm the applicable shaft specification."):note("Shaft diameter and runout limits for this turbocharger type are not specified in the supplied sources. Record the applicable specifications separately."));
  const conditions=items=>h(React.Fragment,null,...items.map(([key,label])=>h("div",{key,style:{border:"1px solid #c6d3dd",padding:readonly?8:12,marginBottom:10,pageBreakInside:"avoid"}},
   h("h4",{style:{margin:"0 0 8px",fontSize:readonly?10:13}},label),
   grid(field("inspection."+key+".before",label+" — condition before",{options:statusOptions}),field("inspection."+key+".after",label+" — condition after",{options:statusOptions})),
